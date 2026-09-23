@@ -5,6 +5,12 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 ## [Unreleased]
 
 ### Added
+- Admin-Systemdashboard mit Benutzer-, DB-, Queue-, Cron- und Audit-Status
+- PWA-Manifest, Service Worker, Offline-Fallback und SVG-App-Icon
+- sicherer Static-Cache ohne Speicherung privater Navigationsantworten
+- MySQL-Integrationstest-Workflow in GitHub Actions
+- Integrationstests für Migrationen, Registrierung, Login, Permissions, Rate-Limit, Audit und Queue
+- rollenbezogene Basiszuweisungen für Admin-, Moderator- und Behördenrollen
 - HMAC-signiertes, verkettetes Audit-System mit Integritätsprüfung
 - Auditierung von Registrierung, Login, Logout, E-Mail-Verifikation und Passwort-Reset
 - DB-basierte Jobqueue mit Prioritäten, Retry, Backoff und Locking
@@ -30,6 +36,7 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 - CSRF-Schutz für Installations- und Authentifizierungsformulare
 
 ### Changed
+- Dashboard zeigt Administration nur bei serverseitig bestätigter `admin.system`-Permission
 - Bootstrap lädt zentrale Anwendungskonfiguration und sichere Sessionparameter
 - Application stellt Datenbankverbindung lazy bereit
 - Startseite leitet vor der Installation auf /install und danach auf /dashboard um

@@ -45,7 +45,7 @@ final class DashboardController
         return Response::html($this->view->render('dashboard/index', [
             'user' => $user,
             'csrf' => Csrf::token(),
-            'isSuperAdmin' => $permissions->hasRole($id, 'SUPER_ADMIN'),
+            'canAdmin' => $permissions->can($id, 'admin.system'),
         ]));
     }
 }

@@ -96,3 +96,26 @@ php cron.php queue
 `queue` verarbeitet verfügbare Jobs über die DB-basierte Queue. Fachliche Job-Handler werden durch spätere Module registriert.
 
 Auf Shared Hosting können diese Befehle über reguläre Cronjobs aufgerufen werden. Jeder Lauf wird mit Status, Start-/Endzeit sowie Fehler- und Verarbeitungszähler protokolliert.
+
+
+## Tests
+
+Neben PHP-Lint und Repository-Sicherheitsprüfungen läuft ein echter MySQL-Integrationstest in GitHub Actions. Er prüft unter anderem:
+
+- vollständige Migrationen
+- Registrierung und Login
+- USER-/Admin-Permissions
+- Login-Rate-Limiting
+- Audit-Kettenintegrität
+- Jobqueue Claim/Complete
+
+Lokal kann der Foundation-Test gegen eine konfigurierte Testdatenbank ausgeführt werden:
+
+```bash
+php database/migrate.php migrate
+php tests/run.php
+```
+
+## PWA
+
+Die Anwendung enthält eine PWA-Grundlage mit Manifest, Service Worker und Offline-Fallback. Private Navigationsantworten werden bewusst nicht im Cache persistiert. Offline-Entwürfe mit IndexedDB folgen zusammen mit dem Meldungsworkflow.
