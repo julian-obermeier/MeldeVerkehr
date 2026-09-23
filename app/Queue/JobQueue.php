@@ -53,9 +53,14 @@ final class JobQueue
             $stmt = $this->pdo->query(
                 'SELECT *
                  FROM jobs
-                 WHERE status IN ("PENDING", "RETRY")
-                   AND available_at <= UTC_TIMESTAMP()
-                   AND (locked_at IS NULL OR locked_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL 30 MINUTE))
+                 WHERE (
+                        status IN ("PENDING", "RETRY")
+                        AND available_at <= UTC_TIMESTAMP()
+                       )
+                    OR (
+                        status = "RUNNING"
+                        AND locked_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL 30 MINUTE)
+                       )
                  ORDER BY priority DESC, id ASC
                  LIMIT 1
                  FOR UPDATE'
