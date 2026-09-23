@@ -71,7 +71,7 @@ final class InstallerService
             'MAIL_USERNAME' => '',
             'MAIL_PASSWORD' => '',
             'MAIL_ENCRYPTION' => 'tls',
-            'MAIL_FROM_ADDRESS' => '',
+            'MAIL_FROM_ADDRESS' => strtolower(trim((string) $admin['email'])),
             'MAIL_FROM_NAME' => $app['name'],
             'IMAP_HOST' => '',
             'IMAP_PORT' => '993',
