@@ -1,0 +1,28 @@
+name: Bug
+description: Fehler in MeldeVerkehr melden
+title: "[BUG] "
+labels: []
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Beschreibung
+      description: Was funktioniert nicht?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Schritte zur Reproduktion
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Erwartetes Verhalten
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version/Commit
