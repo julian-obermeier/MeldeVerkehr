@@ -1,0 +1,24 @@
+name: PHP Lint
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+      - name: Lint PHP files
+        run: |
+          set -e
+          files=$(find . -type f -name '*.php' -not -path './storage/*')
+          if [ -z "$files" ]; then
+            echo "No PHP files yet."
+            exit 0
+          fi
+          while IFS= read -r file; do php -l "$file"; done <<< "$files"
