@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use MeldeVerkehr\Auth\AuthController;
+use MeldeVerkehr\Auth\DashboardController;
 use MeldeVerkehr\Core\Application;
 use MeldeVerkehr\Http\Request;
 use MeldeVerkehr\Http\Response;
@@ -19,14 +21,34 @@ $app->router()->get('/install/admin', [$installer, 'adminForm']);
 $app->router()->post('/install/admin', [$installer, 'install']);
 $app->router()->get('/install/complete', [$installer, 'complete']);
 
+if ($installerService->isInstalled()) {
+    $auth = new AuthController($app);
+    $dashboard = new DashboardController($app);
+
+    $app->router()->get('/register', [$auth, 'registerForm']);
+    $app->router()->post('/register', [$auth, 'register']);
+    $app->router()->get('/login', [$auth, 'loginForm']);
+    $app->router()->post('/login', [$auth, 'login']);
+    $app->router()->post('/logout', [$auth, 'logout']);
+
+    $app->router()->get('/verify-email', [$auth, 'verify']);
+    $app->router()->get('/verify-email/pending', [$auth, 'verificationPending']);
+    $app->router()->post('/verify-email/resend', [$auth, 'resendVerification']);
+
+    $app->router()->get('/forgot-password', [$auth, 'forgotForm']);
+    $app->router()->post('/forgot-password', [$auth, 'forgot']);
+    $app->router()->get('/reset-password', [$auth, 'resetForm']);
+    $app->router()->post('/reset-password', [$auth, 'reset']);
+
+    $app->router()->get('/dashboard', [$dashboard, 'index']);
+}
+
 $app->router()->get('/', static function (Request $request) use ($installerService): Response {
     if (!$installerService->isInstalled()) {
         return Response::redirect('/install');
     }
 
-    return Response::html(
-        '<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MeldeVerkehr</title></head><body><main><h1>MeldeVerkehr</h1><p>Die technische Basis ist aktiv.</p></main></body></html>'
-    );
+    return Response::redirect('/dashboard');
 });
 
 $app->router()->get('/health', static function (Request $request) use ($installerService): Response {
