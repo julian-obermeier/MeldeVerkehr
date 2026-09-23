@@ -2,6 +2,7 @@
 .env.local
 .env.*.local
 
+/storage/app/*
 /storage/logs/*
 /storage/backups/*
 /storage/evidence/*
@@ -10,6 +11,7 @@
 /storage/cache/*
 /storage/tmp/*
 
+!/storage/app/.gitkeep
 !/storage/logs/.gitkeep
 !/storage/backups/.gitkeep
 !/storage/evidence/.gitkeep
