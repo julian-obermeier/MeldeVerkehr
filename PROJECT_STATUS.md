@@ -22,31 +22,37 @@ M1 – Fundament
 - /health-Endpunkt
 - Shared-Hosting-.htaccess-Schutz
 - private Storage-Grundstruktur
+- typisiertes Konfigurationssystem auf Basis von .env + config/*.php
+- sicherer PDO-Datenbank-Layer
+- versionierte Migration-Engine inklusive CLI-Befehl
+- Initialmigrationen für Benutzer, Rollen, Permissions und Einstellungen
+- zweistufiger Webinstaller unter /install
+- Datenbank-Verbindungstest im Installer
+- Superadmin-Erstellung mit password_hash()
+- Installations-Lock und automatische Sperre von /install
+- CSRF-Schutz im Installer
 
 ## In Arbeit
-- vollständige Repository-Grundstruktur
-- Konfigurationssystem
-- automatisierte Tests für Bootstrap/Router
+- automatisierte Tests für Bootstrap, Config, Migrationen und Installer
+- weitere M1-Sicherheits- und Authentifizierungsfunktionen
 
 ## Offen in M1
-- Datenbank-Layer
-- Migration-System
-- Webinstaller
-- Authentifizierung
+- vollständige Authentifizierung
 - E-Mail-Verifikation
-- Rollen und Permissions
+- Rollen- und Permission-Service
 - Audit-System
 - DB-basierte Queue
 - Cron-System und Heartbeats
 - Admin-Basis
 - Bürger-Dashboard
 - PWA-Grundstruktur
-- Testinfrastruktur
+- vollständige Testinfrastruktur
 
 ## Bekannte Einschränkungen
-- Noch keine Datenbank oder Authentifizierung.
-- Der Router unterstützt im ersten Grundgerüst nur exakt registrierte Pfade; parametrisierte Routen folgen im M1-Ausbau.
-- CI-Syntaxprüfung ist eingerichtet; weitere Testworkflows folgen mit der Testinfrastruktur.
+- Der Router unterstützt aktuell nur exakt registrierte Pfade; parametrisierte Routen folgen im M1-Ausbau.
+- Der Webinstaller benötigt eine bereits angelegte MySQL/MariaDB-Datenbank und passende Zugangsdaten.
+- SMTP/IMAP werden erst nach Installation konfiguriert.
+- CI-Syntaxprüfung ist eingerichtet; funktionale Tests folgen mit der Testinfrastruktur.
 
 ## Nächster Schritt
-Konfigurations- und Datenbank-Layer sowie Migration-System implementieren.
+Authentifizierung, E-Mail-Verifikation und das zentrale Rollen-/Permission-System implementieren.
