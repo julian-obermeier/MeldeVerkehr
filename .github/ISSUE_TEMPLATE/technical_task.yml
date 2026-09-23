@@ -1,0 +1,19 @@
+name: Technical Task
+description: Architektur-, Datenbank- oder Infrastrukturaufgabe
+title: "[TECH] "
+labels: []
+body:
+  - type: textarea
+    id: task
+    attributes:
+      label: Aufgabe
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Auswirkungen / Abhängigkeiten
+  - type: textarea
+    id: done
+    attributes:
+      label: Definition of Done
