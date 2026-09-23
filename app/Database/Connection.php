@@ -56,10 +56,16 @@ final class Connection
 
     private static function validate(array $config): void
     {
-        foreach (['host', 'port', 'database', 'username'] as $key) {
+        foreach (['host', 'database', 'username'] as $key) {
             if (!isset($config[$key]) || trim((string) $config[$key]) === '') {
                 throw new \InvalidArgumentException(sprintf('Database configuration "%s" is required.', $key));
             }
+        }
+
+        $port = (int) ($config['port'] ?? 0);
+
+        if ($port < 1 || $port > 65535) {
+            throw new \InvalidArgumentException('Database port must be between 1 and 65535.');
         }
     }
 }
