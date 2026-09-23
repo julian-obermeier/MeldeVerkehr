@@ -81,3 +81,18 @@ Migrationen können bei vorhandenem CLI-Zugriff zusätzlich ausgeführt werden m
 php database/migrate.php migrate
 php database/migrate.php status
 ```
+
+
+## Cronjobs
+
+Die M1-Infrastruktur stellt einen CLI-Einstiegspunkt bereit:
+
+```bash
+php cron.php health
+php cron.php queue
+```
+
+`health` schreibt einen erfolgreichen Heartbeat in `cron_runs`.  
+`queue` verarbeitet verfügbare Jobs über die DB-basierte Queue. Fachliche Job-Handler werden durch spätere Module registriert.
+
+Auf Shared Hosting können diese Befehle über reguläre Cronjobs aufgerufen werden. Jeder Lauf wird mit Status, Start-/Endzeit sowie Fehler- und Verarbeitungszähler protokolliert.
