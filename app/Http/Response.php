@@ -27,6 +27,15 @@ final class Response
         );
     }
 
+    public static function redirect(string $location, int $status = 302): self
+    {
+        if (!str_starts_with($location, '/') && !preg_match('#^https?://#i', $location)) {
+            throw new \InvalidArgumentException('Redirect location must be absolute or root-relative.');
+        }
+
+        return new self('', $status, ['Location' => $location]);
+    }
+
     public function send(): void
     {
         http_response_code($this->status);
