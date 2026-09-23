@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MeldeVerkehr\Core;
 
+use MeldeVerkehr\Config\Config;
 use MeldeVerkehr\Http\Request;
 use MeldeVerkehr\Http\Response;
 use MeldeVerkehr\Routing\Router;
@@ -13,6 +14,7 @@ final class Application
 {
     public function __construct(
         private readonly Router $router,
+        private readonly Config $config,
         private readonly string $basePath,
         private readonly bool $debug = false
     ) {
@@ -21,6 +23,16 @@ final class Application
     public function router(): Router
     {
         return $this->router;
+    }
+
+    public function config(): Config
+    {
+        return $this->config;
+    }
+
+    public function basePath(): string
+    {
+        return $this->basePath;
     }
 
     public function run(Request $request): void
