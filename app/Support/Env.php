@@ -32,13 +32,7 @@ final class Env
                 continue;
             }
 
-            if (
-                (str_starts_with($value, '"') && str_ends_with($value, '"')) ||
-                (str_starts_with($value, "'") && str_ends_with($value, "'"))
-            ) {
-                $value = substr($value, 1, -1);
-            }
-
+            $value = self::decodeValue($value);
             self::$values[$key] = $value;
 
             if (getenv($key) === false) {
@@ -68,5 +62,18 @@ final class Env
         }
 
         return filter_var($value, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE) ?? $default;
+    }
+
+    private static function decodeValue(string $value): string
+    {
+        if (strlen($value) >= 2 && str_starts_with($value, '"') && str_ends_with($value, '"')) {
+            return stripcslashes(substr($value, 1, -1));
+        }
+
+        if (strlen($value) >= 2 && str_starts_with($value, "'") && str_ends_with($value, "'")) {
+            return substr($value, 1, -1);
+        }
+
+        return $value;
     }
 }
