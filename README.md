@@ -62,3 +62,22 @@ M1 Fundament → M2 Bürgerportal → M3 Beweissystem → M4 Behördenrouting �
 ## Status
 
 Das Repository befindet sich im initialen Aufbau. Siehe `PROJECT_STATUS.md`.
+
+
+## Installation (Entwicklungsstand)
+
+1. Repository auf den Webspace deployen.
+2. Domain nach Möglichkeit auf `public/` zeigen lassen. Alternativ greift die Root-`.htaccess`.
+3. Schreibrechte für das Projektverzeichnis (zur Erzeugung von `.env`) und `storage/` sicherstellen.
+4. Eine leere MySQL-/MariaDB-Datenbank anlegen.
+5. `/install` im Browser öffnen.
+6. Systemcheck durchführen und Datenbankzugang testen.
+7. Anwendungsdaten und ersten Superadministrator anlegen.
+8. Nach erfolgreicher Installation wird `/install` automatisch gesperrt.
+
+Migrationen können bei vorhandenem CLI-Zugriff zusätzlich ausgeführt werden mit:
+
+```bash
+php database/migrate.php migrate
+php database/migrate.php status
+```

@@ -1,0 +1,1 @@
+<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Installer gesperrt</title></head><body><main><h1>Installer gesperrt</h1><p>MeldeVerkehr wurde bereits installiert. Aus Sicherheitsgründen ist <code>/install</code> nicht mehr verfügbar.</p><p><a href="/">Zur Anwendung</a></p></main></body></html>
