@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use MeldeVerkehr\Admin\AdminController;
 use MeldeVerkehr\Auth\AuthController;
 use MeldeVerkehr\Auth\DashboardController;
 use MeldeVerkehr\Core\Application;
@@ -24,6 +25,7 @@ $app->router()->get('/install/complete', [$installer, 'complete']);
 if ($installerService->isInstalled()) {
     $auth = new AuthController($app);
     $dashboard = new DashboardController($app);
+    $admin = new AdminController($app);
 
     $app->router()->get('/register', [$auth, 'registerForm']);
     $app->router()->post('/register', [$auth, 'register']);
@@ -41,6 +43,7 @@ if ($installerService->isInstalled()) {
     $app->router()->post('/reset-password', [$auth, 'reset']);
 
     $app->router()->get('/dashboard', [$dashboard, 'index']);
+    $app->router()->get('/admin', [$admin, 'index']);
 }
 
 $app->router()->get('/', static function (Request $request) use ($installerService): Response {
