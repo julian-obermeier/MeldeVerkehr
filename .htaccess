@@ -1,0 +1,15 @@
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    RewriteRule ^(?:\.env|\.git)(?:/|$) - [F,L,NC]
+    RewriteRule ^(?:app|bootstrap|config|database|storage|tests|docs|cron|update)(?:/|$) - [F,L,NC]
+
+    RewriteCond %{REQUEST_URI} !^/public/
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
+
+<FilesMatch "^(?:\.env|composer\.(?:json|lock)|PROJECT_STATUS\.md|CHANGELOG\.md|SECURITY\.md|CONTRIBUTING\.md|AGENTS\.md)$">
+    Require all denied
+</FilesMatch>
