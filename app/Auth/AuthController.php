@@ -55,6 +55,14 @@ final class AuthController
 
         try {
             $user = (new AuthService($this->app->database()))->register($data);
+            $this->audit()->log(
+                'USER_REGISTERED',
+                'user',
+                (string) $user['id'],
+                'USER',
+                (string) $user['id'],
+                $this->auditMetadata()
+            );
             $this->auth->login((string) $user['id']);
             Csrf::rotate();
 
@@ -102,6 +110,14 @@ final class AuthController
         $key = $limiter->keyFor($email, $ip);
 
         if ($limiter->blocked($key)) {
+            $this->audit()->log(
+                'LOGIN_BLOCKED',
+                'user',
+                null,
+                'ANONYMOUS',
+                null,
+                $this->auditMetadata(['email_hash' => $this->emailHash($email)])
+            );
             return $this->loginError('Zu viele fehlgeschlagene Anmeldeversuche. Bitte später erneut versuchen.', $email, 429);
         }
 
@@ -109,12 +125,28 @@ final class AuthController
 
         if ($user === null) {
             $limiter->hit($key);
+            $this->audit()->log(
+                'LOGIN_FAILED',
+                'user',
+                null,
+                'ANONYMOUS',
+                null,
+                $this->auditMetadata(['email_hash' => $this->emailHash($email)])
+            );
             return $this->loginError('E-Mail-Adresse oder Passwort ist nicht korrekt.', $email, 422);
         }
 
         $limiter->clear($key);
         $this->auth->login((string) $user['id']);
         Csrf::rotate();
+        $this->audit()->log(
+            'LOGIN_SUCCESS',
+            'user',
+            (string) $user['id'],
+            'USER',
+            (string) $user['id'],
+            $this->auditMetadata()
+        );
 
         if ($user['email_verified_at'] === null) {
             return Response::redirect('/verify-email/pending');
@@ -127,6 +159,19 @@ final class AuthController
     {
         if (!Csrf::validate((string) $request->input('_csrf', ''))) {
             return $this->csrfError();
+        }
+
+        $userId = $this->auth->id();
+
+        if ($userId !== null) {
+            $this->audit()->log(
+                'LOGOUT',
+                'user',
+                $userId,
+                'USER',
+                $userId,
+                $this->auditMetadata()
+            );
         }
 
         $this->auth->logout();
@@ -191,6 +236,15 @@ final class AuthController
         if (!$this->auth->check()) {
             $this->auth->login($userId);
         }
+
+        $this->audit()->log(
+            'EMAIL_VERIFIED',
+            'user',
+            $userId,
+            'USER',
+            $userId,
+            $this->auditMetadata()
+        );
 
         return Response::html($this->view->render('auth/result', [
             'title' => 'E-Mail bestätigt',
@@ -264,6 +318,15 @@ final class AuthController
             return $this->resetError($token, 'Der Link ist ungültig oder abgelaufen.');
         }
 
+        $this->audit()->log(
+            'PASSWORD_RESET',
+            'user',
+            null,
+            'ANONYMOUS',
+            null,
+            $this->auditMetadata(['token_hash' => hash('sha256', $token)])
+        );
+
         $_SESSION['flash_auth'] = 'Das Passwort wurde geändert. Du kannst dich jetzt anmelden.';
 
         return Response::redirect('/login');
@@ -332,6 +395,31 @@ final class AuthController
             'link' => '/login',
             'linkText' => 'Zum Login',
         ]), 419);
+    }
+
+    private function audit(): AuditLogger
+    {
+        return new AuditLogger(
+            $this->app->database(),
+            (string) $this->app->config()->get('app.key', 'meldeverkehr')
+        );
+    }
+
+    private function auditMetadata(array $extra = []): array
+    {
+        return array_merge(
+            AuditContext::requestMetadata((string) $this->app->config()->get('app.key', 'meldeverkehr')),
+            $extra
+        );
+    }
+
+    private function emailHash(string $email): string
+    {
+        return hash_hmac(
+            'sha256',
+            strtolower(trim($email)),
+            (string) $this->app->config()->get('app.key', 'meldeverkehr')
+        );
     }
 
     private function pullFlash(): ?string

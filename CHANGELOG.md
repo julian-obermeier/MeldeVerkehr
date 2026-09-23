@@ -5,6 +5,12 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 ## [Unreleased]
 
 ### Added
+- HMAC-signiertes, verkettetes Audit-System mit Integritätsprüfung
+- Auditierung von Registrierung, Login, Logout, E-Mail-Verifikation und Passwort-Reset
+- DB-basierte Jobqueue mit Prioritäten, Retry, Backoff und Locking
+- Queue-Recovery für veraltete RUNNING-Jobs
+- Cron-Registry mit Heartbeats und Laufhistorie
+- CLI-Cron-Einstiegspunkt mit `queue` und `health`
 - initiale GitHub-Projektstruktur
 - Produkt-, Spezifikations- und Entwicklungsdokumentation
 - GitHub-first Workflow
@@ -36,6 +42,8 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 - native Mailheader werden gegen Zeilenumbrüche abgesichert und UTF-8-Betreffzeilen kodiert
 
 ### Security
+- Audit-Einträge werden mit dem APP_KEY per HMAC signiert
+- Audit-Metadaten speichern IP- und User-Agent-Bezug nur gehasht
 - Installer wird nach erfolgreicher Installation dauerhaft gesperrt
 - Datenbankzugriffe verwenden PDO mit deaktivierten emulierten Prepared Statements
 - Runtime-Dateien unter storage/app werden nicht versioniert
