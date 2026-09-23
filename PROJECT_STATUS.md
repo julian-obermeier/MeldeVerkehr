@@ -7,33 +7,46 @@
 M1 – Fundament
 
 ## Umgesetzt
-- GitHub-Repository angelegt
-- GitHub-first Projektstruktur definiert
-- grundlegende Projektdokumentation begonnen
+- GitHub-first Repository eingerichtet
+- main und develop vorhanden
+- Produktplan, Spezifikation und Entwicklungs-Masterprompt im Repository
+- README, Security-, Contribution- und Agent-Regeln
+- GitHub Issue-/PR-Templates
+- PHP-Lint- und Security-Baseline-Workflows
+- M1-Arbeitspakete als GitHub Issues
+- PHP-Front-Controller
+- leichtgewichtiger Autoloader
+- Request-/Response-Abstraktion
+- Basis-Router mit 404-Behandlung
+- Application-Kernel mit Request-ID und Fehlerlogging
+- /health-Endpunkt
+- Shared-Hosting-.htaccess-Schutz
+- private Storage-Grundstruktur
 
 ## In Arbeit
-- Repository-Grundstruktur
-- Entwicklungsworkflow
-- CI-Grundlagen
+- vollständige Repository-Grundstruktur
+- Konfigurationssystem
+- automatisierte Tests für Bootstrap/Router
 
 ## Offen in M1
-- PHP-Bootstrap und Router
-- Konfigurationssystem
 - Datenbank-Layer
 - Migration-System
 - Webinstaller
-- Authentifizierung und E-Mail-Verifikation
+- Authentifizierung
+- E-Mail-Verifikation
 - Rollen und Permissions
 - Audit-System
 - DB-basierte Queue
-- Cron-System
+- Cron-System und Heartbeats
 - Admin-Basis
 - Bürger-Dashboard
 - PWA-Grundstruktur
 - Testinfrastruktur
 
-## Bekannte Probleme
-Keine – Anwendungscode ist noch nicht implementiert.
+## Bekannte Einschränkungen
+- Noch keine Datenbank oder Authentifizierung.
+- Der Router unterstützt im ersten Grundgerüst nur exakt registrierte Pfade; parametrisierte Routen folgen im M1-Ausbau.
+- CI-Syntaxprüfung ist eingerichtet; weitere Testworkflows folgen mit der Testinfrastruktur.
 
 ## Nächster Schritt
-Grundgerüst für PHP-Anwendung, Migrationen und Webinstaller erstellen.
+Konfigurations- und Datenbank-Layer sowie Migration-System implementieren.
