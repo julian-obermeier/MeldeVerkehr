@@ -8,6 +8,7 @@ use MeldeVerkehr\Database\Connection;
 use MeldeVerkehr\Database\MigrationRunner;
 use MeldeVerkehr\Support\Uuid;
 use PDO;
+use Throwable;
 
 final class InstallerService
 {
@@ -35,9 +36,19 @@ final class InstallerService
         $runner = new MigrationRunner($pdo, $this->basePath . '/database/migrations');
         $migrations = $runner->migrate();
 
-        $this->seedAccess($pdo);
-        $userId = $this->createSuperAdmin($pdo, $admin);
-        $this->saveSettings($pdo, $app);
+        try {
+            $pdo->beginTransaction();
+            $this->seedAccess($pdo);
+            $userId = $this->createOrUpdateSuperAdmin($pdo, $admin);
+            $this->saveSettings($pdo, $app);
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            throw $e;
+        }
 
         $appKey = 'base64:' . base64_encode(random_bytes(32));
 
@@ -108,7 +119,7 @@ final class InstallerService
         }
     }
 
-    private function createSuperAdmin(PDO $pdo, array $admin): string
+    private function createOrUpdateSuperAdmin(PDO $pdo, array $admin): string
     {
         $email = strtolower(trim((string) $admin['email']));
         $password = (string) $admin['password'];
@@ -121,23 +132,47 @@ final class InstallerService
             throw new \InvalidArgumentException('Administrator password must contain at least 12 characters.');
         }
 
-        $id = Uuid::v4();
+        $find = $pdo->prepare('SELECT id FROM users WHERE email = :email LIMIT 1');
+        $find->execute(['email' => $email]);
+        $existingId = $find->fetchColumn();
 
-        $stmt = $pdo->prepare(
-            'INSERT INTO users (
-                id, first_name, last_name, email, password_hash, email_verified_at, status, created_at, updated_at
-             ) VALUES (
-                :id, :first_name, :last_name, :email, :password_hash, UTC_TIMESTAMP(), :status, UTC_TIMESTAMP(), UTC_TIMESTAMP()
-             )'
-        );
-        $stmt->execute([
+        $id = is_string($existingId) && $existingId !== '' ? $existingId : Uuid::v4();
+        $hash = password_hash($password, PASSWORD_DEFAULT);
+
+        if ($existingId !== false) {
+            $stmt = $pdo->prepare(
+                'UPDATE users
+                 SET first_name = :first_name,
+                     last_name = :last_name,
+                     password_hash = :password_hash,
+                     email_verified_at = COALESCE(email_verified_at, UTC_TIMESTAMP()),
+                     status = :status,
+                     updated_at = UTC_TIMESTAMP()
+                 WHERE id = :id'
+            );
+        } else {
+            $stmt = $pdo->prepare(
+                'INSERT INTO users (
+                    id, first_name, last_name, email, password_hash, email_verified_at, status, created_at, updated_at
+                 ) VALUES (
+                    :id, :first_name, :last_name, :email, :password_hash, UTC_TIMESTAMP(), :status, UTC_TIMESTAMP(), UTC_TIMESTAMP()
+                 )'
+            );
+        }
+
+        $params = [
             'id' => $id,
             'first_name' => trim((string) $admin['first_name']),
             'last_name' => trim((string) $admin['last_name']),
-            'email' => $email,
-            'password_hash' => password_hash($password, PASSWORD_DEFAULT),
+            'password_hash' => $hash,
             'status' => 'ACTIVE',
-        ]);
+        ];
+
+        if ($existingId === false) {
+            $params['email'] = $email;
+        }
+
+        $stmt->execute($params);
 
         $roleId = $pdo->query("SELECT id FROM roles WHERE name = 'SUPER_ADMIN' LIMIT 1")->fetchColumn();
 
@@ -146,7 +181,9 @@ final class InstallerService
         }
 
         $assign = $pdo->prepare(
-            'INSERT INTO user_roles (user_id, role_id, created_at) VALUES (:user_id, :role_id, UTC_TIMESTAMP())'
+            'INSERT INTO user_roles (user_id, role_id, created_at)
+             VALUES (:user_id, :role_id, UTC_TIMESTAMP())
+             ON DUPLICATE KEY UPDATE role_id = VALUES(role_id)'
         );
         $assign->execute([
             'user_id' => $id,
