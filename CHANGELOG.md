@@ -14,18 +14,31 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 - Initialmigrationen für Benutzer, Rollen, Permissions und Einstellungen
 - zweistufiger Webinstaller mit Systemcheck und Datenbankprüfung
 - Superadmin-Erstellung und Installations-Lock
-- CSRF-Schutz für Installationsformulare
+- Registrierung, Login und Logout
+- E-Mail-Verifikation mit ablaufenden, gehashten Tokens
+- Passwort-Reset mit 30-Minuten-Token
+- DB-basiertes Login-Rate-Limiting
+- PermissionService für Rollen und Berechtigungen
+- Shared-Hosting-Mailtransport via PHP mail()
+- geschütztes Dashboard-Grundgerüst
+- CSRF-Schutz für Installations- und Authentifizierungsformulare
 
 ### Changed
 - Bootstrap lädt zentrale Anwendungskonfiguration und sichere Sessionparameter
-- Startseite leitet vor der Installation auf /install um
+- Application stellt Datenbankverbindung lazy bereit
+- Startseite leitet vor der Installation auf /install und danach auf /dashboard um
 - /health zeigt zusätzlich den Installationsstatus
+- Installer setzt eine initiale Absenderadresse für Systemmails
 
 ### Fixed
 - komplexe, gequotete .env-Werte werden korrekt wieder eingelesen
 - Installer-Seeding ist bei Wiederholungsversuchen idempotenter
+- native Mailheader werden gegen Zeilenumbrüche abgesichert und UTF-8-Betreffzeilen kodiert
 
 ### Security
 - Installer wird nach erfolgreicher Installation dauerhaft gesperrt
 - Datenbankzugriffe verwenden PDO mit deaktivierten emulierten Prepared Statements
 - Runtime-Dateien unter storage/app werden nicht versioniert
+- Session-ID wird bei Login und Logout rotiert
+- Loginversuche werden pro E-Mail/IP-Kombination rate-limited
+- Verifikations- und Reset-Tokens werden nur als SHA-256-Hash gespeichert
