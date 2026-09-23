@@ -1,0 +1,50 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: meldeverkehr_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    env:
+      APP_NAME: MeldeVerkehr
+      APP_ENV: testing
+      APP_DEBUG: false
+      APP_URL: http://localhost
+      APP_KEY: test-app-key
+      APP_TIMEZONE: Europe/Berlin
+      APP_LOCALE: de
+      APP_INSTALLED: true
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_DATABASE: meldeverkehr_test
+      DB_USERNAME: root
+      DB_PASSWORD: root
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_mysql, mbstring, fileinfo, openssl
+      - name: Run migrations
+        run: php database/migrate.php migrate
+      - name: Run foundation tests
+        run: php tests/run.php
