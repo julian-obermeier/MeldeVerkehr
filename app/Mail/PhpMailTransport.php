@@ -14,7 +14,12 @@ final class PhpMailTransport implements MailTransportInterface
 
     public function send(string $to, string $subject, string $html, string $text = ''): bool
     {
-        if (!function_exists('mail') || !$this->validHeaderValue($to) || !$this->validHeaderValue($subject)) {
+        if (
+            !function_exists('mail')
+            || !$this->validHeaderValue($to)
+            || !$this->validHeaderValue($subject)
+            || !$this->validHeaderValue($this->fromName)
+        ) {
             return false;
         }
 
@@ -23,9 +28,16 @@ final class PhpMailTransport implements MailTransportInterface
         }
 
         $boundary = 'mv_' . bin2hex(random_bytes(12));
+        $encodedSubject = function_exists('mb_encode_mimeheader')
+            ? mb_encode_mimeheader($subject, 'UTF-8')
+            : $subject;
+        $encodedFromName = function_exists('mb_encode_mimeheader')
+            ? mb_encode_mimeheader($this->fromName, 'UTF-8')
+            : $this->fromName;
+
         $headers = [
             'MIME-Version: 1.0',
-            sprintf('From: %s <%s>', $this->safeDisplayName($this->fromName), $this->fromAddress),
+            sprintf('From: %s <%s>', $encodedFromName, $this->fromAddress),
             'Content-Type: multipart/alternative; boundary="' . $boundary . '"',
         ];
 
@@ -40,16 +52,11 @@ final class PhpMailTransport implements MailTransportInterface
             . $html . "\r\n"
             . '--' . $boundary . "--\r\n";
 
-        return @mail($to, $subject, $body, implode("\r\n", $headers));
+        return @mail($to, $encodedSubject, $body, implode("\r\n", $headers));
     }
 
     private function validHeaderValue(string $value): bool
     {
         return !str_contains($value, "\r") && !str_contains($value, "\n");
-    }
-
-    private function safeDisplayName(string $value): string
-    {
-        return str_replace(['\r', '\n', '"'], '', $value);
     }
 }
