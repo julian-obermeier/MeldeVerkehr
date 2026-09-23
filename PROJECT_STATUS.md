@@ -14,45 +14,45 @@ M1 – Fundament
 - GitHub Issue-/PR-Templates
 - PHP-Lint- und Security-Baseline-Workflows
 - M1-Arbeitspakete als GitHub Issues
-- PHP-Front-Controller
-- leichtgewichtiger Autoloader
-- Request-/Response-Abstraktion
-- Basis-Router mit 404-Behandlung
-- Application-Kernel mit Request-ID und Fehlerlogging
-- /health-Endpunkt
-- Shared-Hosting-.htaccess-Schutz
+- PHP-Front-Controller, Request/Response, Router und Fehlerhandling
+- /health-Endpunkt und Shared-Hosting-.htaccess-Schutz
 - private Storage-Grundstruktur
-- typisiertes Konfigurationssystem auf Basis von .env + config/*.php
+- Konfigurationssystem auf Basis von .env + config/*.php
 - sicherer PDO-Datenbank-Layer
 - versionierte Migration-Engine inklusive CLI-Befehl
-- Initialmigrationen für Benutzer, Rollen, Permissions und Einstellungen
 - zweistufiger Webinstaller unter /install
-- Datenbank-Verbindungstest im Installer
-- Superadmin-Erstellung mit password_hash()
-- Installations-Lock und automatische Sperre von /install
-- CSRF-Schutz im Installer
+- Superadmin-Erstellung und Installations-Lock
+- Registrierung mit USER-Rolle
+- Login/Logout mit Session-Rotation
+- DB-basiertes Login-Rate-Limiting
+- E-Mail-Verifikation mit gehashten, ablaufenden Tokens
+- Passwort-Reset mit gehashten 30-Minuten-Tokens
+- austauschbarer Mail-Transport mit Shared-Hosting-Fallback via PHP mail()
+- PermissionService für Rollen und Berechtigungen
+- geschütztes Dashboard als M1-Grundlage
+- CSRF-Schutz für Auth- und Installer-Formulare
 
 ## In Arbeit
-- automatisierte Tests für Bootstrap, Config, Migrationen und Installer
-- weitere M1-Sicherheits- und Authentifizierungsfunktionen
+- Ausbau des zentralen Rollen-/Permission-Systems für Ressourcen- und Ownership-Prüfungen
+- Audit-System
+- automatisierte funktionale Tests
 
 ## Offen in M1
-- vollständige Authentifizierung
-- E-Mail-Verifikation
-- Rollen- und Permission-Service
-- Audit-System
+- vollständige resource-basierte Policies/Ownership-Prüfungen
+- manipulationsgeschütztes Audit-System
 - DB-basierte Queue
 - Cron-System und Heartbeats
-- Admin-Basis
-- Bürger-Dashboard
+- Admin-Basisbereich
+- vollständiges Bürger-Dashboard
 - PWA-Grundstruktur
 - vollständige Testinfrastruktur
 
 ## Bekannte Einschränkungen
-- Der Router unterstützt aktuell nur exakt registrierte Pfade; parametrisierte Routen folgen im M1-Ausbau.
-- Der Webinstaller benötigt eine bereits angelegte MySQL/MariaDB-Datenbank und passende Zugangsdaten.
-- SMTP/IMAP werden erst nach Installation konfiguriert.
-- CI-Syntaxprüfung ist eingerichtet; funktionale Tests folgen mit der Testinfrastruktur.
+- Der Router unterstützt aktuell nur exakt registrierte Pfade; Tokens werden daher per Query-Parameter verarbeitet.
+- Der aktuelle E-Mail-Transport verwendet PHP mail(); konfigurierbares SMTP folgt mit dem Kommunikations-/Mail-Ausbau.
+- Das Bürger-Dashboard ist noch eine M1-Grundlage und enthält noch keine Vorgänge.
+- Passkeys und TOTP folgen nach dem Basis-Auth-Block.
+- CI-Syntax- und Security-Checks sind vorhanden; funktionale Tests werden noch erweitert.
 
 ## Nächster Schritt
-Authentifizierung, E-Mail-Verifikation und das zentrale Rollen-/Permission-System implementieren.
+Manipulationsgeschütztes Audit-System sowie DB-basierte Queue und Cron-Heartbeats implementieren.

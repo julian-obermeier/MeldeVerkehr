@@ -5,13 +5,17 @@ declare(strict_types=1);
 namespace MeldeVerkehr\Core;
 
 use MeldeVerkehr\Config\Config;
+use MeldeVerkehr\Database\Connection;
 use MeldeVerkehr\Http\Request;
 use MeldeVerkehr\Http\Response;
 use MeldeVerkehr\Routing\Router;
+use PDO;
 use Throwable;
 
 final class Application
 {
+    private ?PDO $database = null;
+
     public function __construct(
         private readonly Router $router,
         private readonly Config $config,
@@ -33,6 +37,15 @@ final class Application
     public function basePath(): string
     {
         return $this->basePath;
+    }
+
+    public function database(): PDO
+    {
+        if ($this->database === null) {
+            $this->database = Connection::make((array) $this->config->get('database', []));
+        }
+
+        return $this->database;
     }
 
     public function run(Request $request): void
