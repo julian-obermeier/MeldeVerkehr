@@ -39,7 +39,7 @@ final class WebAuthnService
             'attestation' => 'none',
             'authenticatorSelection' => [
                 'residentKey' => 'preferred',
-                'userVerification' => 'preferred',
+                'userVerification' => 'required',
             ],
         ];
     }
@@ -52,7 +52,19 @@ final class WebAuthnService
 
         $this->validateClientData($clientData, 'webauthn.create', $challenge);
 
-        $authenticatorData = self::fromB64url((string) ($payload['authenticatorData'] ?? ''));
+        $attestationObject = self::fromB64url((string) ($payload['attestationObject'] ?? ''));
+        $attestation = (new CborDecoder())->decode($attestationObject);
+
+        if (
+            !is_array($attestation)
+            || ($attestation['fmt'] ?? null) !== 'none'
+            || !isset($attestation['authData'])
+            || !is_string($attestation['authData'])
+        ) {
+            throw new \DomainException('Unsupported WebAuthn attestation format.');
+        }
+
+        $authenticatorData = $attestation['authData'];
         $this->validateAuthenticatorData($authenticatorData, true);
 
         $rawId = self::fromB64url((string) ($payload['rawId'] ?? ''));
@@ -92,7 +104,7 @@ final class WebAuthnService
             'challenge' => self::b64url($challenge),
             'rpId' => $this->rpId(),
             'timeout' => 60000,
-            'userVerification' => 'preferred',
+            'userVerification' => 'required',
         ];
     }
 
@@ -174,8 +186,7 @@ final class WebAuthnService
 
     private function storeChallenge(string $purpose, string $challenge, ?string $userId): void
     {
-        $_SESSION['webauthn_challenge'] = [
-            'purpose' => $purpose,
+        $_SESSION['webauthn_challenges'][$purpose] = [
             'value' => self::b64url($challenge),
             'user_id' => $userId,
             'expires_at' => time() + 120,
@@ -184,12 +195,11 @@ final class WebAuthnService
 
     private function consumeChallenge(string $purpose, ?string $userId): string
     {
-        $stored = $_SESSION['webauthn_challenge'] ?? null;
-        unset($_SESSION['webauthn_challenge']);
+        $stored = $_SESSION['webauthn_challenges'][$purpose] ?? null;
+        unset($_SESSION['webauthn_challenges'][$purpose]);
 
         if (
             !is_array($stored)
-            || ($stored['purpose'] ?? null) !== $purpose
             || (int) ($stored['expires_at'] ?? 0) < time()
             || ($stored['user_id'] ?? null) !== $userId
         ) {
@@ -228,6 +238,10 @@ final class WebAuthnService
         $flags = ord($data[32]);
         if (($flags & 0x01) !== 0x01) {
             throw new \DomainException('User presence was not verified.');
+        }
+
+        if (($flags & 0x04) !== 0x04) {
+            throw new \DomainException('User verification is required.');
         }
 
         if ($registration && ($flags & 0x40) !== 0x40) {
