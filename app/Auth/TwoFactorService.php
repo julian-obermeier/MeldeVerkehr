@@ -18,7 +18,9 @@ final class TwoFactorService
     public function enabled(string $userId): bool
     {
         $stmt = $this->pdo->prepare(
-            'SELECT confirmed_at FROM user_totp WHERE user_id = :user_id LIMIT 1'
+            'SELECT 1 FROM user_totp
+             WHERE user_id = :user_id AND confirmed_at IS NOT NULL
+             LIMIT 1'
         );
         $stmt->execute(['user_id' => $userId]);
 
