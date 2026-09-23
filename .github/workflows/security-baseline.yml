@@ -1,0 +1,24 @@
+name: Security Baseline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+
+jobs:
+  repository-safety:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reject tracked environment files
+        run: |
+          if git ls-files | grep -E '(^|/)\.env($|\.)' | grep -v '\.env\.example$'; then
+            echo "Tracked .env file detected."
+            exit 1
+          fi
+      - name: Reject tracked sensitive storage
+        run: |
+          if git ls-files | grep -E '^storage/(evidence|backups|mail)/' | grep -v '\.gitkeep$'; then
+            echo "Sensitive storage content must not be committed."
+            exit 1
+          fi
