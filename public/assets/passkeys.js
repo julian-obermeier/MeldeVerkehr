@@ -114,3 +114,20 @@
     });
   }
 })();
+
+
+document.addEventListener('DOMContentLoaded', () => {
+  if (window.PublicKeyCredential) {
+    return;
+  }
+
+  const login = document.querySelector('[data-passkey-login]');
+  const register = document.querySelector('[data-passkey-register]');
+  const loginError = document.querySelector('[data-passkey-login-error]');
+  const registerError = document.querySelector('[data-passkey-register-error]');
+
+  if (login) login.disabled = true;
+  if (register) register.disabled = true;
+  if (loginError) loginError.textContent = 'Dieser Browser unterstützt WebAuthn/Passkeys nicht.';
+  if (registerError) registerError.textContent = 'Dieser Browser unterstützt WebAuthn/Passkeys nicht.';
+});
