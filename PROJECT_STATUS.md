@@ -1,10 +1,10 @@
 # Projektstatus
 
 ## Aktuelle Version
-0.17.0-dev
+0.18.0-dev
 
 ## Phase
-M17 – Community Social
+M18 – Notification Preferences & Delivery
 
 ## Integrierter Stand bis M13
 Fundament, Vorgangskern, Beweissystem, Zeugenbericht/Final Review, Behördenrouting/Dispatch, Behördenkommunikation, intelligente Assistenz, private Karten/Analytics, Community, Suche/Dokumentcenter/Notifications/Exporte/Retention, Behördenportal/API Produktionshärtung/Release-Operations sowie M13-Vorgangsversionierung und Lifecycle sind auf `develop` integriert.
@@ -31,7 +31,7 @@ Fundament, Vorgangskern, Beweissystem, Zeugenbericht/Final Review, Behördenrout
 - Integrationstests für Versionierung, Nachträge, Korrekturen, Rücknahmen, Abschluss, Export, Ownership und Archivierung
 
 ## Synchronisationshinweis Zielserver
-Der Entwicklungsstand auf `develop` enthält bereits die Migrationen `020`, `021` und `022`. Ein Server, der nur bis Migration `019` anzeigt, ist nicht auf dem aktuellen Repository-Stand. Vor Funktionstests muss deshalb zuerst der aktuelle Entwicklungsstand sauber deployed und anschließend der Migrationslauf ausgeführt werden. M13 ergänzt Migration `023`; M14 Migration `024`; M15 Migration `025`; M16 Migration `026`; M17 Migration `027`.
+Der Entwicklungsstand auf `develop` enthält bereits die Migrationen `020`, `021` und `022`. Ein Server, der nur bis Migration `019` anzeigt, ist nicht auf dem aktuellen Repository-Stand. Vor Funktionstests muss deshalb zuerst der aktuelle Entwicklungsstand sauber deployed und anschließend der Migrationslauf ausgeführt werden. M13 ergänzt Migration `023`; M14 Migration `024`; M15 Migration `025`; M16 Migration `026`; M17 Migration `027`; M18 Migration `028`.
 
 ## M14 – in `develop` integriert
 - Appeals/Einsprüche für HIDE, WARN und RESTRICT
@@ -45,7 +45,7 @@ Der Entwicklungsstand auf `develop` enthält bereits die Migrationen `020`, `021
 - automatische Signale dienen ausschließlich als Prüfhinweise; endgültige Maßnahmen bleiben moderationsgesteuert
 - End-to-End-Tests für Einspruch, Wiederherstellung, Eskalation, Spam und Restriktion
 
-## M15 – auf Feature-Branch umgesetzt
+## M15 – in `develop` integriert
 - Achievements mit transparentem Fortschritt
 - Tageslimits je Reputationskategorie
 - Diminishing Returns nach täglicher Eventanzahl
@@ -55,7 +55,7 @@ Der Entwicklungsstand auf `develop` enthält bereits die Migrationen `020`, `021
 - Admin-Oberfläche für Regeln, Anomalien und Korrekturen
 - Integrationstests für Governance-Regeln
 
-## M16 – auf Feature-Branch umgesetzt
+## M16 – in `develop` integriert
 - strukturierte Behördenanfragen werden Bürgern im jeweiligen Vorgang angezeigt
 - Bürgerantworten werden verschlüsselt, SHA-256-geprüft und versioniert gespeichert
 - Statusfluss OPEN/REVISION_REQUIRED → AWAITING_REVIEW → CLOSED
@@ -65,7 +65,7 @@ Der Entwicklungsstand auf `develop` enthält bereits die Migrationen `020`, `021
 - Auditlogging für Einreichung und behördliche Prüfung
 - neue Migration `20260924_026_create_authority_inquiry_response_tables.php`
 
-## M17 – auf Feature-Branch umgesetzt
+## M17 – in `develop` integriert
 - Follower-Beziehungen zwischen Community-Profilen inklusive Follow/Unfollow und Netzwerkansicht
 - Follower-/Following-Zähler auf Profilen
 - Blockierungen verhindern neue Follow-Beziehungen und filtern Netzwerklisten
@@ -78,8 +78,21 @@ Der Entwicklungsstand auf `develop` enthält bereits die Migrationen `020`, `021
 - Integrationstests für Follow, Favoriten und verschlüsselten Gruppenchat
 - neue Migration `20260924_027_create_community_social_tables.php`
 
+## M18 – auf Feature-Branch umgesetzt
+- vollständige Benachrichtigungspräferenzen als Benutzeroberfläche
+- In-App, E-Mail und Push je Ereignistyp getrennt aktivierbar
+- alle Kanäle standardmäßig aktiviert
+- Präferenzen werden bereits bei der Notification-Erzeugung berücksichtigt
+- E-Mail-Zustellung über den vorhandenen PHP-Mail-Transport mit kanalweiser Deduplizierung und Retry-Grenze
+- Web-Push-Subscriptions pro Benutzer/Gerät mit verschlüsseltem Endpoint
+- VAPID-authentifizierte Web-Push-Signale ohne Übertragung sensibler Notification-Inhalte an den Push-Dienst
+- Service Worker lädt Notification-Inhalte nach Push authentifiziert von MeldeVerkehr und zeigt die Browser-Benachrichtigung
+- abgelaufene Push-Endpunkte (404/410) werden automatisch deaktiviert
+- Benutzer können Push pro Browser aktivieren und wieder deaktivieren
+- Integrationstests für Default-Präferenzen, gespeicherte Kanalwahl und Push-Subscription-Lifecycle
+- neue Migration `20260924_028_create_notification_delivery_tables.php`
+
 ## Noch offen vor 1.0.0
-- Notification-Präferenzen als vollständige UI bereitstellen und mit E-Mail/Push verbinden
 - kontrollierte IndexedDB-Queue für Offline-Evidence evaluieren/umsetzen
 - Inline-CSS/JS aus Legacy-Views entfernen und CSP anschließend ohne `unsafe-inline` betreiben
 - produktive Retention-Fristen fachlich/rechtlich festlegen und Lösch-/Anonymisierungsengine aktivieren
@@ -97,6 +110,6 @@ Der Entwicklungsstand auf `develop` enthält bereits die Migrationen `020`, `021
 - Production darf nicht mit `APP_DEBUG=true` als release-ready gelten.
 
 ## Release-Status
-`0.17.0-dev` ist noch kein Stable-Release. Nach Integration von M17 müssen die verbleibenden 1.0-Punkte umgesetzt, CI vollständig ausgeführt und das Release-/Restore-Runbook auf der Zielumgebung erfolgreich durchgespielt werden.
+`0.18.0-dev` ist noch kein Stable-Release. Nach Integration von M18 müssen die verbleibenden 1.0-Punkte umgesetzt, CI vollständig ausgeführt und das Release-/Restore-Runbook auf der Zielumgebung erfolgreich durchgespielt werden.
 
 Siehe `docs/RELEASE_RUNBOOK.md`.
