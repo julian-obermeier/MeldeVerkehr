@@ -5,6 +5,16 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 ## [Unreleased]
 
 ### Added
+- M11-Datenmodell für Authority-Nutzerscopes, API-Tokens, strukturierte Portal-Inquiries und isolierte Halterdaten
+- Authority-Scope-Service mit per-Behörde-Rollen
+- Behördenportal mit Inbox und frozen Dispatch-Fallansicht
+- strukturierte Behördenanfragen mit Bürger-Task-Brücke
+- separat verschlüsselter Halterdaten-Speicher
+- Authority-scoped CSV-/JSON-/XML-Exporte
+- Authority-Administration für Benutzerzuordnungen und API-Tokens
+- API v1 für Authority-Fallliste, Falldetail und Inquiry-Erstellung
+- gehashte Bearer-Tokens mit Scopes, Ablauf, Widerruf und Last-Used
+- Integrationstests für Authority-RBAC, API, Halterdaten, Inquiries und Exporte
 - M10-Datenmodell für gespeicherte Filter, In-App-Notifications, Notification-Präferenzen, Exportartefakte, Retention-Pläne und Account-Löschvorschau
 - globale nutzereigene Vorgangssuche
 - gespeicherte Suchfilter mit Live-Zählern
@@ -171,6 +181,9 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 - CSRF-Schutz für Installations- und Authentifizierungsformulare
 
 ### Changed
+- Bürgerdashboard zeigt den Behördenportal-Link nur bei aktivem Authority-Scope
+- HTTP Request unterstützt jetzt testbaren Raw-/JSON-Body
+- Bürgerportal-Version auf 0.11.0-dev aktualisiert
 - Bürgerdashboard verlinkt jetzt Suche, Dokumentcenter, Benachrichtigungen und Aufbewahrung
 - Dashboard zeigt die Anzahl ungelesener Benachrichtigungen
 - Administration zeigt zusätzliche Betriebsdiagnostik
@@ -217,6 +230,16 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 - native Mailheader werden gegen Zeilenumbrüche abgesichert und UTF-8-Betreffzeilen kodiert
 
 ### Security
+- Authority-Fallzugriff benötigt neben Rollen immer einen aktiven Scope zur konkreten Behörde
+- Scope-Rollen begrenzen Rechte zusätzlich zu globalen Permissions
+- API-Token ist fest an eine Authority-ID gebunden
+- Cross-Authority-API-Zugriffe werden explizit blockiert
+- API-Tokens werden ausschließlich gehasht gespeichert
+- widerrufene/abgelaufene API-Tokens werden abgewiesen
+- Behördenfallansicht verwendet hashgeprüfte frozen Dispatch-Snapshots
+- Authority-Inquiry-Texte werden verschlüsselt gespeichert
+- Halterdaten werden getrennt verschlüsselt gespeichert und per Payload-Hash geprüft
+- Authority-Exporte enthalten keine isolierten Halterdaten
 - globale Suche ist serverseitig strikt auf eigene Vorgänge begrenzt
 - gespeicherte Filter sind nutzergebunden
 - exakte Kennzeichensuche nutzt HMAC statt Klartextindex
