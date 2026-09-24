@@ -79,13 +79,14 @@ final class WebAuthnService
 
         $stmt = $this->pdo->prepare(
             'INSERT INTO passkey_credentials
-             (id, user_id, credential_id, public_key_pem, algorithm, sign_count, transports_json, label, created_at, last_used_at)
-             VALUES (:id, :user_id, :credential_id, :public_key_pem, -7, :sign_count, :transports, :label, UTC_TIMESTAMP(), NULL)'
+             (id, user_id, credential_id, credential_id_hash, public_key_pem, algorithm, sign_count, transports_json, label, created_at, last_used_at)
+             VALUES (:id, :user_id, :credential_id, :credential_id_hash, :public_key_pem, -7, :sign_count, :transports, :label, UTC_TIMESTAMP(), NULL)'
         );
         $stmt->execute([
             'id' => Uuid::v4(),
             'user_id' => $userId,
             'credential_id' => $credentialIdEncoded,
+            'credential_id_hash' => hash('sha256', $credentialIdEncoded),
             'public_key_pem' => $publicKeyPem,
             'sign_count' => $signCount,
             'transports' => json_encode($payload['transports'] ?? [], JSON_THROW_ON_ERROR),
@@ -114,13 +115,13 @@ final class WebAuthnService
         $credentialId = (string) ($payload['rawId'] ?? '');
 
         $stmt = $this->pdo->prepare(
-            'SELECT id, user_id, public_key_pem, sign_count
-             FROM passkey_credentials WHERE credential_id = :credential_id LIMIT 1'
+            'SELECT id, user_id, credential_id, public_key_pem, sign_count
+             FROM passkey_credentials WHERE credential_id_hash = :credential_id_hash LIMIT 1'
         );
-        $stmt->execute(['credential_id' => $credentialId]);
+        $stmt->execute(['credential_id_hash' => hash('sha256', $credentialId)]);
         $credential = $stmt->fetch();
 
-        if (!is_array($credential)) {
+        if (!is_array($credential) || !hash_equals((string) $credential['credential_id'], $credentialId)) {
             throw new \DomainException('Unknown passkey credential.');
         }
 
