@@ -5,6 +5,19 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 ## [Unreleased]
 
 ### Added
+- M3-Evidence-Datenmodell mit Items, Versionen, Metadaten und Ereignissen
+- geschützter Originalspeicher außerhalb des Webroots
+- SHA-256-Integrität je Evidence-Version
+- strukturierte Evidence-Kategorien
+- Bürger-Evidence-Center mit Kamera-/Dateiupload
+- MIME-, Größen- und Bildabmessungsprüfung
+- technische Qualitätsstufen für Bildnachweise
+- getrennte ORIGINAL- und WORKING-Varianten
+- GD-basierte Arbeitskopien mit Maximaldimension 1920 px
+- logisches Entfernen von Evidence ohne stille Originalvernichtung
+- Evidence-Integritätsprüfung
+- zusätzliche Apache-Sperre für Runtime-Storage
+- Integrationstests für Evidence-Storage, Ownership, Hashes und Arbeitskopien
 - Beobachtungsbeginn und optionales Beobachtungsende im Vorgang
 - UTC-Speicherung mit lokaler Zeitdarstellung
 - automatische Ableitung der Beobachtungsdauer
@@ -88,6 +101,11 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 - native Mailheader werden gegen Zeilenumbrüche abgesichert und UTF-8-Betreffzeilen kodiert
 
 ### Security
+- Evidence-Originale werden außerhalb des öffentlichen Webroots gespeichert
+- hochgeladene Dateitypen werden anhand des tatsächlichen MIME-Inhalts validiert
+- Evidence-Dateinamen im Storage werden ausschließlich aus serverseitigen UUIDs gebildet
+- Originale und Arbeitskopien werden getrennt versioniert und gehasht
+- private Evidence-Zugriffe sind serverseitig an Case-Ownership gebunden
 - TOTP-Secrets werden mit AES-256-GCM verschlüsselt gespeichert
 - Recovery-Codes werden ausschließlich gehasht gespeichert und nach Nutzung entfernt
 - WebAuthn prüft Challenge, Origin, RP-ID-Hash, User Presence, User Verification und Signatur

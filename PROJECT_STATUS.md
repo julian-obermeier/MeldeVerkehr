@@ -1,57 +1,58 @@
 # Projektstatus
 
 ## Aktuelle Version
-0.2.0-dev
+0.3.0-dev
 
 ## Phase
-M2 – Bürgerportal / Vorgangskern
+M3 – Beweissystem
 
 ## M1 – Fundament
 Abgeschlossen und auf `develop` integriert.
 
-## M2 – umgesetzt
-- parametrisierte Router-Pfade wie `/cases/{id}`
-- Vorgangstabelle mit UUID und öffentlicher Nummer `OWI-YYYY-NNNNNN`
-- atomarer Jahresnummernkreis
-- vollständige Statuskonstanten und explizite Statusmaschine
-- Statushistorie und Vorgangstimeline
-- serverseitige Ownership-Prüfung für private Vorgänge
-- verschlüsselte Kennzeichenspeicherung
-- geheimer HMAC-Suchhash für Kennzeichen
-- Fahrzeugdaten mit festen Fahrzeugtypen
-- Standortdaten mit GPS oder Adresse
-- strukturierter Verkehrsraum und PUBLIC/PRIVATE/UNCLEAR
-- Beobachtungsbeginn und optionales Beobachtungsende
-- UTC-Speicherung und lokale Darstellung der Beobachtungszeit
-- automatisch abgeleitete Beobachtungsdauer
-- strukturierte Angaben zu Behinderung, Gefährdung und Sachschaden ohne automatische Rechtswertung
-- versionierte Tatbestände und Tatbestandskategorien
-- neutraler interner Entwurfs-Tatbestand ohne ungeprüfte Rechts-/Bußgeldwerte
-- eigener Vorgangsbereich mit Liste, Statusfilter und Suche
-- Suche nach Vorgangsnummer, Straße, Ort oder exaktem Kennzeichen
-- adaptiver Wizard Fahrzeug → Standort → Beobachtung → Tatbestand → Review
-- Browser-GPS-Übernahme
-- separate Grunddaten-Review-Seite
-- Pflichtprüfung fehlender Grunddaten vor M3
-- gelbe Review-Hinweise mit expliziter Bestätigung
-- Statusfolge bis `READY_FOR_REVIEW` und nach Bestätigung `WAITING_FOR_EVIDENCE`
-- Dashboard mit echten Vorgangszahlen und letzten Vorgängen
-- automatische Rücksetzung der Grunddatenprüfung bei nachträglichen Änderungen
-- Integrationstests für Nummernkreis, Statusmaschine, Ownership, Fahrzeug, Standort, Suche, Zeit, Tatbestandsversionierung, Review und Dashboarddaten
+## M2 – Bürgerportal / Vorgangskern
+Abgeschlossen und auf `develop` integriert.
 
-## M2-Status
-Der technische M2-Core ist abgeschlossen. Der Übergabepunkt zu M3 ist `WAITING_FOR_EVIDENCE`.
+## M3 – bereits umgesetzt
+- eigenes Evidence-Datenmodell mit Evidence-Items, Versionen, Metadaten und Ereignissen
+- strukturierte Foto-Kategorien
+- geschützte Originaldateien außerhalb des öffentlichen Webroots
+- zufällige Evidence-IDs statt nutzerbestimmter Storage-Dateinamen
+- SHA-256-Hash je gespeicherter Dateiversion
+- tatsächliche MIME-Prüfung über `finfo`
+- serverseitige Beschränkung auf JPEG, PNG und WebP
+- Größenlimit von 20 MB
+- Bildabmessungen über serverseitige Bildprüfung
+- technische Qualitätsstufen `SUITABLE`, `LIMITED`, `RETAKE_RECOMMENDED`
+- getrennte `ORIGINAL`- und `WORKING`-Varianten
+- Arbeitskopien über GD mit Maximaldimension 1920 px
+- Re-Encoding der Arbeitskopie statt Veränderung des Originals
+- geschützter Bürger-Upload nur nach abgeschlossenem M2-Grunddaten-Review
+- Ownership-Prüfung für Evidence-Zugriffe
+- Evidence-Center pro Vorgang
+- Mobilkamera-Unterstützung über File-Capture
+- logisches Entfernen aus dem aktiven Beweissatz ohne stille Vernichtung des Originals
+- Integritätsprüfung des Originals gegen gespeicherten SHA-256-Hash
+- Audit-/Evidence-Ereignisse für Speicherung und Entfernung
+- zusätzlicher Apache-Deny-Schutz für `storage/`
+- Integrationstests für Originalspeicher, Hashintegrität, Ownership, Arbeitskopie und logisches Entfernen
 
-## Bewusst separat
-- produktive, fachlich/rechtlich verifizierte Tatbestandsdaten werden getrennt gepflegt und versioniert; ungeprüfte Bußgeld- oder Rechtsangaben werden nicht in den technischen Core eingebaut.
-- Serien-/Gruppenmeldungen folgen in einer späteren Ausbaustufe.
+## M3 noch offen
+- Privacy-/Anonymisierungsgrundlage für Gesichter, fremde Kennzeichen und Redaktionsbereiche
+- kategorienbasierte Vollständigkeitsprüfung
+- Evidence-Review
+- Beweismappen-/Exportgrundlage
+- spätere OCR-/KI-Qualitäts- und Privacy-Assistenten
+
+## Bewusst getrennt
+- Originale werden nie durch Qualitäts-, Anonymisierungs- oder Kompressionsschritte überschrieben.
+- Arbeits- und spätere öffentliche/versandfähige Kopien werden als eigene Varianten versioniert.
+- KI-/OCR-Ausgaben werden später ausschließlich assistiv behandelt und benötigen Nutzerbestätigung.
 
 ## Bekannte Einschränkungen
-- Die produktive Tatbestandsdatenbank enthält bewusst noch keine ungeprüften Bußgeld- oder Rechtsangaben.
+- Arbeitskopien werden nur erzeugt, wenn die PHP-GD-Erweiterung verfügbar ist; das Original bleibt davon unabhängig funktionsfähig.
+- Die aktuelle Qualitätsprüfung ist technisch und regelbasiert; Unschärfe/Helligkeit und motivbezogene Eignung folgen in weiteren M3-Ausbaustufen.
+- Produktive Tatbestandsdaten bleiben getrennt fachlich/rechtlich zu verifizieren.
 - Der aktuelle E-Mail-Transport verwendet PHP `mail()`; SMTP folgt mit dem Kommunikationsausbau.
-- Beweisbilder, OCR, Anonymisierung und Beweismappe beginnen in M3.
-- PWA-Offlinedaten/IndexedDB für Meldungsentwürfe folgen zusammen mit dem Beweis-/Meldeworkflow.
-- WebAuthn unterstützt derzeit ES256/P-256.
 
 ## Nächster Schritt
-M2-Core per CI integrieren; danach M3 – Beweissystem mit Dateiablage, Original-/Arbeitskopien, Metadaten, Hashes, Foto-Kategorien und Qualitätsprüfung.
+M3-Core per CI integrieren; anschließend Privacy-/Anonymisierungsgrundlage und Evidence-Review/Beweismappe umsetzen.

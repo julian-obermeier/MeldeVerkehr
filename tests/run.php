@@ -16,6 +16,9 @@ use MeldeVerkehr\Cases\CaseStatusMachine;
 use MeldeVerkehr\Config\Config;
 use MeldeVerkehr\Database\Connection;
 use MeldeVerkehr\Database\MigrationRunner;
+use MeldeVerkehr\Evidence\EvidenceImageProcessor;
+use MeldeVerkehr\Evidence\EvidenceService;
+use MeldeVerkehr\Evidence\EvidenceStorage;
 use MeldeVerkehr\Queue\JobQueue;
 use MeldeVerkehr\Security\SecretCipher;
 use MeldeVerkehr\Support\Env;
@@ -222,6 +225,94 @@ try {
         'Confirmed M2 review advances to WAITING_FOR_EVIDENCE'
     );
 
+    $evidenceSource = tempnam(sys_get_temp_dir(), 'mv-evidence-');
+    if ($evidenceSource === false) {
+        throw new RuntimeException('Could not create evidence test file.');
+    }
+
+    if (!extension_loaded('gd')) {
+        throw new RuntimeException('GD extension is required for evidence derivative integration tests.');
+    }
+
+    $testImage = imagecreatetruecolor(320, 240);
+    if (!$testImage instanceof GdImage) {
+        throw new RuntimeException('Could not create evidence test image.');
+    }
+
+    $background = imagecolorallocate($testImage, 230, 230, 230);
+    $foreground = imagecolorallocate($testImage, 25, 25, 25);
+    imagefilledrectangle($testImage, 0, 0, 319, 239, $background);
+    imagerectangle($testImage, 20, 20, 300, 220, $foreground);
+
+    if (!imagepng($testImage, $evidenceSource, 6)) {
+        imagedestroy($testImage);
+        throw new RuntimeException('Could not write evidence test image.');
+    }
+    imagedestroy($testImage);
+
+    $evidenceStorage = new EvidenceStorage($basePath . '/storage/app');
+    $evidenceService = new EvidenceService(
+        $pdo,
+        new AuthorizationService($permissions),
+        $evidenceStorage,
+        new AuditLogger($pdo, 'test-audit-key'),
+        new EvidenceImageProcessor($evidenceStorage)
+    );
+
+    $storedEvidence = $evidenceService->storeFile(
+        (string) $user['id'],
+        $caseId,
+        $evidenceSource,
+        'test.png',
+        'OVERVIEW'
+    );
+
+    $assert(($storedEvidence['category'] ?? null) === 'OVERVIEW', 'Evidence category stored');
+    $assert(($storedEvidence['mime_type'] ?? null) === 'image/png', 'Evidence MIME detected from content');
+    $assert(($storedEvidence['quality_state'] ?? null) === 'RETAKE_RECOMMENDED', 'Tiny image receives retake recommendation');
+    $assert(
+        $evidenceService->verifyIntegrity((string) $user['id'], (string) $storedEvidence['id']),
+        'Evidence SHA-256 integrity verified'
+    );
+
+    $pathStmt = $pdo->prepare(
+        'SELECT storage_path FROM evidence_versions
+         WHERE evidence_id = :id AND variant = "ORIGINAL" AND version_no = 1'
+    );
+    $pathStmt->execute(['id' => $storedEvidence['id']]);
+    $storedPath = $pathStmt->fetchColumn();
+    $assert(
+        is_string($storedPath)
+        && str_starts_with($storedPath, 'evidence/originals/' . $caseId . '/')
+        && is_file($basePath . '/storage/app/' . $storedPath),
+        'Evidence original stored in protected application storage'
+    );
+
+    $evidenceList = $evidenceService->listForCase((string) $user['id'], $caseId);
+    $assert(count($evidenceList) === 1, 'Evidence appears in owned case list');
+    $assert(
+        (int) ($evidenceList[0]['has_working_copy'] ?? 0) === 1,
+        'Evidence working copy is generated when GD is available'
+    );
+
+    $workingStmt = $pdo->prepare(
+        'SELECT storage_path, sha256 FROM evidence_versions
+         WHERE evidence_id = :id AND variant = "WORKING" AND version_no = 1'
+    );
+    $workingStmt->execute(['id' => $storedEvidence['id']]);
+    $workingRow = $workingStmt->fetch();
+    $assert(
+        is_array($workingRow)
+        && is_file($basePath . '/storage/app/' . $workingRow['storage_path'])
+        && hash_equals(
+            (string) $workingRow['sha256'],
+            hash_file('sha256', $basePath . '/storage/app/' . $workingRow['storage_path'])
+        ),
+        'Evidence working copy is separately stored and hashed'
+    );
+
+    @unlink($evidenceSource);
+
     $other = $auth->register([
         'first_name' => 'Other',
         'last_name' => 'User',
@@ -235,6 +326,18 @@ try {
         $foreignBlocked = true;
     }
     $assert($foreignBlocked, 'Foreign user cannot read another user case');
+
+    $foreignEvidenceBlocked = false;
+    try {
+        $evidenceService->findOwned((string) $other['id'], (string) $storedEvidence['id']);
+    } catch (Throwable $e) {
+        $foreignEvidenceBlocked = true;
+    }
+    $assert($foreignEvidenceBlocked, 'Foreign user cannot read another user evidence');
+
+    $evidenceService->markRemoved((string) $user['id'], (string) $storedEvidence['id']);
+    $removedList = $evidenceService->listForCase((string) $user['id'], $caseId);
+    $assert(($removedList[0]['status'] ?? null) === 'REMOVED', 'Evidence removal is logical and retains original record');
 
     $warningCase = $caseService->createDraft((string) $user['id']);
     $warningCaseId = (string) $warningCase['case']['id'];
