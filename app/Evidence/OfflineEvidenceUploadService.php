@@ -66,6 +66,11 @@ final class OfflineEvidenceUploadService
             throw new \InvalidArgumentException('Upload-Datei ist nicht lesbar.');
         }
 
+        $context = $this->context($userId, $caseId);
+        if (!$context['can_upload']) {
+            throw new \DomainException('Der Beweissatz ist inzwischen nicht mehr bearbeitbar.');
+        }
+
         $serverHash = hash_file('sha256', $sourcePath);
         if (!is_string($serverHash) || !hash_equals($clientSha256, strtolower($serverHash))) {
             throw new \InvalidArgumentException('Lokale Datei und Server-Upload stimmen nicht überein.');
