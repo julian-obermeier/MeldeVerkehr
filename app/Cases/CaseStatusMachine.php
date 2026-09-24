@@ -38,6 +38,7 @@ final class CaseStatusMachine
         CaseStatus::SUBMISSION_PENDING => [
             CaseStatus::SENT,
             CaseStatus::DELIVERY_FAILED,
+            CaseStatus::WITHDRAWAL_PENDING,
         ],
         CaseStatus::SENT => [
             CaseStatus::DELIVERED,
@@ -45,12 +46,14 @@ final class CaseStatusMachine
             CaseStatus::DELIVERY_FAILED,
             CaseStatus::AUTHORITY_REPLY,
             CaseStatus::AUTHORITY_PROCESSING,
+            CaseStatus::CORRECTION_PENDING,
             CaseStatus::WITHDRAWAL_PENDING,
         ],
         CaseStatus::DELIVERED => [
             CaseStatus::AUTHORITY_PROCESSING,
             CaseStatus::AUTHORITY_REPLY,
             CaseStatus::USER_ACTION_REQUIRED,
+            CaseStatus::CORRECTION_PENDING,
             CaseStatus::WITHDRAWAL_PENDING,
             CaseStatus::CLOSED,
         ],
@@ -58,14 +61,19 @@ final class CaseStatusMachine
             CaseStatus::DELIVERED,
             CaseStatus::DELIVERY_FAILED,
             CaseStatus::AUTHORITY_REPLY,
+            CaseStatus::CORRECTION_PENDING,
+            CaseStatus::WITHDRAWAL_PENDING,
         ],
         CaseStatus::DELIVERY_FAILED => [
             CaseStatus::SUBMISSION_PENDING,
+            CaseStatus::CORRECTION_PENDING,
             CaseStatus::WITHDRAWAL_PENDING,
         ],
         CaseStatus::AUTHORITY_REPLY => [
             CaseStatus::USER_ACTION_REQUIRED,
             CaseStatus::AUTHORITY_PROCESSING,
+            CaseStatus::CORRECTION_PENDING,
+            CaseStatus::WITHDRAWAL_PENDING,
             CaseStatus::CLOSED,
         ],
         CaseStatus::USER_ACTION_REQUIRED => [
@@ -77,11 +85,14 @@ final class CaseStatusMachine
         CaseStatus::AUTHORITY_PROCESSING => [
             CaseStatus::AUTHORITY_REPLY,
             CaseStatus::USER_ACTION_REQUIRED,
+            CaseStatus::CORRECTION_PENDING,
+            CaseStatus::WITHDRAWAL_PENDING,
             CaseStatus::CLOSED,
         ],
         CaseStatus::CORRECTION_PENDING => [
             CaseStatus::AUTHORITY_PROCESSING,
             CaseStatus::USER_ACTION_REQUIRED,
+            CaseStatus::WITHDRAWAL_PENDING,
         ],
         CaseStatus::WITHDRAWAL_PENDING => [
             CaseStatus::CLOSED,
