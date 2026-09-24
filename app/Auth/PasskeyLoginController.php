@@ -16,10 +16,21 @@ use Throwable;
 final class PasskeyLoginController
 {
     private readonly AuthManager $auth;
+    private readonly View $view;
 
     public function __construct(private readonly Application $app)
     {
         $this->auth = new AuthManager();
+        $this->view = new View($app->basePath() . '/resources/views');
+    }
+
+    public function page(Request $request): Response
+    {
+        if ($this->auth->check()) {
+            return Response::redirect('/dashboard');
+        }
+
+        return Response::html($this->view->render('auth/passkey'));
     }
 
     public function options(Request $request): Response
