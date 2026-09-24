@@ -149,6 +149,38 @@ final class CaseLifecycleService
         ];
     }
 
+    public function closureDossier(string $userId, string $caseId, string $closureId): array
+    {
+        $case = $this->ownedCase($userId, $caseId, 'case.view_own');
+
+        $row = $this->fetchOne(
+            'SELECT id, closure_no, closure_reason, dossier_json, dossier_sha256, closed_at
+             FROM case_closure_records
+             WHERE id = :id AND case_id = :case_id LIMIT 1',
+            ['id' => $closureId, 'case_id' => $caseId]
+        );
+
+        if ($row === null) {
+            throw new \DomainException('Abschlussakte nicht gefunden.');
+        }
+
+        $json = (string) $row['dossier_json'];
+        if ($json === '' || !hash_equals((string) $row['dossier_sha256'], hash('sha256', $json))) {
+            throw new \DomainException('Integritätsprüfung der Abschlussakte ist fehlgeschlagen.');
+        }
+
+        return [
+            'case' => $case,
+            'closure' => $row,
+            'json' => $json,
+            'filename' => sprintf(
+                '%s_Abschlussakte_%02d.json',
+                preg_replace('/[^A-Za-z0-9_-]/', '_', (string) $case['public_number']) ?: 'MeldeVerkehr',
+                (int) $row['closure_no']
+            ),
+        ];
+    }
+
     public function addAmendment(
         string $userId,
         string $caseId,
