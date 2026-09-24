@@ -389,6 +389,20 @@ final class CaseLifecycleService
                 'Korrektur dokumentiert und zur weiteren Bearbeitung übergeben'
             );
 
+            $stmt = $this->pdo->prepare(
+                'UPDATE case_correction_requests
+                 SET status = "COMPLETED",
+                     completed_by = :completed_by, completed_at = UTC_TIMESTAMP(),
+                     completion_note = :completion_note
+                 WHERE id = :id AND case_id = :case_id AND status = "OPEN"'
+            );
+            $stmt->execute([
+                'completed_by' => $userId,
+                'completion_note' => $completionNote,
+                'id' => $correctionId,
+                'case_id' => $caseId,
+            ]);
+
             $completed = $this->versions->record(
                 $caseId,
                 'CORRECTION_COMPLETED',
@@ -396,17 +410,12 @@ final class CaseLifecycleService
                 'Korrekturworkflow abgeschlossen'
             );
 
-            $stmt = $this->pdo->prepare(
+            $this->pdo->prepare(
                 'UPDATE case_correction_requests
-                 SET status = "COMPLETED", completed_version_id = :version_id,
-                     completed_by = :completed_by, completed_at = UTC_TIMESTAMP(),
-                     completion_note = :completion_note
-                 WHERE id = :id AND case_id = :case_id AND status = "OPEN"'
-            );
-            $stmt->execute([
+                 SET completed_version_id = :version_id
+                 WHERE id = :id AND case_id = :case_id'
+            )->execute([
                 'version_id' => $completed['id'],
-                'completed_by' => $userId,
-                'completion_note' => $completionNote,
                 'id' => $correctionId,
                 'case_id' => $caseId,
             ]);
@@ -525,6 +534,20 @@ final class CaseLifecycleService
 
             $this->transition($case, CaseStatus::CLOSED, $userId, 'Rücknahme abgeschlossen');
 
+            $stmt = $this->pdo->prepare(
+                'UPDATE case_withdrawals
+                 SET status = "COMPLETED",
+                     completed_by = :completed_by, completed_at = UTC_TIMESTAMP(),
+                     completion_note = :completion_note
+                 WHERE id = :id AND case_id = :case_id AND status = "OPEN"'
+            );
+            $stmt->execute([
+                'completed_by' => $userId,
+                'completion_note' => $completionNote,
+                'id' => $withdrawalId,
+                'case_id' => $caseId,
+            ]);
+
             $closure = $this->createClosureRecord(
                 $caseId,
                 $userId,
@@ -532,17 +555,12 @@ final class CaseLifecycleService
                 $completionNote ?? (string) $withdrawal['reason']
             );
 
-            $stmt = $this->pdo->prepare(
+            $this->pdo->prepare(
                 'UPDATE case_withdrawals
-                 SET status = "COMPLETED", closure_version_id = :version_id,
-                     completed_by = :completed_by, completed_at = UTC_TIMESTAMP(),
-                     completion_note = :completion_note
-                 WHERE id = :id AND case_id = :case_id AND status = "OPEN"'
-            );
-            $stmt->execute([
+                 SET closure_version_id = :version_id
+                 WHERE id = :id AND case_id = :case_id'
+            )->execute([
                 'version_id' => $closure['version']['id'],
-                'completed_by' => $userId,
-                'completion_note' => $completionNote,
                 'id' => $withdrawalId,
                 'case_id' => $caseId,
             ]);
