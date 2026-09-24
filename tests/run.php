@@ -16,6 +16,7 @@ use MeldeVerkehr\Cases\CaseStatusMachine;
 use MeldeVerkehr\Config\Config;
 use MeldeVerkehr\Database\Connection;
 use MeldeVerkehr\Database\MigrationRunner;
+use MeldeVerkehr\Evidence\EvidenceImageProcessor;
 use MeldeVerkehr\Evidence\EvidenceService;
 use MeldeVerkehr\Evidence\EvidenceStorage;
 use MeldeVerkehr\Queue\JobQueue;
@@ -238,11 +239,13 @@ try {
     }
     file_put_contents($evidenceSource, $png);
 
+    $evidenceStorage = new EvidenceStorage($basePath . '/storage/app');
     $evidenceService = new EvidenceService(
         $pdo,
         new AuthorizationService($permissions),
-        new EvidenceStorage($basePath . '/storage/app'),
-        new AuditLogger($pdo, 'test-audit-key')
+        $evidenceStorage,
+        new AuditLogger($pdo, 'test-audit-key'),
+        new EvidenceImageProcessor($evidenceStorage)
     );
 
     $storedEvidence = $evidenceService->storeFile(
@@ -276,6 +279,26 @@ try {
 
     $evidenceList = $evidenceService->listForCase((string) $user['id'], $caseId);
     $assert(count($evidenceList) === 1, 'Evidence appears in owned case list');
+    $assert(
+        (int) ($evidenceList[0]['has_working_copy'] ?? 0) === 1,
+        'Evidence working copy is generated when GD is available'
+    );
+
+    $workingStmt = $pdo->prepare(
+        'SELECT storage_path, sha256 FROM evidence_versions
+         WHERE evidence_id = :id AND variant = "WORKING" AND version_no = 1'
+    );
+    $workingStmt->execute(['id' => $storedEvidence['id']]);
+    $workingRow = $workingStmt->fetch();
+    $assert(
+        is_array($workingRow)
+        && is_file($basePath . '/storage/app/' . $workingRow['storage_path'])
+        && hash_equals(
+            (string) $workingRow['sha256'],
+            hash_file('sha256', $basePath . '/storage/app/' . $workingRow['storage_path'])
+        ),
+        'Evidence working copy is separately stored and hashed'
+    );
 
     @unlink($evidenceSource);
 
