@@ -94,7 +94,7 @@ textarea{min-height:80px}button,.button{display:inline-block;margin-top:12px;pad
 <?php if($coreComplete):?>
 <section class="card <?= $c['status']==='READY_FOR_REVIEW'?'next':'' ?>"><h2>5. Grunddaten-Review</h2>
 <?php if($c['status']==='READY_FOR_REVIEW'):?><p>Die Grunddaten sind vollständig. Prüfe sie vor dem Übergang zur Beweiserfassung.</p><a class="button" href="/cases/<?= rawurlencode($c['id']) ?>/review">Review öffnen</a>
-<?php elseif($reviewDone):?><p class="done">Grunddaten wurden bestätigt. Nächster Schritt: Beweiserfassung in M3.</p>
+<?php elseif($reviewDone):?><p class="done">Grunddaten wurden bestätigt. Die Beweiserfassung ist freigeschaltet.</p><a class="button" href="/cases/<?= rawurlencode($c['id']) ?>/evidence">Beweise erfassen</a>
 <?php else:?><p class="muted">Der Review wird verfügbar, sobald der Vorgang den Prüfstatus erreicht.</p><?php endif;?>
 </section>
 <?php endif;?>
