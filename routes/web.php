@@ -6,6 +6,7 @@ use MeldeVerkehr\Admin\AdminController;
 use MeldeVerkehr\Analytics\MapAnalyticsController;
 use MeldeVerkehr\Assist\AssistController;
 use MeldeVerkehr\AuthorityPortal\AuthorityApiController;
+use MeldeVerkehr\AuthorityPortal\AuthorityInquiryWorkflowController;
 use MeldeVerkehr\AuthorityPortal\AuthorityPortalController;
 use MeldeVerkehr\Auth\AuthController;
 use MeldeVerkehr\Auth\DashboardController;
@@ -65,6 +66,7 @@ if ($installerService->isInstalled()) {
     $operations = new OperationsController($app);
     $releaseAdmin = new ReleaseAdminController($app);
     $authorityPortal = new AuthorityPortalController($app);
+    $authorityInquiry = new AuthorityInquiryWorkflowController($app);
     $authorityApi = new AuthorityApiController($app);
 
     $app->router()->get('/register', [$auth, 'registerForm']);
@@ -138,6 +140,8 @@ if ($installerService->isInstalled()) {
     $app->router()->post('/cases/{id}/dispatch', [$dispatch, 'queue']);
 
     $app->router()->get('/cases/{id}/communication', [$communication, 'index']);
+    $app->router()->get('/cases/{id}/inquiries', [$authorityInquiry, 'citizenInbox']);
+    $app->router()->post('/authority-inquiries/{id}/responses', [$authorityInquiry, 'submitResponse']);
     $app->router()->get('/communication-attachments/{id}', [$communication, 'attachment']);
     $app->router()->post('/communication-tasks/{id}/complete', [$communication, 'completeTask']);
     $app->router()->post('/communication-deadlines/{id}/resolve', [$communication, 'resolveDeadline']);
@@ -216,6 +220,7 @@ if ($installerService->isInstalled()) {
     $app->router()->get('/authority', [$authorityPortal, 'index']);
     $app->router()->get('/authority/cases/{id}', [$authorityPortal, 'case']);
     $app->router()->post('/authority/cases/{id}/inquiries', [$authorityPortal, 'createInquiry']);
+    $app->router()->post('/authority/inquiries/{id}/review', [$authorityInquiry, 'authorityReview']);
     $app->router()->get('/authority/cases/{id}/holder', [$authorityPortal, 'holder']);
     $app->router()->post('/authority/cases/{id}/holder', [$authorityPortal, 'saveHolder']);
     $app->router()->get('/authority/admin', [$authorityPortal, 'admin']);

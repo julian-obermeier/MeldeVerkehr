@@ -51,6 +51,18 @@ final class AuthorityPortalServiceFactory
         );
     }
 
+    public static function inquiries(Application $app): AuthorityInquiryWorkflowService
+    {
+        $key = (string) $app->config()->get('app.key', '');
+
+        return new AuthorityInquiryWorkflowService(
+            $app->database(),
+            self::access($app),
+            new SecretCipher($key),
+            new AuditLogger($app->database(), $key)
+        );
+    }
+
     public static function exports(Application $app): AuthorityExportService
     {
         return new AuthorityExportService(
