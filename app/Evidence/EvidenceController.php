@@ -158,14 +158,17 @@ final class EvidenceController
     {
         $permissions = new PermissionService($this->app->database());
 
+        $storage = new EvidenceStorage($this->app->basePath() . '/storage/app');
+
         return new EvidenceService(
             $this->app->database(),
             new AuthorizationService($permissions),
-            new EvidenceStorage($this->app->basePath() . '/storage/app'),
+            $storage,
             new AuditLogger(
                 $this->app->database(),
                 (string) $this->app->config()->get('app.key', '')
-            )
+            ),
+            new EvidenceImageProcessor($storage)
         );
     }
 
