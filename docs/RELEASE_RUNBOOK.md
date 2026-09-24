@@ -186,6 +186,7 @@ php cron.php inbound-mail
 php cron.php notifications
 php cron.php export-cleanup
 php cron.php retention-plan
+php cron.php rate-limit-cleanup
 php cron.php health
 ~~~
 
@@ -195,6 +196,7 @@ Empfehlung:
 - Notifications: alle 5–15 Minuten
 - Export-Cleanup: täglich
 - Retention-Plan: täglich
+- Rate-Limit-Cleanup: täglich
 - Health: alle 15 Minuten
 
 ## 8. Production-Konfiguration
