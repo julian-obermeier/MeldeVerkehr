@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace MeldeVerkehr\Auth;
 
+use MeldeVerkehr\Audit\AuditContext;
+use MeldeVerkehr\Audit\AuditLogger;
 use MeldeVerkehr\Core\Application;
 use MeldeVerkehr\Http\Request;
 use MeldeVerkehr\Http\Response;
