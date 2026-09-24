@@ -85,6 +85,7 @@ final class InstallerService
             'OCR_API_KEY' => '',
             'PUSH_VAPID_PUBLIC_KEY' => '',
             'PUSH_VAPID_PRIVATE_KEY' => '',
+            'DISPATCH_TRANSPORT' => 'dry_run',
         ]);
 
         $directory = dirname($this->lockPath());

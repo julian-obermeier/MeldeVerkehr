@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use MeldeVerkehr\Cron\CronHeartbeat;
 use MeldeVerkehr\Cron\CronRegistry;
+use MeldeVerkehr\Dispatch\DispatchJobHandler;
+use MeldeVerkehr\Dispatch\DispatchServiceFactory;
 use MeldeVerkehr\Queue\JobQueue;
 use MeldeVerkehr\Queue\JobWorker;
 
@@ -20,7 +22,10 @@ $registry = new CronRegistry();
 
 $registry->register('queue', static function () use ($app): array {
     $workerId = gethostname() . ':' . getmypid();
-    $worker = new JobWorker(new JobQueue($app->database()), []);
+    $worker = new JobWorker(
+        new JobQueue($app->database()),
+        [new DispatchJobHandler(DispatchServiceFactory::make($app))]
+    );
 
     return $worker->run($workerId, 20);
 });

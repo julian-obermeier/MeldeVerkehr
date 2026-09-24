@@ -16,12 +16,18 @@ use MeldeVerkehr\Cases\CaseStatusMachine;
 use MeldeVerkehr\Config\Config;
 use MeldeVerkehr\Database\Connection;
 use MeldeVerkehr\Database\MigrationRunner;
+use MeldeVerkehr\Dispatch\AuthorityRoutingService;
+use MeldeVerkehr\Dispatch\DispatchJobHandler;
+use MeldeVerkehr\Dispatch\DispatchPackageService;
+use MeldeVerkehr\Dispatch\DispatchService;
+use MeldeVerkehr\Dispatch\DryRunDispatchTransport;
 use MeldeVerkehr\Evidence\EvidenceImageProcessor;
 use MeldeVerkehr\Evidence\EvidencePrivacyService;
 use MeldeVerkehr\Evidence\EvidenceReviewService;
 use MeldeVerkehr\Evidence\EvidenceService;
 use MeldeVerkehr\Evidence\EvidenceStorage;
 use MeldeVerkehr\Queue\JobQueue;
+use MeldeVerkehr\Queue\JobWorker;
 use MeldeVerkehr\Security\SecretCipher;
 use MeldeVerkehr\Support\Env;
 use MeldeVerkehr\Support\Uuid;
@@ -683,6 +689,259 @@ try {
         && (int) $qualityReview['acknowledged_yellow'] === 1
         && $qualityReview['confirmed_at'] !== null,
         'Final quality review is versioned and stores traffic-light snapshot'
+    );
+
+    $authorityId = Uuid::v4();
+    $endpointId = Uuid::v4();
+    $requirementId = Uuid::v4();
+    $routingRuleId = Uuid::v4();
+
+    $pdo->prepare(
+        'INSERT INTO authorities
+         (id, name, authority_type, country_code, state_code, district, municipality, status,
+          source_note, last_verified_at, created_at, updated_at)
+         VALUES
+         (:id, "Testbehörde Gießen", "TRAFFIC_ENFORCEMENT", "DE", NULL, NULL, "Gießen", "VERIFIED",
+          "Nur automatisierter Integrationstest", UTC_TIMESTAMP(), UTC_TIMESTAMP(), UTC_TIMESTAMP())'
+    )->execute(['id' => $authorityId]);
+
+    $pdo->prepare(
+        'INSERT INTO authority_endpoints
+         (id, authority_id, channel, endpoint_value, priority, status, max_total_bytes,
+          last_verified_at, created_at, updated_at)
+         VALUES
+         (:id, :authority_id, "EMAIL", "authority@example.test", 10, "VERIFIED", 10485760,
+          UTC_TIMESTAMP(), UTC_TIMESTAMP(), UTC_TIMESTAMP())'
+    )->execute(['id' => $endpointId, 'authority_id' => $authorityId]);
+
+    $pdo->prepare(
+        'INSERT INTO authority_requirement_versions
+         (id, authority_id, version_no, required_fields_json, accepted_mime_json,
+          max_attachment_bytes, max_total_bytes, notes, active, created_at)
+         VALUES
+         (:id, :authority_id, 1, :required_fields, :accepted_mime,
+          5242880, 10485760, "Testprofil", 1, UTC_TIMESTAMP())'
+    )->execute([
+        'id' => $requirementId,
+        'authority_id' => $authorityId,
+        'required_fields' => json_encode([
+            'reporter.first_name',
+            'reporter.last_name',
+            'reporter.email',
+            'witness_report.snapshot.narrative.text',
+        ], JSON_THROW_ON_ERROR),
+        'accepted_mime' => json_encode(['image/png'], JSON_THROW_ON_ERROR),
+    ]);
+
+    $pdo->prepare(
+        'INSERT INTO authority_routing_rules
+         (id, authority_id, endpoint_id, country_code, state_code, postal_code, postal_prefix,
+          city, district, offense_category, priority, certainty, active, created_at, updated_at)
+         VALUES
+         (:id, :authority_id, :endpoint_id, "DE", NULL, "35390", NULL,
+          "Gießen", NULL, "OTHER", 200, "EXACT", 1, UTC_TIMESTAMP(), UTC_TIMESTAMP())'
+    )->execute([
+        'id' => $routingRuleId,
+        'authority_id' => $authorityId,
+        'endpoint_id' => $endpointId,
+    ]);
+
+    $broadAuthorityId = Uuid::v4();
+    $broadEndpointId = Uuid::v4();
+    $broadRuleId = Uuid::v4();
+
+    $pdo->prepare(
+        'INSERT INTO authorities
+         (id, name, authority_type, country_code, state_code, district, municipality, status,
+          source_note, last_verified_at, created_at, updated_at)
+         VALUES
+         (:id, "Breite Testbehörde", "TRAFFIC_ENFORCEMENT", "DE", NULL, NULL, NULL, "VERIFIED",
+          "Nur automatisierter Integrationstest", UTC_TIMESTAMP(), UTC_TIMESTAMP(), UTC_TIMESTAMP())'
+    )->execute(['id' => $broadAuthorityId]);
+
+    $pdo->prepare(
+        'INSERT INTO authority_endpoints
+         (id, authority_id, channel, endpoint_value, priority, status, max_total_bytes,
+          last_verified_at, created_at, updated_at)
+         VALUES
+         (:id, :authority_id, "EMAIL", "broad@example.test", 10, "VERIFIED", NULL,
+          UTC_TIMESTAMP(), UTC_TIMESTAMP(), UTC_TIMESTAMP())'
+    )->execute(['id' => $broadEndpointId, 'authority_id' => $broadAuthorityId]);
+
+    $pdo->prepare(
+        'INSERT INTO authority_routing_rules
+         (id, authority_id, endpoint_id, country_code, state_code, postal_code, postal_prefix,
+          city, district, offense_category, priority, certainty, active, created_at, updated_at)
+         VALUES
+         (:id, :authority_id, :endpoint_id, "DE", NULL, NULL, NULL,
+          NULL, NULL, NULL, 10, "LIKELY", 1, UTC_TIMESTAMP(), UTC_TIMESTAMP())'
+    )->execute([
+        'id' => $broadRuleId,
+        'authority_id' => $broadAuthorityId,
+        'endpoint_id' => $broadEndpointId,
+    ]);
+
+    $dispatchAuthorization = new AuthorizationService($permissions);
+    $routingService = new AuthorityRoutingService($pdo, $dispatchAuthorization);
+    $route = $routingService->routeForCase((string) $user['id'], $caseId);
+    $assert(
+        $route['status'] === 'MATCHED'
+        && ($route['selected']['authority_id'] ?? null) === $authorityId
+        && ($route['selected']['certainty'] ?? null) === 'EXACT',
+        'Authority routing selects the most specific exact rule'
+    );
+
+    $requirements = $routingService->requirements($authorityId);
+    $assert(
+        is_array($requirements)
+        && (int) $requirements['version_no'] === 1
+        && in_array('reporter.email', $requirements['required_fields'], true),
+        'Authority requirement profile loads latest active version'
+    );
+
+    $dispatchPackageService = new DispatchPackageService(
+        $pdo,
+        $dispatchAuthorization,
+        $caseService,
+        $witnessService,
+        $witnessCipher
+    );
+    $dispatchPreview = $dispatchPackageService->preview(
+        (string) $user['id'],
+        $caseId,
+        $route['selected'],
+        $requirements
+    );
+    $assert(
+        $dispatchPreview['ready'] === true
+        && $dispatchPreview['errors'] === [],
+        'Dispatch package satisfies authority compatibility profile'
+    );
+
+    $dispatchQueue = new JobQueue($pdo);
+    $dryRunTransport = new DryRunDispatchTransport($pdo);
+    $dispatchService = new DispatchService(
+        $pdo,
+        $dispatchAuthorization,
+        $caseService,
+        $routingService,
+        $dispatchPackageService,
+        $dispatchQueue,
+        $dryRunTransport,
+        $evidenceStorage,
+        new AuditLogger($pdo, 'test-audit-key')
+    );
+
+    $dispatchReview = $dispatchService->review((string) $user['id'], $caseId);
+    $assert(
+        $dispatchReview['ready'] === true
+        && $dispatchReview['warnings'] === [],
+        'Citizen dispatch review is ready for exact verified test route'
+    );
+
+    $queuedDispatch = $dispatchService->queueDispatch(
+        (string) $user['id'],
+        $caseId,
+        true,
+        true
+    );
+    $assert(
+        ($queuedDispatch['status'] ?? null) === 'QUEUED',
+        'Dispatch is queued only after explicit citizen confirmation'
+    );
+
+    $afterDispatchQueue = $caseService->findOwned((string) $user['id'], $caseId);
+    $assert(
+        ($afterDispatchQueue['case']['status'] ?? null) === CaseStatus::SUBMISSION_PENDING,
+        'Queued dispatch advances case to SUBMISSION_PENDING'
+    );
+
+    $dispatchPackageStmt = $pdo->prepare(
+        'SELECT manifest_encrypted, manifest_sha256
+         FROM dispatch_packages WHERE id = :id LIMIT 1'
+    );
+    $dispatchPackageStmt->execute(['id' => $queuedDispatch['package_id']]);
+    $dispatchPackageStorage = $dispatchPackageStmt->fetch();
+    $assert(
+        is_array($dispatchPackageStorage)
+        && !str_contains((string) $dispatchPackageStorage['manifest_encrypted'], 'Teststraße')
+        && !str_contains((string) $dispatchPackageStorage['manifest_encrypted'], 'authority@example.test'),
+        'Dispatch manifest is encrypted at rest'
+    );
+
+    $loadedDispatchPackage = $dispatchPackageService->load((string) $queuedDispatch['package_id']);
+    $loadedDispatchJson = json_encode(
+        $loadedDispatchPackage['manifest'],
+        JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+    );
+    $assert(
+        hash_equals(
+            (string) $loadedDispatchPackage['manifest_sha256'],
+            hash('sha256', $loadedDispatchJson)
+        ),
+        'Dispatch package plaintext verifies against stored SHA-256'
+    );
+
+    $dispatchWorker = new JobWorker(
+        $dispatchQueue,
+        [new DispatchJobHandler($dispatchService)]
+    );
+    $dispatchWorkerResult = $dispatchWorker->run('dispatch-test-worker', 1);
+    $assert(
+        $dispatchWorkerResult['processed'] === 1
+        && $dispatchWorkerResult['errors'] === 0,
+        'Dispatch queue worker processes dry-run transport job'
+    );
+
+    $dispatchRowStmt = $pdo->prepare(
+        'SELECT status, sent_at, last_error FROM dispatches WHERE id = :id LIMIT 1'
+    );
+    $dispatchRowStmt->execute(['id' => $queuedDispatch['dispatch_id']]);
+    $dispatchRow = $dispatchRowStmt->fetch();
+    $assert(
+        is_array($dispatchRow)
+        && $dispatchRow['status'] === 'SENT'
+        && $dispatchRow['sent_at'] !== null
+        && $dispatchRow['last_error'] === null,
+        'Accepted dry-run transport records dispatch as SENT'
+    );
+
+    $afterDispatch = $caseService->findOwned((string) $user['id'], $caseId);
+    $assert(
+        ($afterDispatch['case']['status'] ?? null) === CaseStatus::SENT,
+        'Accepted dispatch advances case to SENT'
+    );
+
+    $outboxStmt = $pdo->prepare(
+        'SELECT recipient, body_sha256, attachment_manifest_json
+         FROM dispatch_dry_run_outbox WHERE dispatch_id = :dispatch_id LIMIT 1'
+    );
+    $outboxStmt->execute(['dispatch_id' => $queuedDispatch['dispatch_id']]);
+    $outbox = $outboxStmt->fetch();
+    $outboxAttachments = is_array($outbox)
+        ? json_decode((string) $outbox['attachment_manifest_json'], true)
+        : null;
+    $assert(
+        is_array($outbox)
+        && $outbox['recipient'] === 'authority@example.test'
+        && is_array($outboxAttachments)
+        && count($outboxAttachments) === 1
+        && ($outboxAttachments[0]['sha256'] ?? null) === $publicPreview['sha256'],
+        'Dry-run outbox records recipient and verified attachment hashes without sending mail'
+    );
+
+    $attemptStmt = $pdo->prepare(
+        'SELECT attempt_no, status, provider_reference
+         FROM dispatch_attempts WHERE dispatch_id = :dispatch_id ORDER BY attempt_no DESC LIMIT 1'
+    );
+    $attemptStmt->execute(['dispatch_id' => $queuedDispatch['dispatch_id']]);
+    $attempt = $attemptStmt->fetch();
+    $assert(
+        is_array($attempt)
+        && (int) $attempt['attempt_no'] === 1
+        && $attempt['status'] === 'SENT'
+        && str_starts_with((string) $attempt['provider_reference'], 'dryrun:'),
+        'Dispatch attempt stores dry-run provider reference'
     );
 
     @unlink($evidenceSource);

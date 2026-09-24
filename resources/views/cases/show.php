@@ -19,6 +19,12 @@ $coreComplete=$vehicleDone&&$locationDone&&$observationDone&&$offenseDone;
 $reviewDone=$c['status']===MeldeVerkehrCasesCaseStatus::WAITING_FOR_EVIDENCE;
 $duration=$c['observation_duration_seconds']??null;
 $submissionReady=$c['status']===\MeldeVerkehr\Cases\CaseStatus::READY_FOR_SUBMISSION;
+$dispatchRelevant=in_array($c['status'],[
+    \MeldeVerkehr\Cases\CaseStatus::READY_FOR_SUBMISSION,
+    \MeldeVerkehr\Cases\CaseStatus::SUBMISSION_PENDING,
+    \MeldeVerkehr\Cases\CaseStatus::SENT,
+    \MeldeVerkehr\Cases\CaseStatus::DELIVERY_FAILED,
+],true);
 ?>
 <!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#172033"><link rel="manifest" href="/manifest.webmanifest"><title><?= $e($c['public_number']) ?> – MeldeVerkehr</title>
 <style>
@@ -105,6 +111,8 @@ textarea{min-height:80px}button,.button{display:inline-block;margin-top:12px;pad
 </section>
 <?php endif;?>
 <?php else:?><section class="card"><p>Dieser Vorgang ist in seinem aktuellen Status nicht direkt bearbeitbar.</p></section><?php endif;?>
+
+<?php if($dispatchRelevant):?><section class="card"><h2>Behördenversand</h2><p><?= $submissionReady?'Der Vorgang ist für das Behördenrouting freigegeben.':'Für diesen Vorgang existiert ein Versandstatus.' ?></p><a class="button" href="/cases/<?= rawurlencode($c['id']) ?>/dispatch"><?= $submissionReady?'Behörde prüfen & Versand vorbereiten':'Versandstatus ansehen' ?></a></section><?php endif;?>
 
 <section class="card"><h2>Statushistorie</h2><div class="timeline"><?php foreach(array_reverse($data['history']) as $item):?><div class="event"><strong><?= $e($statusLabels[$item['new_status']]??$item['new_status']) ?></strong><br><small class="muted"><?= $e($item['created_at']) ?><?php if($item['reason']):?> · <?= $e($item['reason']) ?><?php endif;?></small></div><?php endforeach;?></div></section>
 </main><script src="/assets/app.js" defer></script><script>

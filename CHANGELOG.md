@@ -5,6 +5,16 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 ## [Unreleased]
 
 ### Added
+- M5-Behördenverzeichnis mit Endpunkten, Routingregeln und versionierten Anforderungen
+- deterministische Zuständigkeitslogik mit Spezifitätsscore und Ambiguitätserkennung
+- verschlüsselte und gehashte Dispatch-Packages
+- Behörden-Kompatibilitätsprüfung für Pflichtfelder, MIME-Typen und Größenlimits
+- versionierte Dispatches und Versandversuche
+- Dispatch-Queue-Handler für Shared-Hosting-Cron
+- DB-Dry-Run-Transport und attachment-fähiger PHP-mail-Transport
+- Bürger-Versandreview mit expliziter Ziel-/Warnungsbestätigung
+- Dry-Run-Outbox für nachvollziehbare Tests ohne reale E-Mails
+- Integrationstests für Routing, Dispatch-Package, Queue, Attachments und SENT-Status
 - M4-Datenmodell für eigene Beobachtungen, Narrative, Zeugenberichte, Erklärungen und Qualitätsreviews
 - versionierte eigene Beobachtung mit verschlüsselter Freitextspeicherung
 - deterministischer neutraler Sachverhaltgenerator
@@ -102,6 +112,9 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 - CSRF-Schutz für Installations- und Authentifizierungsformulare
 
 ### Changed
+- Installer und Beispielkonfiguration setzen DISPATCH_TRANSPORT standardmäßig auf dry_run
+- Cron-Queue registriert den DISPATCH_SEND-Handler
+- READY_FOR_SUBMISSION kann nach bestätigtem Versandauftrag in SUBMISSION_PENDING wechseln
 - nach bestätigtem M4-Review sind Beobachtung, Sachverhalt und Zeugenbericht nur noch lesbar
 - READY_FOR_SUBMISSION markiert den abgeschlossenen Bürger-Vorbereitungsprozess vor dem Behördenversand
 - Evidence-Änderungen werden nach eingefrorener Beweismappe serverseitig gesperrt
@@ -128,6 +141,10 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 - native Mailheader werden gegen Zeilenumbrüche abgesichert und UTF-8-Betreffzeilen kodiert
 
 ### Security
+- Dispatch-Manifeste werden feldseitig verschlüsselt gespeichert und per SHA-256 verifiziert
+- Evidence-Anlagen werden direkt vor dem Transport erneut gegen eingefrorene Hashes geprüft
+- reale Behördenmails sind standardmäßig deaktiviert; Dry-Run muss explizit auf php_mail umgestellt werden
+- Routing bei gleichwertigen Behördenkandidaten wird blockiert statt still ausgewählt
 - Beobachtungs- und Sachverhaltstexte werden feldseitig verschlüsselt gespeichert
 - Zeugenbericht-Snapshots werden verschlüsselt gespeichert und zusätzlich per SHA-256 verifiziert
 - elektronische Erklärungen speichern IP-, User-Agent- und Sessionbezug nur als Hash/HMAC
