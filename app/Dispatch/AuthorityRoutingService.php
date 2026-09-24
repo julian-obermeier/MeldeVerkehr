@@ -126,7 +126,7 @@ final class AuthorityRoutingService
     private function caseContext(string $userId, string $caseId): array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT c.id, c.user_id, l.country, l.postal_code, l.city,
+            'SELECT c.id, c.user_id, l.country, l.state, l.district, l.postal_code, l.city,
                     o.category_key AS offense_category
              FROM cases c
              LEFT JOIN locations l ON l.case_id = c.id
@@ -149,8 +149,8 @@ final class AuthorityRoutingService
             'country_code' => strtoupper(trim((string) ($row['country'] ?? 'DE'))) ?: 'DE',
             'postal_code' => trim((string) ($row['postal_code'] ?? '')),
             'city' => trim((string) ($row['city'] ?? '')),
-            'district' => '',
-            'state_code' => '',
+            'district' => trim((string) ($row['district'] ?? '')),
+            'state_code' => trim((string) ($row['state'] ?? '')),
             'offense_category' => trim((string) ($row['offense_category'] ?? '')),
         ];
     }
