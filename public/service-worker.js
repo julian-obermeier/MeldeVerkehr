@@ -44,3 +44,45 @@ self.addEventListener('fetch', event => {
     );
   }
 });
+
+
+self.addEventListener('push', event => {
+  event.waitUntil(
+    fetch('/notifications/push-latest', {
+      credentials: 'include',
+      cache: 'no-store',
+      headers: { 'Accept': 'application/json' }
+    })
+      .then(response => response.ok ? response.json() : null)
+      .then(payload => {
+        const item = payload?.data;
+        if (!item?.title) return;
+
+        return self.registration.showNotification(item.title, {
+          body: item.body || '',
+          icon: '/assets/icon.svg',
+          badge: '/assets/icon.svg',
+          tag: item.id ? 'notification-' + item.id : undefined,
+          data: { url: item.action_url || '/notifications' }
+        });
+      })
+      .catch(() => undefined)
+  );
+});
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const url = event.notification?.data?.url || '/notifications';
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clients => {
+      for (const client of clients) {
+        if ('focus' in client) {
+          client.navigate(url);
+          return client.focus();
+        }
+      }
+      return self.clients.openWindow ? self.clients.openWindow(url) : undefined;
+    })
+  );
+});
