@@ -1,51 +1,50 @@
 # Projektstatus
 
 ## Aktuelle Version
-0.1.0-dev
+0.2.0-dev
 
 ## Phase
-M1 – Fundament
+M2 – Bürgerportal / Vorgangskern
 
-## Umgesetzt
-- GitHub-first Repository eingerichtet
-- main und develop vorhanden
-- Produktplan, Spezifikation und Entwicklungs-Masterprompt im Repository
-- README, Security-, Contribution- und Agent-Regeln
-- GitHub Issue-/PR-Templates
-- PHP-Lint-, Security- und MySQL-Integrationstest-Workflows
-- PHP-Front-Controller, Request/Response, Router und Fehlerhandling
-- /health-Endpunkt und Shared-Hosting-.htaccess-Schutz
-- private Storage-Grundstruktur
-- Konfigurationssystem auf Basis von .env + config/*.php
-- sicherer PDO-Datenbank-Layer
-- versionierte Migration-Engine inklusive CLI-Befehl
-- zweistufiger Webinstaller unter /install
-- Registrierung, Login/Logout, E-Mail-Verifikation und Passwort-Reset
-- DB-basiertes Login-Rate-Limiting
-- Rollen/Permissions inklusive resource-basierter Ownership-Autorisierung
-- HMAC-signiertes, verkettetes Audit-System
-- DB-basierte Jobqueue mit Locking, Retry und Backoff
-- Cron-Registry mit Heartbeat-/Run-Historie
-- Admin-Systemdashboard mit DB-, Queue-, Cron- und Audit-Status
-- aktionsorientiertes Bürger-Dashboard-Grundgerüst
-- PWA-Manifest, Service Worker, Offline-Fallback und App-Icon
-- datenschutzfreundliche Cache-Strategie ohne Caching privater Navigationsantworten
-- TOTP-Zwei-Faktor-Authentifizierung mit verschlüsseltem Secret und Einmal-Recovery-Codes
-- Passkeys/WebAuthn mit ES256/P-256, RP-ID-/Origin-/Challenge-/Signaturprüfung
-- frische Re-Authentication für sensible Sicherheitseinstellungen
-- Rate-Limits für Passwort-, TOTP- und Passkey-Anmeldung
-- MySQL-Integrationstests plus zusätzliche Tests für Ownership, TOTP, Secret-Verschlüsselung und WebAuthn-Helfer
+## M1 – Fundament
+Abgeschlossen und auf `develop` integriert.
 
-## M1-Status
-M1 – Fundament ist technisch abgeschlossen. Die fachlichen Vorgangsdaten beginnen in M2.
+## In M2 umgesetzt
+- parametrisierte Router-Pfade wie `/cases/{id}`
+- Vorgangstabelle mit UUID und öffentlicher Nummer `OWI-YYYY-NNNNNN`
+- atomarer Jahresnummernkreis
+- vollständige Statuskonstanten und explizite Statusmaschine
+- Statushistorie und Vorgangstimeline
+- serverseitige Ownership-Prüfung für private Vorgänge
+- verschlüsselte Kennzeichenspeicherung
+- geheimer HMAC-Suchhash für Kennzeichen
+- Fahrzeugdaten mit festen Fahrzeugtypen
+- Standortdaten mit GPS oder Adresse
+- strukturierter Verkehrsraum und PUBLIC/PRIVATE/UNCLEAR
+- versionierte Tatbestände
+- eigene Tatbestandskategorien als Stammdaten
+- neutraler interner Entwurfs-Tatbestand ohne ungeprüfte Rechts-/Bußgeldwerte
+- eigener Vorgangsbereich mit Liste, Statusfilter und Suche
+- Suche nach Vorgangsnummer, Straße, Ort oder exaktem Kennzeichen
+- adaptive Erfassung Fahrzeug → Standort → Tatbestand
+- Browser-GPS-Übernahme
+- Dashboard mit echten Vorgangszahlen und letzten Vorgängen
+- automatische Fortschrittslogik DRAFT → CAPTURE_IN_PROGRESS → WAITING_FOR_EVIDENCE
+- Integrationstests für Nummernkreis, Statusmaschine, Ownership, Fahrzeug, Standort, Suche, Tatbestandsversionierung und Dashboarddaten
+
+## M2 noch offen
+- Tatzeit-/Beobachtungszeit-UI
+- weitere fachlich verifizierte Tatbestandsdaten
+- Feinschliff des mobilen Wizards
+- Review-Schritt als Vorbereitung auf M3
+- ggf. Serien-/Gruppen-Grundstruktur erst in späterer Ausbaustufe
 
 ## Bekannte Einschränkungen
-- Der Router unterstützt aktuell nur exakt registrierte Pfade; dynamische Parameter folgen mit M2.
-- Der aktuelle E-Mail-Transport verwendet PHP mail(); konfigurierbares SMTP folgt mit dem Kommunikations-/Mail-Ausbau.
-- Das Bürger-Dashboard zeigt noch keine Vorgangszahlen, da die Case-Tabellen erst in M2 entstehen.
-- Die Queue besitzt Infrastruktur, fachliche Job-Handler folgen mit den jeweiligen Modulen.
-- PWA-Offlinedaten/IndexedDB für Meldungsentwürfe folgen mit dem Meldeworkflow.
-- WebAuthn unterstützt in M1 gezielt ES256/P-256; weitere Algorithmen können später ergänzt werden.
+- Die produktive Tatbestandsdatenbank enthält bewusst noch keine ungeprüften Bußgeld- oder Rechtsangaben.
+- Der aktuelle E-Mail-Transport verwendet PHP `mail()`; SMTP folgt mit dem Kommunikationsausbau.
+- Beweisbilder, OCR, Anonymisierung und Beweismappe beginnen in M3.
+- PWA-Offlinedaten/IndexedDB für Meldungsentwürfe folgen zusammen mit dem erweiterten Meldeworkflow.
+- WebAuthn unterstützt derzeit ES256/P-256.
 
 ## Nächster Schritt
-M2 – Bürgerportal/Vorgänge: Case-Modell, Statusmaschine, Fahrzeug, Standort, Tatbestände und adaptiver Melde-Wizard.
+M2-Core per CI validieren und integrieren; anschließend Tatzeit/Review fertigstellen und M3 – Beweissystem beginnen.
