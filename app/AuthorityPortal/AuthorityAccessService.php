@@ -223,7 +223,7 @@ final class AuthorityAccessService
         $roleStmt->execute(['name' => $roleName]);
         $roleId = $roleStmt->fetchColumn();
 
-        if (!is_string($roleId) || $roleId === '') {
+        if ($roleId === false || $roleId === null || (string) $roleId === '') {
             throw new \RuntimeException('Authority-Rolle fehlt.');
         }
 
