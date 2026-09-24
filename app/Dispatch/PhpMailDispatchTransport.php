@@ -38,6 +38,16 @@ final class PhpMailDispatchTransport implements DispatchTransportInterface
         $boundary = 'mv_dispatch_' . bin2hex(random_bytes(16));
         $messageId = $headers['Message-ID'] ?? ('<mv-' . bin2hex(random_bytes(16)) . '@localhost>');
         $replyTo = $headers['Reply-To'] ?? null;
+        $inReplyTo = $headers['In-Reply-To'] ?? null;
+
+        if ($inReplyTo !== null && !$this->validHeaderValue($inReplyTo)) {
+            return [
+                'accepted' => false,
+                'provider_reference' => null,
+                'response' => ['reason' => 'invalid_in_reply_to_header'],
+                'message_id' => null,
+            ];
+        }
 
         if (
             !$this->validHeaderValue($messageId)
@@ -67,6 +77,10 @@ final class PhpMailDispatchTransport implements DispatchTransportInterface
 
         if ($replyTo !== null) {
             $headers[] = 'Reply-To: ' . $replyTo;
+        }
+        if ($inReplyTo !== null) {
+            $headers[] = 'In-Reply-To: ' . $inReplyTo;
+            $headers[] = 'References: ' . $inReplyTo;
         }
 
         $body = '--' . $boundary . "\r\n"
@@ -111,7 +125,7 @@ final class PhpMailDispatchTransport implements DispatchTransportInterface
         return [
             'accepted' => $accepted,
             'provider_reference' => $accepted ? 'php-mail:' . $dispatchId : null,
-            'response' => ['mode' => 'php_mail', 'reply_to' => $replyTo],
+            'response' => ['mode' => 'php_mail', 'reply_to' => $replyTo, 'in_reply_to' => $inReplyTo],
             'message_id' => $accepted ? $messageId : null,
         ];
     }
