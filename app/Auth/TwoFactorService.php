@@ -29,6 +29,10 @@ final class TwoFactorService
 
     public function beginSetup(string $userId, string $email, string $issuer): array
     {
+        if ($this->enabled($userId)) {
+            throw new \DomainException('TOTP is already enabled.');
+        }
+
         $secret = Totp::secret();
         $encrypted = $this->cipher->encrypt($secret);
 
