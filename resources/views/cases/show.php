@@ -143,7 +143,7 @@ textarea{min-height:80px}button,.button{display:inline-block;margin-top:12px;pad
 <?php endif;?>
 <?php else:?><section class="card"><p>Dieser Vorgang ist in seinem aktuellen Status nicht direkt bearbeitbar.</p></section><?php endif;?>
 
-<?php if($dispatchRelevant):?><section class="card"><h2>Behördenversand</h2><p><?= $submissionReady?'Der Vorgang ist für das Behördenrouting freigegeben.':'Für diesen Vorgang existiert ein Versandstatus.' ?></p><a class="button" href="/cases/<?= rawurlencode($c['id']) ?>/dispatch"><?= $submissionReady?'Behörde prüfen & Versand vorbereiten':'Versandstatus ansehen' ?></a><?php if($communicationRelevant):?> <a class="button" href="/cases/<?= rawurlencode($c['id']) ?>/communication">Behördenkommunikation</a><?php endif;?></section><?php endif;?>
+<?php if($dispatchRelevant):?><section class="card"><h2>Behördenversand</h2><p><?= $submissionReady?'Der Vorgang ist für das Behördenrouting freigegeben.':'Für diesen Vorgang existiert ein Versandstatus.' ?></p><a class="button" href="/cases/<?= rawurlencode($c['id']) ?>/dispatch"><?= $submissionReady?'Behörde prüfen & Versand vorbereiten':'Versandstatus ansehen' ?></a><?php if($communicationRelevant):?> <a class="button" href="/cases/<?= rawurlencode($c['id']) ?>/communication">Behördenkommunikation</a> <a class="button secondary" href="/cases/<?= rawurlencode($c['id']) ?>/inquiries">Behördenanfragen</a><?php endif;?></section><?php endif;?>
 
 <?php if(in_array($c['status'],[
         \MeldeVerkehr\Cases\CaseStatus::WAITING_FOR_EVIDENCE,
