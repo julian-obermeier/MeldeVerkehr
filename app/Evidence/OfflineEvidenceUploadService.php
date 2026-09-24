@@ -99,6 +99,13 @@ final class OfflineEvidenceUploadService
                 ];
             }
 
+            if ((string) $existing['status'] === 'PROCESSING') {
+                $updated = strtotime((string) $existing['updated_at'] . ' UTC');
+                if ($updated !== false && $updated > time() - 120) {
+                    throw new \DomainException('Dieser Offline-Upload wird bereits verarbeitet.');
+                }
+            }
+
             $this->pdo->prepare(
                 'UPDATE offline_evidence_uploads
                  SET status = "PROCESSING", last_error = NULL, updated_at = UTC_TIMESTAMP()
