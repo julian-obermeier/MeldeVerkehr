@@ -11,6 +11,7 @@ use MeldeVerkehr\Auth\PermissionService;
 use MeldeVerkehr\Core\Application;
 use MeldeVerkehr\Http\Request;
 use MeldeVerkehr\Http\Response;
+use MeldeVerkehr\Operations\OperationsServiceFactory;
 use MeldeVerkehr\Support\View;
 use PDO;
 
@@ -63,6 +64,7 @@ final class AdminController
             'jobCounts' => $this->jobCounts($this->app->database()),
             'cronRuns' => $this->recentCronRuns($this->app->database()),
             'auditIntegrity' => $audit->verifyChain(),
+            'diagnostics' => OperationsServiceFactory::diagnostics($this->app)->snapshot(),
         ]));
     }
 
