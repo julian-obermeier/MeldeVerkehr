@@ -236,6 +236,41 @@ try {
     }
     $assert($foreignBlocked, 'Foreign user cannot read another user case');
 
+    $warningCase = $caseService->createDraft((string) $user['id']);
+    $warningCaseId = (string) $warningCase['case']['id'];
+    $caseService->saveVehicle((string) $user['id'], $warningCaseId, [
+        'license_plate' => 'GI-CD 456',
+        'vehicle_type' => 'PKW',
+    ]);
+    $caseService->saveLocation((string) $user['id'], $warningCaseId, [
+        'street' => 'Warnstraße',
+        'city' => 'Gießen',
+        'traffic_space_type' => 'UNKNOWN',
+        'access_type' => 'UNCLEAR',
+    ]);
+    $caseService->saveObservation((string) $user['id'], $warningCaseId, [
+        'observed_from' => '2026-09-24T11:00',
+        'observed_until' => null,
+    ]);
+    $caseService->setPrimaryOffense((string) $user['id'], $warningCaseId, $newerVersionId);
+    $warningReview = $caseService->reviewSummary((string) $user['id'], $warningCaseId);
+    $assert(count($warningReview['warnings']) >= 2, 'Review exposes quality warnings');
+
+    $warningBlocked = false;
+    try {
+        $caseService->confirmCoreReview((string) $user['id'], $warningCaseId, false);
+    } catch (DomainException $e) {
+        $warningBlocked = true;
+    }
+    $assert($warningBlocked, 'Review warnings require explicit acknowledgement');
+
+    $caseService->confirmCoreReview((string) $user['id'], $warningCaseId, true);
+    $warningAfterReview = $caseService->findOwned((string) $user['id'], $warningCaseId);
+    $assert(
+        ($warningAfterReview['case']['status'] ?? null) === CaseStatus::WAITING_FOR_EVIDENCE,
+        'Acknowledged warnings allow transition to evidence'
+    );
+
     $summary = $caseService->dashboardSummary((string) $user['id']);
     $assert($summary['open'] >= 2, 'Dashboard counts own open cases');
     $assert(count($summary['recent']) >= 2, 'Dashboard returns recent cases');
