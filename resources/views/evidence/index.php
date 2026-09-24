@@ -16,10 +16,17 @@ $quality=['SUITABLE'=>'Geeignet','LIMITED'=>'Eingeschränkt','RETAKE_RECOMMENDED
 <section class="card"><a href="/cases/<?= rawurlencode($caseId) ?>/evidence/review" style="display:inline-block;padding:10px 14px;border-radius:9px;background:#172033;color:#fff;text-decoration:none;font-weight:700">Evidence-Review / Beweismappe</a></section>
 
 <?php if(($case['status']??'')===\MeldeVerkehr\Cases\CaseStatus::WAITING_FOR_EVIDENCE):?><section class="card"><h2>Bildnachweis hinzufügen</h2>
-<form method="post" enctype="multipart/form-data" action="/cases/<?= rawurlencode($caseId) ?>/evidence"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>">
+<form method="post" enctype="multipart/form-data" action="/cases/<?= rawurlencode($caseId) ?>/evidence" data-offline-evidence="1" data-case-id="<?= $e($caseId) ?>"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>">
 <label>Kategorie</label><select name="category" required><?php foreach($categories as $category):?><option value="<?= $e($category) ?>"><?= $e($labels[$category]??$category) ?></option><?php endforeach;?></select>
 <label>Bilddatei</label><input type="file" name="evidence" accept="image/jpeg,image/png,image/webp" capture="environment" required>
-<p class="muted">JPEG, PNG oder WebP · maximal 20 MB. Die Kamera kann auf unterstützten Mobilgeräten direkt geöffnet werden.</p><button type="submit">Original sicher speichern</button></form></section>
+<p class="muted">JPEG, PNG oder WebP · maximal 20 MB. Die Kamera kann auf unterstützten Mobilgeräten direkt geöffnet werden.</p><button type="submit">Original sicher speichern</button></form>
+<div data-evidence-queue-panel style="margin-top:16px;padding-top:14px;border-top:1px solid #e1e7ed">
+<strong>Offline-Queue</strong>
+<p class="muted">Bei fehlender Verbindung kann das ausgewählte Original lokal im Browser zwischengespeichert werden. Maximal 10 Dateien / 100 MB. Einträge laufen nach 24 Stunden ab und werden beim nächsten Öffnen von MeldeVerkehr entfernt. Es werden keine Vorschaubilder erzeugt.</p>
+<p data-evidence-queue-status class="muted">Lokale Queue wird geprüft …</p>
+<button type="button" data-evidence-queue-sync>Lokale Queue jetzt senden</button>
+<button type="button" class="danger" data-evidence-queue-clear>Lokale Queue dieses Vorgangs löschen</button>
+</div></section>
 <?php else:?><section class="card"><p><strong>Beweissatz ist eingefroren.</strong> Weitere Änderungen sind in diesem Status nicht möglich. Die eingefrorene Beweismappe bleibt revisionssicher erhalten.</p></section><?php endif;?>
 
 <section class="card"><h2>Gespeicherte Nachweise</h2>

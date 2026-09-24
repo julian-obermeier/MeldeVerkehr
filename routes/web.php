@@ -115,6 +115,8 @@ if ($installerService->isInstalled()) {
 
     $app->router()->get('/cases/{id}/evidence', [$evidence, 'index']);
     $app->router()->post('/cases/{id}/evidence', [$evidence, 'upload']);
+    $app->router()->get('/cases/{id}/evidence/offline-token', [$evidence, 'offlineToken']);
+    $app->router()->post('/cases/{id}/evidence/offline-upload', [$evidence, 'offlineUpload']);
     $app->router()->post('/evidence/{id}/remove', [$evidence, 'remove']);
 
     $app->router()->get('/evidence/{id}/privacy', [$privacy, 'index']);

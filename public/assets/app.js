@@ -10,7 +10,8 @@
   }
 
   const DB_NAME = 'meldeverkehr-offline-v1';
-  const STORE = 'drafts';
+  const DRAFT_STORE = 'drafts';
+  const EVIDENCE_STORE = 'evidenceQueue';
 
   const openDb = () => new Promise((resolve, reject) => {
     if (!('indexedDB' in window)) {
@@ -18,22 +19,27 @@
       return;
     }
 
-    const request = indexedDB.open(DB_NAME, 1);
+    const request = indexedDB.open(DB_NAME, 2);
     request.onupgradeneeded = () => {
       const db = request.result;
-      if (!db.objectStoreNames.contains(STORE)) {
-        db.createObjectStore(STORE, { keyPath: 'key' });
+      if (!db.objectStoreNames.contains(DRAFT_STORE)) {
+        db.createObjectStore(DRAFT_STORE, { keyPath: 'key' });
+      }
+      if (!db.objectStoreNames.contains(EVIDENCE_STORE)) {
+        const store = db.createObjectStore(EVIDENCE_STORE, { keyPath: 'id' });
+        store.createIndex('caseId', 'caseId', { unique: false });
+        store.createIndex('expiresAt', 'expiresAt', { unique: false });
       }
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
 
-  const withStore = async (mode, callback) => {
+  const withNamedStore = async (storeName, mode, callback) => {
     const db = await openDb();
     return new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE, mode);
-      const store = tx.objectStore(STORE);
+      const tx = db.transaction(storeName, mode);
+      const store = tx.objectStore(storeName);
       let result;
       try {
         result = callback(store);
@@ -49,15 +55,15 @@
   const getDraft = async key => {
     const db = await openDb();
     return new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE, 'readonly');
-      const request = tx.objectStore(STORE).get(key);
+      const tx = db.transaction(DRAFT_STORE, 'readonly');
+      const request = tx.objectStore(DRAFT_STORE).get(key);
       request.onsuccess = () => resolve(request.result || null);
       request.onerror = () => reject(request.error);
     });
   };
 
-  const putDraft = draft => withStore('readwrite', store => store.put(draft));
-  const deleteDraft = key => withStore('readwrite', store => store.delete(key));
+  const putDraft = draft => withNamedStore(DRAFT_STORE, 'readwrite', store => store.put(draft));
+  const deleteDraft = key => withNamedStore(DRAFT_STORE, 'readwrite', store => store.delete(key));
 
   const serializeForm = form => {
     const fields = {};
@@ -205,6 +211,325 @@
         message.textContent = 'Keine Verbindung: Der Stand wurde nur lokal als Entwurf gespeichert und nicht an den Server gesendet.';
         form.parentElement?.insertBefore(message, form);
       });
+    }
+  };
+
+  const EVIDENCE_MAX_FILE_BYTES = 20 * 1024 * 1024;
+  const EVIDENCE_MAX_QUEUE_BYTES = 100 * 1024 * 1024;
+  const EVIDENCE_MAX_QUEUE_ITEMS = 10;
+  const EVIDENCE_QUEUE_TTL_MS = 24 * 60 * 60 * 1000;
+  const EVIDENCE_MIME = new Set(['image/jpeg', 'image/png', 'image/webp']);
+
+  const evidenceQueueAll = async () => {
+    const db = await openDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(EVIDENCE_STORE, 'readonly');
+      const request = tx.objectStore(EVIDENCE_STORE).getAll();
+      request.onsuccess = () => resolve(Array.isArray(request.result) ? request.result : []);
+      request.onerror = () => reject(request.error);
+    });
+  };
+
+  const putEvidenceQueueItem = item =>
+    withNamedStore(EVIDENCE_STORE, 'readwrite', store => store.put(item));
+
+  const deleteEvidenceQueueItem = id =>
+    withNamedStore(EVIDENCE_STORE, 'readwrite', store => store.delete(id));
+
+  const queueUuid = () => {
+    if (crypto.randomUUID) return crypto.randomUUID();
+
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = [...bytes].map(value => value.toString(16).padStart(2, '0')).join('');
+    return [
+      hex.slice(0, 8),
+      hex.slice(8, 12),
+      hex.slice(12, 16),
+      hex.slice(16, 20),
+      hex.slice(20),
+    ].join('-');
+  };
+
+  const sha256Blob = async blob => {
+    if (!crypto.subtle) throw new Error('SHA-256 ist in diesem Browser nicht verfügbar.');
+    const digest = await crypto.subtle.digest('SHA-256', await blob.arrayBuffer());
+    return [...new Uint8Array(digest)]
+      .map(value => value.toString(16).padStart(2, '0'))
+      .join('');
+  };
+
+  const purgeExpiredEvidence = async () => {
+    const now = Date.now();
+    const rows = await evidenceQueueAll();
+    let removed = 0;
+
+    for (const row of rows) {
+      if (Number(row.expiresAt || 0) <= now) {
+        await deleteEvidenceQueueItem(row.id);
+        removed++;
+      }
+    }
+
+    return removed;
+  };
+
+  const evidenceQueueForCase = async caseId => {
+    await purgeExpiredEvidence();
+    return (await evidenceQueueAll())
+      .filter(row => String(row.caseId) === String(caseId))
+      .sort((a, b) => Number(a.queuedAt || 0) - Number(b.queuedAt || 0));
+  };
+
+  const setEvidenceQueueStatus = text => {
+    const node = document.querySelector('[data-evidence-queue-status]');
+    if (node) node.textContent = text;
+  };
+
+  const refreshEvidenceQueueStatus = async caseId => {
+    const rows = await evidenceQueueForCase(caseId);
+    const bytes = rows.reduce((sum, row) => sum + Number(row.size || 0), 0);
+    const errors = rows.filter(row => row.state === 'ERROR' || row.state === 'BLOCKED').length;
+    const mib = (bytes / 1024 / 1024).toFixed(1);
+
+    setEvidenceQueueStatus(
+      rows.length === 0
+        ? 'Keine lokalen Bildnachweise in der Queue.'
+        : `${rows.length} lokale Datei(en), ${mib} MB${errors ? ` · ${errors} benötigt/benötigen Aufmerksamkeit` : ''}.`
+    );
+  };
+
+  const queueEvidenceFile = async (caseId, category, file) => {
+    if (!file || !(file instanceof Blob)) {
+      throw new Error('Bitte eine Bilddatei auswählen.');
+    }
+    if (!EVIDENCE_MIME.has(String(file.type).toLowerCase())) {
+      throw new Error('Offline sind nur JPEG, PNG und WebP zulässig.');
+    }
+    if (file.size < 1 || file.size > EVIDENCE_MAX_FILE_BYTES) {
+      throw new Error('Die Bilddatei muss zwischen 1 Byte und 20 MB groß sein.');
+    }
+
+    await purgeExpiredEvidence();
+    const existing = await evidenceQueueAll();
+    const totalBytes = existing.reduce((sum, row) => sum + Number(row.size || 0), 0);
+
+    if (existing.length >= EVIDENCE_MAX_QUEUE_ITEMS) {
+      throw new Error('Die Offline-Queue ist voll (maximal 10 Dateien).');
+    }
+    if (totalBytes + file.size > EVIDENCE_MAX_QUEUE_BYTES) {
+      throw new Error('Die Offline-Queue würde 100 MB überschreiten.');
+    }
+
+    const queuedAt = Date.now();
+    const item = {
+      id: queueUuid(),
+      caseId: String(caseId),
+      category: String(category),
+      name: String(file.name || 'offline-bild'),
+      type: String(file.type || ''),
+      size: Number(file.size || 0),
+      lastModified: Number(file.lastModified || queuedAt),
+      sha256: await sha256Blob(file),
+      blob: file,
+      queuedAt,
+      expiresAt: queuedAt + EVIDENCE_QUEUE_TTL_MS,
+      state: 'QUEUED',
+      attempts: 0,
+      lastError: '',
+    };
+
+    try {
+      await putEvidenceQueueItem(item);
+    } catch (error) {
+      if (error?.name === 'QuotaExceededError') {
+        throw new Error('Der Browser hat nicht genug lokalen Speicher für diesen Bildnachweis.');
+      }
+      throw error;
+    }
+
+    return item;
+  };
+
+  const offlineEvidenceToken = async caseId => {
+    const response = await fetch(
+      '/cases/' + encodeURIComponent(caseId) + '/evidence/offline-token',
+      { credentials: 'same-origin', cache: 'no-store', headers: { 'Accept': 'application/json' } }
+    );
+
+    if (response.redirected) {
+      throw new Error('Die Sitzung ist abgelaufen. Bitte erneut anmelden.');
+    }
+
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || !payload?.success) {
+      throw new Error(payload?.errors?.[0]?.message || 'Offline-Upload ist derzeit nicht möglich.');
+    }
+    if (!payload.data?.can_upload) {
+      throw new Error('Der Beweissatz ist inzwischen nicht mehr bearbeitbar.');
+    }
+
+    return payload.data;
+  };
+
+  const uploadEvidenceQueueItem = async item => {
+    const token = await offlineEvidenceToken(item.caseId);
+    const form = new FormData();
+    form.append('_csrf', token.csrf);
+    form.append('client_upload_id', item.id);
+    form.append('client_sha256', item.sha256);
+    form.append('category', item.category);
+
+    const uploadFile = typeof File === 'function'
+      ? new File([item.blob], item.name, { type: item.type, lastModified: item.lastModified })
+      : item.blob;
+    form.append('evidence', uploadFile, item.name);
+
+    item.state = 'UPLOADING';
+    item.attempts = Number(item.attempts || 0) + 1;
+    item.lastError = '';
+    await putEvidenceQueueItem(item);
+
+    let response;
+    try {
+      response = await fetch(
+        '/cases/' + encodeURIComponent(item.caseId) + '/evidence/offline-upload',
+        {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Accept': 'application/json' },
+          body: form,
+        }
+      );
+    } catch (error) {
+      item.state = 'QUEUED';
+      item.lastError = 'Netzwerkfehler';
+      await putEvidenceQueueItem(item);
+      throw error;
+    }
+
+    if (response.redirected) {
+      item.state = 'QUEUED';
+      item.lastError = 'Sitzung abgelaufen';
+      await putEvidenceQueueItem(item);
+      throw new Error('Die Sitzung ist abgelaufen. Bitte erneut anmelden.');
+    }
+
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || !payload?.success) {
+      const message = payload?.errors?.[0]?.message || 'Server hat den Offline-Upload abgelehnt.';
+      item.state = response.status === 409 ? 'QUEUED' : 'ERROR';
+      item.lastError = message;
+      await putEvidenceQueueItem(item);
+      throw new Error(message);
+    }
+
+    if (
+      payload.data?.receipt_status !== 'DONE'
+      || String(payload.data?.sha256 || '').toLowerCase() !== String(item.sha256).toLowerCase()
+    ) {
+      item.state = 'ERROR';
+      item.lastError = 'Serverbestätigung stimmt nicht mit dem lokalen SHA-256 überein.';
+      await putEvidenceQueueItem(item);
+      throw new Error(item.lastError);
+    }
+
+    await deleteEvidenceQueueItem(item.id);
+    return payload.data;
+  };
+
+  const flushEvidenceQueue = async caseId => {
+    if (!navigator.onLine) {
+      setEvidenceQueueStatus('Offline: lokale Bildnachweise bleiben geschützt in diesem Browser gespeichert.');
+      return { sent: 0, failed: 0 };
+    }
+
+    const rows = await evidenceQueueForCase(caseId);
+    let sent = 0;
+    let failed = 0;
+
+    for (const item of rows) {
+      try {
+        setEvidenceQueueStatus(`Offline-Queue wird gesendet (${sent + failed + 1}/${rows.length}) …`);
+        await uploadEvidenceQueueItem(item);
+        sent++;
+      } catch (_) {
+        failed++;
+      }
+    }
+
+    await refreshEvidenceQueueStatus(caseId);
+    return { sent, failed };
+  };
+
+  const attachOfflineEvidence = async () => {
+    const form = document.querySelector('form[data-offline-evidence="1"]');
+    if (!form) return;
+
+    const caseId = form.dataset.caseId || '';
+    const fileInput = form.querySelector('input[type="file"][name="evidence"]');
+    const category = form.querySelector('select[name="category"]');
+    const syncButton = document.querySelector('[data-evidence-queue-sync]');
+    const clearButton = document.querySelector('[data-evidence-queue-clear]');
+
+    if (!caseId || !fileInput || !category) return;
+
+    await refreshEvidenceQueueStatus(caseId).catch(() => {
+      setEvidenceQueueStatus('Lokaler Browser-Speicher ist nicht verfügbar.');
+    });
+
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      const file = fileInput.files?.[0];
+
+      try {
+        setEvidenceQueueStatus('Bild wird lokal geprüft und SHA-256 berechnet …');
+        await queueEvidenceFile(caseId, category.value, file);
+        fileInput.value = '';
+        await refreshEvidenceQueueStatus(caseId);
+
+        if (navigator.onLine) {
+          const result = await flushEvidenceQueue(caseId);
+          if (result.sent > 0 && result.failed === 0) {
+            window.location.reload();
+          }
+        } else {
+          setEvidenceQueueStatus('Offline gespeichert. Der Upload startet, sobald MeldeVerkehr wieder online geöffnet ist.');
+        }
+      } catch (error) {
+        setEvidenceQueueStatus(error?.message || 'Bild konnte nicht in die Offline-Queue aufgenommen werden.');
+      }
+    });
+
+    syncButton?.addEventListener('click', async () => {
+      const result = await flushEvidenceQueue(caseId);
+      if (result.sent > 0 && result.failed === 0) window.location.reload();
+    });
+
+    clearButton?.addEventListener('click', async () => {
+      const rows = await evidenceQueueForCase(caseId);
+      for (const row of rows) await deleteEvidenceQueueItem(row.id);
+      await refreshEvidenceQueueStatus(caseId);
+    });
+
+    window.addEventListener('online', () => {
+      flushEvidenceQueue(caseId)
+        .then(result => {
+          if (result.sent > 0 && result.failed === 0) window.location.reload();
+        })
+        .catch(() => {});
+    });
+
+    if (navigator.onLine) {
+      const rows = await evidenceQueueForCase(caseId);
+      if (rows.length > 0) {
+        flushEvidenceQueue(caseId)
+          .then(result => {
+            if (result.sent > 0 && result.failed === 0) window.location.reload();
+          })
+          .catch(() => {});
+      }
     }
   };
 
@@ -384,6 +709,7 @@
     enhanceAccessibility();
     attachGps();
     attachOfflineDrafts().catch(() => {});
+    attachOfflineEvidence().catch(() => {});
     attachPushSettings();
   });
 })();

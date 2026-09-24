@@ -34,7 +34,8 @@ final class EvidenceService
         string $originalName,
         string $category,
         string $source = 'UPLOAD',
-        ?string $capturedAt = null
+        ?string $capturedAt = null,
+        ?string $reservedEvidenceId = null
     ): array {
         $case = $this->ownedCase($userId, $caseId, 'evidence.upload');
 
@@ -71,7 +72,16 @@ final class EvidenceService
         $width = (int) $dimensions[0];
         $height = (int) $dimensions[1];
         $quality = $this->qualityState($width, $height, $size);
-        $evidenceId = Uuid::v4();
+        if (
+            $reservedEvidenceId !== null
+            && !preg_match(
+                '/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i',
+                $reservedEvidenceId
+            )
+        ) {
+            throw new \InvalidArgumentException('Reservierte Evidence-ID ist ungültig.');
+        }
+        $evidenceId = $reservedEvidenceId ?? Uuid::v4();
         $stored = $this->storage->storeOriginal($caseId, $evidenceId, $sourcePath, $mime);
 
         try {
