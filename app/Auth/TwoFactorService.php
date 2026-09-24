@@ -58,7 +58,14 @@ final class TwoFactorService
 
     public function confirm(string $userId, string $code): ?array
     {
-        $secret = $this->secretFor($userId, false);
+        $stmt = $this->pdo->prepare(
+            'SELECT secret_encrypted FROM user_totp
+             WHERE user_id = :user_id AND confirmed_at IS NULL
+             LIMIT 1'
+        );
+        $stmt->execute(['user_id' => $userId]);
+        $encrypted = $stmt->fetchColumn();
+        $secret = is_string($encrypted) ? $this->cipher->decrypt($encrypted) : null;
 
         if ($secret === null || !Totp::verify($secret, $code)) {
             return null;
