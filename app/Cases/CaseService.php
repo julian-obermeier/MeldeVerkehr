@@ -21,6 +21,7 @@ final class CaseService
         private readonly PDO $pdo,
         private readonly AuthorizationService $authorization,
         private readonly SecretCipher $cipher,
+        private readonly string $searchKey,
         private readonly AuditLogger $audit
     ) {
     }
@@ -171,7 +172,7 @@ final class CaseService
         }
 
         $encrypted = $this->cipher->encrypt($plate);
-        $hash = hash_hmac('sha256', $normalized, $this->auditKeyHint());
+        $hash = hash_hmac('sha256', $normalized, $this->searchKey);
 
         $stmt = $this->pdo->prepare(
             'INSERT INTO vehicles
@@ -488,8 +489,4 @@ final class CaseService
         return $number;
     }
 
-    private function auditKeyHint(): string
-    {
-        return hash('sha256', $this->cipher::class);
-    }
 }
