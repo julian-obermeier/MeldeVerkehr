@@ -18,9 +18,12 @@ final class DryRunDispatchTransport implements DispatchTransportInterface
         string $recipient,
         string $subject,
         string $text,
-        array $attachments = []
+        array $attachments = [],
+        array $headers = []
     ): array {
         $reference = 'dryrun:' . Uuid::v4();
+        $messageId = $headers['Message-ID'] ?? ('<mv-' . Uuid::v4() . '@dry-run.invalid>');
+        $replyTo = $headers['Reply-To'] ?? null;
 
         $attachmentManifest = array_map(
             static fn(array $attachment): array => [
@@ -34,13 +37,15 @@ final class DryRunDispatchTransport implements DispatchTransportInterface
 
         $stmt = $this->pdo->prepare(
             'INSERT INTO dispatch_dry_run_outbox
-             (dispatch_id, recipient, subject, body_sha256, attachment_manifest_json, created_at)
-             VALUES (:dispatch_id, :recipient, :subject, :body_sha256, :attachments, UTC_TIMESTAMP())'
+             (dispatch_id, recipient, reply_to, subject, message_id, body_sha256, attachment_manifest_json, created_at)
+             VALUES (:dispatch_id, :recipient, :reply_to, :subject, :message_id, :body_sha256, :attachments, UTC_TIMESTAMP())'
         );
         $stmt->execute([
             'dispatch_id' => $dispatchId,
             'recipient' => $recipient,
+            'reply_to' => $replyTo,
             'subject' => $subject,
+            'message_id' => $messageId,
             'body_sha256' => hash('sha256', $text),
             'attachments' => json_encode(
                 $attachmentManifest,
@@ -54,7 +59,9 @@ final class DryRunDispatchTransport implements DispatchTransportInterface
             'response' => [
                 'mode' => 'dry_run',
                 'attachment_count' => count($attachmentManifest),
+                'reply_to' => $replyTo,
             ],
+            'message_id' => $messageId,
         ];
     }
 }
