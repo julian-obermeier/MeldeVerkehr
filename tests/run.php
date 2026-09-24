@@ -40,6 +40,13 @@ use MeldeVerkehr\Evidence\EvidencePrivacyService;
 use MeldeVerkehr\Evidence\EvidenceReviewService;
 use MeldeVerkehr\Evidence\EvidenceService;
 use MeldeVerkehr\Evidence\EvidenceStorage;
+use MeldeVerkehr\Operations\CaseSearchService;
+use MeldeVerkehr\Operations\DiagnosticsService;
+use MeldeVerkehr\Operations\DocumentCenterService;
+use MeldeVerkehr\Operations\ExportService;
+use MeldeVerkehr\Operations\ExportStorage;
+use MeldeVerkehr\Operations\NotificationService;
+use MeldeVerkehr\Operations\RetentionService;
 use MeldeVerkehr\Queue\JobQueue;
 use MeldeVerkehr\Queue\JobWorker;
 use MeldeVerkehr\Security\SecretCipher;
@@ -2095,6 +2102,272 @@ try {
     $assert(
         $communityService->post((string) $moderator['id'], (string) $communityPost['id']) === null,
         'Moderation HIDE removes reported post from public feed'
+    );
+
+    $caseSearch = new CaseSearchService(
+        $pdo,
+        new SecretCipher('test-app-key'),
+        'test-app-key'
+    );
+
+    $plateSearch = $caseSearch->search((string) $user['id'], ['q' => 'GI-X 777']);
+    $plateSearchIds = array_column($plateSearch['results'], 'id');
+    $assert(
+        in_array($caseId, $plateSearchIds, true)
+        && !in_array($foreignMapCaseId, $plateSearchIds, true),
+        'Global case search finds exact own plate and excludes foreign cases'
+    );
+
+    $foreignPlateSearch = $caseSearch->search((string) $other['id'], ['q' => 'GI-X 777']);
+    $assert(
+        count($foreignPlateSearch['results']) === 0,
+        'Foreign user cannot discover owner case through global plate search'
+    );
+
+    $citySearch = $caseSearch->search((string) $user['id'], [
+        'city' => 'Gießen',
+        'date_from' => '2026-09-01',
+        'date_to' => '2026-09-30',
+    ]);
+    $assert(
+        $citySearch['count'] >= 2,
+        'Global case search supports city and date filters'
+    );
+
+    $savedFilter = $caseSearch->saveFilter(
+        (string) $user['id'],
+        'Gießen September',
+        [
+            'city' => 'Gießen',
+            'date_from' => '2026-09-01',
+            'date_to' => '2026-09-30',
+        ]
+    );
+    $assert(
+        ($savedFilter['name'] ?? null) === 'Gießen September'
+        && (int) ($savedFilter['live_count'] ?? 0) >= 2,
+        'Saved case filter stores normalized filters and live count'
+    );
+    $assert(
+        $caseSearch->savedFilter((string) $other['id'], (string) $savedFilter['id']) === null,
+        'Saved filters are private to their owner'
+    );
+
+    $notificationService = new NotificationService(
+        $pdo,
+        new SecretCipher('test-app-key')
+    );
+    $notificationCreated = $notificationService->create(
+        (string) $user['id'],
+        $caseId,
+        'TEST_NOTIFICATION',
+        'test-notification:' . $caseId,
+        'HIGH',
+        'Testbenachrichtigung',
+        'Verschlüsselter Benachrichtigungstext.',
+        '/cases/' . rawurlencode($caseId)
+    );
+    $assert($notificationCreated, 'In-app notification can be created');
+
+    $notificationDuplicate = $notificationService->create(
+        (string) $user['id'],
+        $caseId,
+        'TEST_NOTIFICATION',
+        'test-notification:' . $caseId,
+        'HIGH',
+        'Testbenachrichtigung',
+        'Verschlüsselter Benachrichtigungstext.',
+        '/cases/' . rawurlencode($caseId)
+    );
+    $assert(!$notificationDuplicate, 'Notification unique key prevents duplicates');
+
+    $notificationStorageStmt = $pdo->prepare(
+        'SELECT id, body_encrypted FROM user_notifications
+         WHERE user_id = :user_id AND unique_key = :unique_key LIMIT 1'
+    );
+    $notificationStorageStmt->execute([
+        'user_id' => $user['id'],
+        'unique_key' => 'test-notification:' . $caseId,
+    ]);
+    $notificationStorage = $notificationStorageStmt->fetch();
+    $assert(
+        is_array($notificationStorage)
+        && !str_contains(
+            (string) $notificationStorage['body_encrypted'],
+            'Verschlüsselter Benachrichtigungstext'
+        ),
+        'Notification body is encrypted at rest'
+    );
+
+    $notificationList = $notificationService->list((string) $user['id']);
+    $listedNotification = array_values(array_filter(
+        $notificationList,
+        static fn(array $row): bool => ($row['event_key'] ?? null) === 'TEST_NOTIFICATION'
+    ))[0] ?? null;
+    $assert(
+        is_array($listedNotification)
+        && ($listedNotification['body'] ?? null) === 'Verschlüsselter Benachrichtigungstext.',
+        'Notification center decrypts own notification body'
+    );
+    $assert(
+        count(array_filter(
+            $notificationService->list((string) $other['id']),
+            static fn(array $row): bool => ($row['event_key'] ?? null) === 'TEST_NOTIFICATION'
+        )) === 0,
+        'Notification center excludes foreign notifications'
+    );
+
+    $notificationService->markRead(
+        (string) $user['id'],
+        (string) $notificationStorage['id']
+    );
+    $readNotification = array_values(array_filter(
+        $notificationService->list((string) $user['id']),
+        static fn(array $row): bool => ($row['event_key'] ?? null) === 'TEST_NOTIFICATION'
+    ))[0] ?? null;
+    $assert(
+        is_array($readNotification) && $readNotification['read_at'] !== null,
+        'Notification can be marked read by owner'
+    );
+
+    $notificationService->savePreference(
+        (string) $user['id'],
+        'TEST_DISABLED',
+        false,
+        true,
+        true
+    );
+    $assert(
+        !$notificationService->create(
+            (string) $user['id'],
+            null,
+            'TEST_DISABLED',
+            'disabled:' . $user['id'],
+            'NORMAL',
+            'Nicht anlegen',
+            null,
+            '/dashboard'
+        ),
+        'Disabled in-app preference prevents notification creation'
+    );
+
+    $documentCenter = new DocumentCenterService($pdo);
+    $documentsBeforeExport = $documentCenter->list((string) $user['id']);
+    $documentTypes = array_values(array_unique(array_column($documentsBeforeExport, 'type')));
+    $assert(
+        in_array('EVIDENCE_PACKAGE', $documentTypes, true)
+        && in_array('WITNESS_REPORT', $documentTypes, true)
+        && in_array('DISPATCH_PACKAGE', $documentTypes, true)
+        && in_array('MUNICIPAL_REPORT', $documentTypes, true),
+        'Document center aggregates existing owned artifacts'
+    );
+    $assert(
+        count(array_filter(
+            $documentCenter->list((string) $other['id']),
+            static fn(array $row): bool => ($row['case_id'] ?? null) === $caseId
+        )) === 0,
+        'Document center excludes foreign case artifacts'
+    );
+
+    $exportStorage = new ExportStorage($basePath . '/storage/app');
+    $exportService = new ExportService(
+        $pdo,
+        $caseSearch,
+        $exportStorage,
+        new AuditLogger($pdo, 'test-audit-key')
+    );
+
+    $safeExport = $exportService->createCaseExport(
+        (string) $user['id'],
+        'json',
+        false,
+        ['q' => 'GI-X 777']
+    );
+    $safeExportBinary = $exportService->binary(
+        (string) $user['id'],
+        (string) $safeExport['id']
+    );
+    $safeExportJson = json_decode((string) $safeExportBinary['body'], true, 512, JSON_THROW_ON_ERROR);
+    $assert(
+        is_array($safeExportJson)
+        && ($safeExportJson['includes_sensitive'] ?? true) === false
+        && !str_contains((string) $safeExportBinary['body'], 'GI-X 777')
+        && !array_key_exists('license_plate', $safeExportJson['cases'][0] ?? []),
+        'Default JSON export omits sensitive plate data'
+    );
+
+    $sensitiveExport = $exportService->createCaseExport(
+        (string) $user['id'],
+        'json',
+        true,
+        ['q' => 'GI-X 777']
+    );
+    $sensitiveExportBinary = $exportService->binary(
+        (string) $user['id'],
+        (string) $sensitiveExport['id']
+    );
+    $assert(
+        str_contains((string) $sensitiveExportBinary['body'], 'GI-X 777'),
+        'Sensitive export includes plate only after explicit opt-in'
+    );
+
+    $foreignExportBlocked = false;
+    try {
+        $exportService->binary(
+            (string) $other['id'],
+            (string) $sensitiveExport['id']
+        );
+    } catch (DomainException $e) {
+        $foreignExportBlocked = true;
+    }
+    $assert($foreignExportBlocked, 'Export download enforces owner isolation');
+
+    $documentsAfterExport = $documentCenter->list((string) $user['id'], 'EXPORT');
+    $assert(
+        count($documentsAfterExport) >= 2,
+        'Document center includes newly generated exports'
+    );
+
+    $retentionService = new RetentionService($pdo, null, 7);
+    $retentionPlan = $retentionService->planForUser((string) $user['id']);
+    $retentionOverview = $retentionService->overview((string) $user['id']);
+    $assert(
+        $retentionPlan['automatic_case_deletion_enabled'] === false
+        && $retentionOverview['closed_case_days'] === null
+        && count(array_filter(
+            $retentionOverview['schedules'],
+            static fn(array $row): bool => ($row['data_type'] ?? null) === 'EXPORT'
+        )) >= 2,
+        'Retention plans temporary exports while automatic case deletion remains disabled'
+    );
+
+    $deletionPreview = $retentionService->accountDeletionPreview((string) $user['id']);
+    $assert(
+        isset($deletionPreview['review_required']['cases'])
+        && str_contains((string) $deletionPreview['note'], 'nicht automatisch gelöscht'),
+        'Account deletion preview separates review-required case data'
+    );
+
+    $diagnostics = (new DiagnosticsService(
+        $pdo,
+        new AuditLogger($pdo, 'test-audit-key'),
+        $basePath . '/storage/app'
+    ))->snapshot();
+    $assert(
+        ($diagnostics['audit']['ok'] ?? false) === true
+        && ($diagnostics['storage']['exists'] ?? false) === true
+        && (int) ($diagnostics['database']['migrations_total'] ?? 0) >= 20,
+        'Operational diagnostics reports audit storage and migration health'
+    );
+
+    $pdo->prepare(
+        'UPDATE export_artifacts
+         SET expires_at = DATE_SUB(UTC_TIMESTAMP(), INTERVAL 1 MINUTE)
+         WHERE id = :id'
+    )->execute(['id' => $safeExport['id']]);
+    $assert(
+        $exportService->cleanupExpired() >= 1,
+        'Expired export cleanup removes protected export artifacts'
     );
 
     $warningCase = $caseService->createDraft((string) $user['id']);
