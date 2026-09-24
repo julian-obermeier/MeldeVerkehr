@@ -22,7 +22,7 @@ $quality=['SUITABLE'=>'Geeignet','LIMITED'=>'Eingeschränkt','RETAKE_RECOMMENDED
 <p class="muted">JPEG, PNG oder WebP · maximal 20 MB. Die Kamera kann auf unterstützten Mobilgeräten direkt geöffnet werden.</p><button type="submit">Original sicher speichern</button></form>
 <div data-evidence-queue-panel style="margin-top:16px;padding-top:14px;border-top:1px solid #e1e7ed">
 <strong>Offline-Queue</strong>
-<p class="muted">Bei fehlender Verbindung kann das ausgewählte Original lokal im Browser zwischengespeichert werden. Maximal 10 Dateien / 100 MB, automatische Löschung nach 24 Stunden. Es werden keine Vorschaubilder erzeugt.</p>
+<p class="muted">Bei fehlender Verbindung kann das ausgewählte Original lokal im Browser zwischengespeichert werden. Maximal 10 Dateien / 100 MB. Einträge laufen nach 24 Stunden ab und werden beim nächsten Öffnen von MeldeVerkehr entfernt. Es werden keine Vorschaubilder erzeugt.</p>
 <p data-evidence-queue-status class="muted">Lokale Queue wird geprüft …</p>
 <button type="button" data-evidence-queue-sync>Lokale Queue jetzt senden</button>
 <button type="button" class="danger" data-evidence-queue-clear>Lokale Queue dieses Vorgangs löschen</button>
