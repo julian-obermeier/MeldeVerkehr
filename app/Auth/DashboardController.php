@@ -10,6 +10,7 @@ use MeldeVerkehr\Cases\CaseService;
 use MeldeVerkehr\Core\Application;
 use MeldeVerkehr\Http\Request;
 use MeldeVerkehr\Http\Response;
+use MeldeVerkehr\Operations\OperationsServiceFactory;
 use MeldeVerkehr\Security\Csrf;
 use MeldeVerkehr\Security\SecretCipher;
 use MeldeVerkehr\Support\View;
@@ -66,6 +67,9 @@ final class DashboardController
             )
         );
         $caseSummary = $caseService->dashboardSummary($id);
+        $notifications = OperationsServiceFactory::notifications($this->app);
+        $notifications->syncForUser($id);
+        $unreadNotifications = $notifications->unreadCount($id);
 
         return Response::html($this->view->render('dashboard/index', [
             'user' => $user,
@@ -74,6 +78,7 @@ final class DashboardController
             'totpEnabled' => $twoFactor->enabled($id),
             'passkeyCount' => count($passkeys),
             'caseSummary' => $caseSummary,
+            'unreadNotifications' => $unreadNotifications,
         ]));
     }
 }

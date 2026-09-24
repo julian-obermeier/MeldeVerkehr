@@ -1,0 +1,26 @@
+<?php
+$e=static fn(mixed $v):string=>htmlspecialchars((string)$v,ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8');
+$f=$result['filters'];
+?>
+<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Suche – MeldeVerkehr</title>
+<style>body{font-family:system-ui,sans-serif;background:#f5f7fa;color:#172033;margin:0}main{max-width:1150px;margin:28px auto;padding:20px}.card{background:#fff;border:1px solid #dfe5ec;border-radius:15px;padding:20px;margin-bottom:14px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}input,select{width:100%;box-sizing:border-box;padding:9px;border:1px solid #bac5d1;border-radius:8px}button,.button{display:inline-block;padding:9px 13px;border:0;border-radius:9px;background:#172033;color:#fff;text-decoration:none;font-weight:700}.secondary{background:#fff;color:#172033;border:1px solid #9aa8b7}.message,.error{padding:10px;border-radius:8px}.message{border:1px solid #8fb799}.error{border:1px solid #c99}table{width:100%;border-collapse:collapse}td,th{padding:8px;border-bottom:1px solid #e6eaef;text-align:left}.muted{color:#66758a}.filters{display:flex;gap:8px;flex-wrap:wrap}</style></head><body><main>
+<p><a href="/dashboard">Dashboard</a> · <a href="/documents">Dokumente</a> · <a href="/notifications">Benachrichtigungen</a></p>
+<h1>Globale Suche in meinen Vorgängen</h1>
+<?php if($message):?><div class="message"><?= $e($message) ?></div><?php endif;?><?php if($error):?><div class="error"><?= $e($error) ?></div><?php endif;?>
+<section class="card"><form method="get" action="/search"><div class="grid">
+<div><label>Suchbegriff</label><input name="q" value="<?= $e($f['q']??'') ?>" placeholder="Vorgang, Straße, Ort, Tatbestand, Behörde, exaktes Kennzeichen"></div>
+<div><label>Status</label><input name="status" value="<?= $e($f['status']??'') ?>"></div>
+<div><label>Ort</label><input name="city" value="<?= $e($f['city']??'') ?>"></div>
+<div><label>Behörden-ID</label><input name="authority_id" value="<?= $e($f['authority_id']??'') ?>"></div>
+<div><label>Von</label><input type="date" name="date_from" value="<?= $e($f['date_from']??'') ?>"></div>
+<div><label>Bis</label><input type="date" name="date_to" value="<?= $e($f['date_to']??'') ?>"></div>
+</div><p><button type="submit">Suchen</button></p></form></section>
+
+<section class="card"><h2>Gespeicherte Filter</h2><div class="filters"><?php foreach($savedFilters as $sf):?><span><a class="button secondary" href="/search?saved=<?= rawurlencode($sf['id']) ?>"><?= $e($sf['name']) ?> (<?= $e($sf['live_count']) ?>)</a></span><?php endforeach;?></div>
+<form method="post" action="/search/filters" style="margin-top:14px"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><?php foreach(['q','status','city','authority_id','date_from','date_to'] as $k):?><input type="hidden" name="<?= $e($k) ?>" value="<?= $e($f[$k]??'') ?>"><?php endforeach;?><div class="grid"><input name="name" placeholder="Name für aktuellen Filter" required><button type="submit">Aktuellen Filter speichern</button></div></form>
+<?php foreach($savedFilters as $sf):?><form method="post" action="/search/filters/<?= rawurlencode($sf['id']) ?>/delete" style="display:inline-block;margin-top:8px"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><button class="secondary" type="submit">„<?= $e($sf['name']) ?>“ löschen</button></form><?php endforeach;?></section>
+
+<section class="card"><h2>Export der aktuellen Treffer</h2><p class="muted">Kennzeichen werden standardmäßig nicht exportiert. Sensible Fahrzeugdaten müssen ausdrücklich eingeschaltet werden.</p><form method="post" action="/exports/cases"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><?php foreach(['q','status','city','authority_id','date_from','date_to'] as $k):?><input type="hidden" name="<?= $e($k) ?>" value="<?= $e($f[$k]??'') ?>"><?php endforeach;?><select name="format"><option value="csv">CSV</option><option value="json">JSON</option></select> <label><input style="width:auto" type="checkbox" name="include_sensitive" value="1"> Kennzeichen in diesen Export aufnehmen</label> <button type="submit">Export erstellen</button></form></section>
+
+<section class="card"><h2><?= $e($result['count']) ?> Treffer</h2><table><thead><tr><th>Vorgang</th><th>Status</th><th>Ort</th><th>Fahrzeug</th><th>Tatbestand</th><th>Behörde</th></tr></thead><tbody><?php foreach($result['results'] as $row):?><tr><td><a href="/cases/<?= rawurlencode($row['id']) ?>"><strong><?= $e($row['public_number']) ?></strong></a><br><small><?= $e($row['observed_from']??'') ?></small></td><td><?= $e($row['status']) ?></td><td><?= $e(trim(($row['street']??'').' '.($row['house_number']??'').', '.($row['city']??''),', ')) ?></td><td><?= $e($row['vehicle_type']??'') ?><?php if($row['license_plate']):?><br><small><?= $e($row['license_plate']) ?></small><?php endif;?></td><td><?= $e($row['offense_title']??'') ?></td><td><?= $e($row['authority_name']??'') ?></td></tr><?php endforeach;?></tbody></table></section>
+</main></body></html>

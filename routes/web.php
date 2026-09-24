@@ -22,6 +22,7 @@ use MeldeVerkehr\Http\Request;
 use MeldeVerkehr\Http\Response;
 use MeldeVerkehr\Install\InstallerController;
 use MeldeVerkehr\Install\InstallerService;
+use MeldeVerkehr\Operations\OperationsController;
 use MeldeVerkehr\Witness\FinalReviewController;
 use MeldeVerkehr\Witness\WitnessController;
 
@@ -54,6 +55,7 @@ if ($installerService->isInstalled()) {
     $assist = new AssistController($app);
     $analytics = new MapAnalyticsController($app);
     $community = new CommunityController($app);
+    $operations = new OperationsController($app);
 
     $app->router()->get('/register', [$auth, 'registerForm']);
     $app->router()->post('/register', [$auth, 'register']);
@@ -170,6 +172,17 @@ if ($installerService->isInstalled()) {
     $app->router()->get('/community/moderation', [$community, 'moderation']);
     $app->router()->post('/community/moderation/problems/{id}/approve', [$community, 'approveProblem']);
     $app->router()->post('/community/moderation/reports/{id}/resolve', [$community, 'resolveModeration']);
+
+    $app->router()->get('/search', [$operations, 'search']);
+    $app->router()->post('/search/filters', [$operations, 'saveFilter']);
+    $app->router()->post('/search/filters/{id}/delete', [$operations, 'deleteFilter']);
+    $app->router()->get('/documents', [$operations, 'documents']);
+    $app->router()->get('/notifications', [$operations, 'notifications']);
+    $app->router()->post('/notifications/{id}/read', [$operations, 'markNotification']);
+    $app->router()->post('/notifications/read-all', [$operations, 'markAllNotifications']);
+    $app->router()->post('/exports/cases', [$operations, 'createExport']);
+    $app->router()->get('/exports/{id}', [$operations, 'exportBinary']);
+    $app->router()->get('/settings/retention', [$operations, 'retention']);
 
     $app->router()->get('/settings/security', [$security, 'index']);
     $app->router()->post('/settings/security/totp/start', [$security, 'startTotp']);

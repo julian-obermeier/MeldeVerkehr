@@ -5,6 +5,19 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 ## [Unreleased]
 
 ### Added
+- M10-Datenmodell für gespeicherte Filter, In-App-Notifications, Notification-Präferenzen, Exportartefakte, Retention-Pläne und Account-Löschvorschau
+- globale nutzereigene Vorgangssuche
+- gespeicherte Suchfilter mit Live-Zählern
+- fallübergreifendes Dokumentcenter
+- In-App-Benachrichtigungscenter mit Prioritäten und gelesen/ungelesen
+- idempotente Notification-Synchronisation aus Aufgaben, Fristen und kritischen Fallstatus
+- CSV-/JSON-Exporte eigener Vorgänge
+- geschützter Export-Storage mit SHA-256-Prüfung
+- Retention-Planung ohne automatische Falllöschung
+- Account-Löschvorschau
+- erweiterte Betriebsdiagnostik
+- Cronjobs für Notifications, Export-Bereinigung und Retention-Planung
+- Integrationstests für Suche, Filter, Dokumente, Notifications, Exporte, Retention und Diagnostik
 - M9-Community-Datenmodell für Profile, Gruppen, Posts, Kommentare, Reaktionen, öffentliche Problemstellen, kontrollierte Fallfreigaben, Nachrichten, Moderation, Reputation und Badges
 - separate Community-Profile mit feldbezogener Sichtbarkeit
 - regionale und thematische Gruppen mit Mitgliedschaften
@@ -158,6 +171,11 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 - CSRF-Schutz für Installations- und Authentifizierungsformulare
 
 ### Changed
+- Bürgerdashboard verlinkt jetzt Suche, Dokumentcenter, Benachrichtigungen und Aufbewahrung
+- Dashboard zeigt die Anzahl ungelesener Benachrichtigungen
+- Administration zeigt zusätzliche Betriebsdiagnostik
+- Installer setzt Export-Retention auf 7 Tage und lässt geschlossene Fall-Retention standardmäßig deaktiviert
+- Bürgerportal-Version auf 0.10.0-dev aktualisiert
 - Bürgerdashboard verlinkt jetzt die Community
 - private Vorgangsansicht bietet kontrollierte Community-Freigaben für abgeschlossene Evidence-Pakete
 - Bürgerportal-Version auf 0.9.0-dev aktualisiert
@@ -199,6 +217,16 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 - native Mailheader werden gegen Zeilenumbrüche abgesichert und UTF-8-Betreffzeilen kodiert
 
 ### Security
+- globale Suche ist serverseitig strikt auf eigene Vorgänge begrenzt
+- gespeicherte Filter sind nutzergebunden
+- exakte Kennzeichensuche nutzt HMAC statt Klartextindex
+- Exporte enthalten Kennzeichen nur nach ausdrücklichem Opt-in
+- Exportdateien liegen außerhalb des Webroots und werden vor Download gehasht verifiziert
+- fremde Nutzer können Exportartefakte nicht herunterladen
+- Notification-Bodies werden verschlüsselt gespeichert
+- Notification-Aktionsziele dürfen nur lokale Root-relative URLs sein
+- Dokumentcenter zeigt ausschließlich eigene Fall-/Exportartefakte
+- automatische Falllöschung bleibt standardmäßig deaktiviert
 - Community-Profilabfragen geben keine Konto-E-Mail oder privaten Vorgangsdaten aus
 - kontrollierte Fallfreigaben enthalten weder Kennzeichen noch interne/öffentliche Vorgangsnummern
 - Community-Freigaben nutzen ausschließlich Privacy-bestätigte PUBLIC-Evidence-Versionen

@@ -9,6 +9,7 @@ use MeldeVerkehr\Communication\CommunicationServiceFactory;
 use MeldeVerkehr\Communication\InboundMailPoller;
 use MeldeVerkehr\Dispatch\DispatchJobHandler;
 use MeldeVerkehr\Dispatch\DispatchServiceFactory;
+use MeldeVerkehr\Operations\OperationsServiceFactory;
 use MeldeVerkehr\Queue\JobQueue;
 use MeldeVerkehr\Queue\JobWorker;
 
@@ -54,6 +55,59 @@ $registry->register('inbound-mail', static function () use ($app): array {
     );
 
     return $poller->run(20);
+});
+
+$registry->register('notifications', static function () use ($app): array {
+    $stmt = $app->database()->query(
+        'SELECT id FROM users WHERE status = "ACTIVE" AND email_verified_at IS NOT NULL ORDER BY id'
+    );
+
+    $service = OperationsServiceFactory::notifications($app);
+    $processed = 0;
+    $created = 0;
+
+    foreach ($stmt->fetchAll() as $row) {
+        $created += $service->syncForUser((string) $row['id']);
+        $processed++;
+    }
+
+    return [
+        'processed' => $processed,
+        'errors' => 0,
+        'message' => 'Created notifications: ' . $created,
+    ];
+});
+
+$registry->register('export-cleanup', static function () use ($app): array {
+    $count = OperationsServiceFactory::exports($app)->cleanupExpired();
+
+    return [
+        'processed' => $count,
+        'errors' => 0,
+        'message' => 'Expired exports cleaned.',
+    ];
+});
+
+$registry->register('retention-plan', static function () use ($app): array {
+    $stmt = $app->database()->query(
+        'SELECT id FROM users WHERE status = "ACTIVE" ORDER BY id'
+    );
+    $service = OperationsServiceFactory::retention($app);
+    $processed = 0;
+    $planned = 0;
+
+    foreach ($stmt->fetchAll() as $row) {
+        $result = $service->planForUser((string) $row['id']);
+        $planned += (int) $result['planned'];
+        $processed++;
+    }
+
+    return [
+        'processed' => $processed,
+        'errors' => 0,
+        'message' => 'Retention schedules created: ' . $planned
+            . '; automatic case deletion remains disabled.',
+    ];
 });
 
 $registry->register('health', static function (): array {
