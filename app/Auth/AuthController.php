@@ -137,6 +137,28 @@ final class AuthController
         }
 
         $limiter->clear($key);
+
+        if ($user['email_verified_at'] === null) {
+            $this->auth->login((string) $user['id']);
+            Csrf::rotate();
+            return Response::redirect('/verify-email/pending');
+        }
+
+        if ($this->twoFactor()->enabled((string) $user['id'])) {
+            $this->auth->beginSecondFactor((string) $user['id']);
+            Csrf::rotate();
+            $this->audit()->log(
+                'LOGIN_PASSWORD_VERIFIED_SECOND_FACTOR_REQUIRED',
+                'user',
+                (string) $user['id'],
+                'USER',
+                (string) $user['id'],
+                $this->auditMetadata()
+            );
+
+            return Response::redirect('/two-factor');
+        }
+
         $this->auth->login((string) $user['id']);
         Csrf::rotate();
         $this->audit()->log(
@@ -147,10 +169,6 @@ final class AuthController
             (string) $user['id'],
             $this->auditMetadata()
         );
-
-        if ($user['email_verified_at'] === null) {
-            return Response::redirect('/verify-email/pending');
-        }
 
         return Response::redirect('/dashboard');
     }
@@ -337,6 +355,14 @@ final class AuthController
         $id = $this->auth->id();
 
         return $id === null ? null : (new AuthService($this->app->database()))->findById($id);
+    }
+
+    private function twoFactor(): TwoFactorService
+    {
+        return new TwoFactorService(
+            $this->app->database(),
+            new \MeldeVerkehr\Security\SecretCipher((string) $this->app->config()->get('app.key', ''))
+        );
     }
 
     private function verificationService(): EmailVerificationService
