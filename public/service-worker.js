@@ -2,6 +2,7 @@ const STATIC_CACHE = 'meldeverkehr-static-v2';
 const STATIC_ASSETS = [
   '/offline.html',
   '/assets/app.js',
+  '/assets/app.css',
   '/assets/icon.svg',
   '/manifest.webmanifest'
 ];
