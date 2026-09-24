@@ -282,9 +282,108 @@
     document.head.appendChild(style);
   };
 
+  const base64UrlBytes = value => {
+    const padding = '='.repeat((4 - (value.length % 4)) % 4);
+    const raw = atob((value + padding).replace(/-/g, '+').replace(/_/g, '/'));
+    return Uint8Array.from([...raw].map(char => char.charCodeAt(0)));
+  };
+
+  const attachPushSettings = () => {
+    const enable = document.querySelector('[data-push-enable]');
+    const disable = document.querySelector('[data-push-disable]');
+    const status = document.querySelector('[data-push-status]');
+
+    if (!enable && !disable) return;
+
+    const setStatus = message => {
+      if (status) status.textContent = message;
+    };
+
+    if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
+      setStatus('Dieser Browser unterstützt Web Push nicht.');
+      if (enable) enable.disabled = true;
+      if (disable) disable.disabled = true;
+      return;
+    }
+
+    enable?.addEventListener('click', async () => {
+      try {
+        setStatus('Push wird aktiviert …');
+        const keyResponse = await fetch('/notifications/push/key', {
+          credentials: 'same-origin',
+          cache: 'no-store',
+        });
+        const keyPayload = await keyResponse.json();
+        if (!keyResponse.ok || !keyPayload?.data?.public_key) {
+          throw new Error('Push ist serverseitig nicht konfiguriert.');
+        }
+
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+          throw new Error('Benachrichtigungsberechtigung wurde nicht erteilt.');
+        }
+
+        const registration = await navigator.serviceWorker.ready;
+        let subscription = await registration.pushManager.getSubscription();
+        if (!subscription) {
+          subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: base64UrlBytes(keyPayload.data.public_key),
+          });
+        }
+
+        const json = subscription.toJSON();
+        const body = new URLSearchParams({
+          _csrf: enable.dataset.csrf || '',
+          endpoint: subscription.endpoint,
+          p256dh: json.keys?.p256dh || '',
+          auth: json.keys?.auth || '',
+        });
+
+        const response = await fetch('/notifications/push/subscriptions', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+          body,
+        });
+        if (!response.ok) {
+          throw new Error('Push-Abonnement konnte nicht gespeichert werden.');
+        }
+
+        setStatus('Push ist auf diesem Gerät aktiviert.');
+      } catch (error) {
+        setStatus(error?.message || 'Push konnte nicht aktiviert werden.');
+      }
+    });
+
+    disable?.addEventListener('click', async () => {
+      try {
+        setStatus('Push wird deaktiviert …');
+        const registration = await navigator.serviceWorker.ready;
+        const subscription = await registration.pushManager.getSubscription();
+        if (subscription) await subscription.unsubscribe();
+
+        const response = await fetch('/notifications/push/unsubscribe', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+          body: new URLSearchParams({ _csrf: disable.dataset.csrf || '' }),
+        });
+        if (!response.ok) {
+          throw new Error('Push-Registrierung konnte serverseitig nicht deaktiviert werden.');
+        }
+
+        setStatus('Push ist auf diesem Gerät deaktiviert.');
+      } catch (error) {
+        setStatus(error?.message || 'Push konnte nicht deaktiviert werden.');
+      }
+    });
+  };
+
   window.addEventListener('DOMContentLoaded', () => {
     enhanceAccessibility();
     attachGps();
     attachOfflineDrafts().catch(() => {});
+    attachPushSettings();
   });
 })();
