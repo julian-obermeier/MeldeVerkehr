@@ -37,7 +37,7 @@ final class EvidenceReviewService
         $summary = $this->collect($userId, $caseId);
 
         $items = array_map(static function (array $item): array {
-            unset($item['storage_path']);
+            unset($item['storage_path'], $item['original_storage_path']);
             return $item;
         }, $summary['items']);
 
