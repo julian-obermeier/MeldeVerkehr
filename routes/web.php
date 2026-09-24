@@ -14,6 +14,7 @@ use MeldeVerkehr\Evidence\EvidenceController;
 use MeldeVerkehr\Evidence\EvidencePrivacyController;
 use MeldeVerkehr\Evidence\EvidenceReviewController;
 use MeldeVerkehr\Dispatch\DispatchController;
+use MeldeVerkehr\Communication\CommunicationController;
 use MeldeVerkehr\Http\Request;
 use MeldeVerkehr\Http\Response;
 use MeldeVerkehr\Install\InstallerController;
@@ -46,6 +47,7 @@ if ($installerService->isInstalled()) {
     $witness = new WitnessController($app);
     $finalReview = new FinalReviewController($app);
     $dispatch = new DispatchController($app);
+    $communication = new CommunicationController($app);
 
     $app->router()->get('/register', [$auth, 'registerForm']);
     $app->router()->post('/register', [$auth, 'register']);
@@ -106,6 +108,14 @@ if ($installerService->isInstalled()) {
 
     $app->router()->get('/cases/{id}/dispatch', [$dispatch, 'index']);
     $app->router()->post('/cases/{id}/dispatch', [$dispatch, 'queue']);
+
+    $app->router()->get('/cases/{id}/communication', [$communication, 'index']);
+    $app->router()->get('/communication-attachments/{id}', [$communication, 'attachment']);
+    $app->router()->post('/communication-tasks/{id}/complete', [$communication, 'completeTask']);
+    $app->router()->post('/communication-deadlines/{id}/resolve', [$communication, 'resolveDeadline']);
+    $app->router()->post('/authority-messages/{id}/reply-draft', [$communication, 'createDraft']);
+    $app->router()->post('/authority-reply-drafts/{id}/save', [$communication, 'saveDraft']);
+    $app->router()->post('/authority-reply-drafts/{id}/queue', [$communication, 'queueDraft']);
 
     $app->router()->get('/settings/security', [$security, 'index']);
     $app->router()->post('/settings/security/totp/start', [$security, 'startTotp']);
