@@ -240,7 +240,50 @@
     });
   };
 
+  const enhanceAccessibility = () => {
+    const main = document.querySelector('main');
+
+    if (main) {
+      if (!main.id) main.id = 'main-content';
+
+      if (!document.querySelector('[data-skip-link]')) {
+        const link = document.createElement('a');
+        link.href = '#' + main.id;
+        link.dataset.skipLink = '1';
+        link.textContent = 'Zum Hauptinhalt';
+        link.style.position = 'fixed';
+        link.style.left = '12px';
+        link.style.top = '-80px';
+        link.style.zIndex = '9999';
+        link.style.padding = '10px 14px';
+        link.style.background = '#ffffff';
+        link.style.color = '#172033';
+        link.style.border = '2px solid #172033';
+        link.style.borderRadius = '8px';
+        link.addEventListener('focus', () => { link.style.top = '12px'; });
+        link.addEventListener('blur', () => { link.style.top = '-80px'; });
+        document.body.prepend(link);
+      }
+    }
+
+    document.querySelectorAll('.error').forEach(node => {
+      if (!node.hasAttribute('role')) node.setAttribute('role', 'alert');
+    });
+
+    document.querySelectorAll('.message').forEach(node => {
+      if (!node.hasAttribute('role')) node.setAttribute('role', 'status');
+      if (!node.hasAttribute('aria-live')) node.setAttribute('aria-live', 'polite');
+    });
+
+    const style = document.createElement('style');
+    style.textContent =
+      ':focus-visible{outline:3px solid currentColor;outline-offset:3px}' +
+      '[aria-disabled="true"]{cursor:not-allowed}';
+    document.head.appendChild(style);
+  };
+
   window.addEventListener('DOMContentLoaded', () => {
+    enhanceAccessibility();
     attachGps();
     attachOfflineDrafts().catch(() => {});
   });
