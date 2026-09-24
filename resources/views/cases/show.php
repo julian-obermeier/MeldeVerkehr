@@ -1,6 +1,6 @@
 <?php
 $e=static fn(mixed $v):string=>htmlspecialchars((string)$v,ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8');
-$c=$data['case']; $v=$data['vehicle']; $l=$data['location'];
+$c=$caseData['case']; $v=$caseData['vehicle']; $l=$caseData['location'];
 $statusLabels=[
 'DRAFT'=>'Entwurf','CAPTURE_IN_PROGRESS'=>'Erfassung läuft','WAITING_FOR_EVIDENCE'=>'Beweise fehlen',
 'READY_FOR_REVIEW'=>'Grunddaten prüfen','REVIEW_REQUIRED'=>'Prüfung erforderlich','READY_FOR_SUBMISSION'=>'Versandbereit',
@@ -13,7 +13,7 @@ $editable=in_array($c['status'],['DRAFT','CAPTURE_IN_PROGRESS','WAITING_FOR_EVID
 $vehicleDone=$v!==null && !empty($v['license_plate']) && !empty($v['vehicle_type']);
 $locationDone=$l!==null;
 $observationDone=!empty($c['observed_from']);
-$primaryOffense=$data['offenses'][0]??null;
+$primaryOffense=$caseData['offenses'][0]??null;
 $offenseDone=$primaryOffense!==null && ($primaryOffense['stable_key']??'')!=='UNCLASSIFIED_PARKING';
 $coreComplete=$vehicleDone&&$locationDone&&$observationDone&&$offenseDone;
 $coreReviewReady=$c['status']===\MeldeVerkehr\Cases\CaseStatus::READY_FOR_REVIEW;
@@ -33,8 +33,8 @@ $reviewDone=in_array($c['status'],[
     \MeldeVerkehr\Cases\CaseStatus::CLOSED,
     \MeldeVerkehr\Cases\CaseStatus::ARCHIVED,
 ],true);
-$evidencePackage=is_array($data['evidence_package']??null)?$data['evidence_package']:null;
-$history=is_array($data['history']??null)?$data['history']:[];
+$evidencePackage=is_array($caseData['evidence_package']??null)?$caseData['evidence_package']:null;
+$history=is_array($caseData['history']??null)?$caseData['history']:[];
 $duration=$c['observation_duration_seconds']??null;
 $submissionReady=$c['status']===\MeldeVerkehr\Cases\CaseStatus::READY_FOR_SUBMISSION;
 $dispatchRelevant=in_array($c['status'],[
