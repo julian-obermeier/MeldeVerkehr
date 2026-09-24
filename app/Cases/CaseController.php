@@ -158,8 +158,10 @@ final class CaseController
         try {
             $operation($userId, $caseId);
             $_SESSION['case_message'] = 'Änderungen wurden gespeichert.';
-        } catch (Throwable $e) {
+        } catch (\InvalidArgumentException|\DomainException|AuthorizationException $e) {
             $_SESSION['case_error'] = $e->getMessage();
+        } catch (Throwable $e) {
+            throw $e;
         }
 
         return Response::redirect('/cases/' . rawurlencode($caseId));
