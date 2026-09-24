@@ -16,7 +16,25 @@ $observationDone=!empty($c['observed_from']);
 $primaryOffense=$data['offenses'][0]??null;
 $offenseDone=$primaryOffense!==null && ($primaryOffense['stable_key']??'')!=='UNCLASSIFIED_PARKING';
 $coreComplete=$vehicleDone&&$locationDone&&$observationDone&&$offenseDone;
-$reviewDone=$c['status']===\MeldeVerkehr\Cases\CaseStatus::WAITING_FOR_EVIDENCE;
+$coreReviewReady=$c['status']===\MeldeVerkehr\Cases\CaseStatus::READY_FOR_REVIEW;
+$reviewDone=in_array($c['status'],[
+    \MeldeVerkehr\Cases\CaseStatus::WAITING_FOR_EVIDENCE,
+    \MeldeVerkehr\Cases\CaseStatus::READY_FOR_SUBMISSION,
+    \MeldeVerkehr\Cases\CaseStatus::SUBMISSION_PENDING,
+    \MeldeVerkehr\Cases\CaseStatus::SENT,
+    \MeldeVerkehr\Cases\CaseStatus::DELIVERED,
+    \MeldeVerkehr\Cases\CaseStatus::DELIVERY_UNKNOWN,
+    \MeldeVerkehr\Cases\CaseStatus::DELIVERY_FAILED,
+    \MeldeVerkehr\Cases\CaseStatus::AUTHORITY_REPLY,
+    \MeldeVerkehr\Cases\CaseStatus::USER_ACTION_REQUIRED,
+    \MeldeVerkehr\Cases\CaseStatus::AUTHORITY_PROCESSING,
+    \MeldeVerkehr\Cases\CaseStatus::CORRECTION_PENDING,
+    \MeldeVerkehr\Cases\CaseStatus::WITHDRAWAL_PENDING,
+    \MeldeVerkehr\Cases\CaseStatus::CLOSED,
+    \MeldeVerkehr\Cases\CaseStatus::ARCHIVED,
+],true);
+$evidencePackage=is_array($data['evidence_package']??null)?$data['evidence_package']:null;
+$history=is_array($data['history']??null)?$data['history']:[];
 $duration=$c['observation_duration_seconds']??null;
 $submissionReady=$c['status']===\MeldeVerkehr\Cases\CaseStatus::READY_FOR_SUBMISSION;
 $dispatchRelevant=in_array($c['status'],[
@@ -141,7 +159,7 @@ textarea{min-height:80px}button,.button{display:inline-block;margin-top:12px;pad
 
 <?php if($evidencePackage):?><section class="card"><h2>Community-Freigabe</h2><p>Erzeuge bei Bedarf eine separate anonymisierte öffentliche Kopie. Die private Akte wird dabei nicht verändert.</p><a class="button" href="/cases/<?= rawurlencode($c['id']) ?>/community-release">Freigaben verwalten</a></section><?php endif;?>
 
-<section class="card"><h2>Statushistorie</h2><div class="timeline"><?php foreach(array_reverse($data['history']) as $item):?><div class="event"><strong><?= $e($statusLabels[$item['new_status']]??$item['new_status']) ?></strong><br><small class="muted"><?= $e($item['created_at']) ?><?php if($item['reason']):?> · <?= $e($item['reason']) ?><?php endif;?></small></div><?php endforeach;?></div></section>
+<section class="card"><h2>Statushistorie</h2><?php if($history):?><div class="timeline"><?php foreach(array_reverse($history) as $item):?><div class="event"><strong><?= $e($statusLabels[$item['new_status']]??$item['new_status']) ?></strong><br><small class="muted"><?= $e($item['created_at']) ?><?php if($item['reason']):?> · <?= $e($item['reason']) ?><?php endif;?></small></div><?php endforeach;?></div><?php else:?><p class="muted">Noch keine Statushistorie vorhanden.</p><?php endif;?></section>
 </main><script src="/assets/app.js" defer></script><script>
 (() => {
  const button=document.getElementById('useGps');
