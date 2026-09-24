@@ -1,76 +1,61 @@
 # Projektstatus
 
 ## Aktuelle Version
-0.12.0-rc1
+0.13.0-dev
 
 ## Phase
-M12 – Produktionshärtung & Release Candidate
+M13 – Vorgangsversionierung & Lifecycle
 
-## M1–M11
-Fundament, Vorgangskern, Beweissystem, Zeugenbericht/Final Review, Behördenrouting/Dispatch, Behördenkommunikation, intelligente Assistenz, private Karten/Analytics, Community, Suche/Dokumentcenter/Notifications/Exporte/Retention sowie Behördenportal/API sind abgeschlossen und auf develop integriert.
+## Integrierter Stand bis M12
+Fundament, Vorgangskern, Beweissystem, Zeugenbericht/Final Review, Behördenrouting/Dispatch, Behördenkommunikation, intelligente Assistenz, private Karten/Analytics, Community, Suche/Dokumentcenter/Notifications/Exporte/Retention, Behördenportal/API sowie Produktionshärtung und Release-Operations sind auf `develop` integriert.
 
-## M12 – umgesetzt
-- Release-Operations-Datenmodell für Backups, Updates und generisches Request-Rate-Limiting
-- idempotentes Release-Repository, damit der Updater nicht von seiner eigenen Migration abhängt
-- verschlüsselte Datenbank-Backups außerhalb des Webroots
-- verschlüsselte Runtime-Dateisicherung für storage/app
-- SHA-256-Integrität für Datenbank- und Runtime-Payloads
-- manifestbasierte Backup-Verifikation
-- Restore mit ausdrücklicher Bestätigung und vollständiger Verifikation vor Schreibzugriff
-- Release-/Rate-Limit-Tabellen werden nicht in ihre eigenen Restores zurückgespielt
-- konfigurierbare sichere Dateigrößenobergrenze; kein stilles Teilbackup
-- Maintenance-Modus mit persistiertem Grund und HTTP 503
-- Update-Workflow: Preflight → Maintenance → Backup → Verify → Migration → Versionsstatus → Audit → Maintenance off
-- fehlgeschlagenes Update lässt Maintenance absichtlich aktiv
-- CLI maintenance.php für Status, Readiness, Backup, Verify, Restore und Update
-- Admin-Releasecenter unter /admin/system/update
-- Restore bleibt bewusst CLI-only
-- Release-Readiness-Checks für DB, Storage, Audit, Production-Debug, Install-Lock, PWA, Backups, Queue und temporäre Exporte
-- zentrale Security-Header mit CSP, HSTS bei HTTPS, Frame-/MIME-/Referrer-/Permissions-Policy
-- maintenance.php wird durch Apache explizit vom Webzugriff ausgeschlossen
-- generisches serverseitiges Request-Rate-Limiting
-- Authority API v1 ist burst-limitiert und liefert 429 + Retry-After
-- PWA-Offline-Entwürfe via IndexedDB für den Kern-Wizard
-- serverVersion/localVersion-Konfliktmodell
-- lokale Entwürfe werden niemals still auf Serverdaten angewendet
-- explizite Aktionen „lokal übernehmen“ oder „verwerfen“
-- Offline-Submit wird abgefangen und klar als nur lokal gespeichert gekennzeichnet
-- Service Worker speichert keine privaten Navigationsantworten
-- PWA-Shortcuts für Vorgänge, Karte und Benachrichtigungen
-- Accessibility-Basis mit Skip-Link, :focus-visible und ARIA-Status/Alert
-- gemeinsame Accessibility-Helfer auf Bürger-, Authority- und Operations-Flächen
-- Dashboard-Version kommt dynamisch aus VERSION
-- M12-Regressionsblock für Backup, Verschlüsselung, Verify, Restore-Guard, Rate-Limit, Maintenance, Update-Preflight, Readiness, PWA und Security-Invarianten
-- HTTP-Liveness unter `/health/live`
-- HTTP-Readiness unter `/health/ready` mit HTTP 503 bei Maintenance oder blockierender Readiness
-- reproduzierbares Shared-Hosting-Release-ZIP via GitHub Actions
-- SHA-256-Checksumme für Release-Artefakte
-- Release-Paket schließt .env und Runtime-Storage aus
-- explizite Batch-Grenzregression für Notification-Center, globale Suche und Authority-Inbox
-- kompakte RC-Release-Checkliste zusätzlich zum ausführlichen Runbook
+## M13 – auf Feature-Branch umgesetzt
+- neue Migration `20260924_023_create_case_lifecycle_tables.php`
+- `case_versions` als unveränderliche, fortlaufende Vorgangsversionen
+- kanonische JSON-Snapshots mit SHA-256-Integritätswert
+- automatische Baseline-Version bei Vorgangsanlage
+- automatische Versionierung bei Änderungen an Fahrzeug, Standort, Beobachtung, Tatbestand und bestätigtem Grunddaten-Review
+- revisionssichere Nachträge als append-only Datensätze
+- Korrekturworkflow mit eingefrorenem Vorher-Stand, getrennten bisherigen/korrigierten Angaben, Begründung und Abschlussvermerk
+- Statusübergänge nach `CORRECTION_PENDING` aus relevanten Versand-/Behördenstatus
+- Rücknahmeworkflow mit Vorher-Snapshot und `WITHDRAWAL_PENDING`
+- Abschluss von Rücknahmen nach `CLOSED` inklusive Abschlussakte
+- regulärer Abschlussworkflow aus fachlich zulässigen Status
+- Abschlussakte mit Snapshot, Versionsmetadaten, Timeline und SHA-256
+- geschützter JSON-Export einer Abschlussakte; Download nur nach erfolgreicher Hashprüfung
+- Archivierung `CLOSED → ARCHIVED` mit eigener Archivversion
+- Lifecycle-UI direkt aus der Vorgangsdetailansicht erreichbar
+- Abschlussakten werden im Dokumentencenter geführt
+- Ownership-/Permission-Prüfung für alle Lifecycle-Operationen
+- Timeline- und manipulationsgeschütztes Auditlogging für kritische Aktionen
+- Integrationstests für Versionierung, Nachträge, Korrekturen, Rücknahmen, Abschluss, Export, Ownership und Archivierung
+
+## Synchronisationshinweis Zielserver
+Der Entwicklungsstand auf `develop` enthält bereits die Migrationen `020`, `021` und `022`. Ein Server, der nur bis Migration `019` anzeigt, ist nicht auf dem aktuellen Repository-Stand. Vor Funktionstests muss deshalb zuerst der aktuelle Entwicklungsstand sauber deployed und anschließend der Migrationslauf ausgeführt werden. M13 ergänzt danach Migration `023`.
+
+## Noch offen vor 1.0.0
+- Moderation vollständig ausbauen: Appeals, Abuse Flags, Eskalationsworkflow sowie Anti-Spam-/Bot-/Mass-Report-Erkennung
+- Reputation erweitern: Achievements, Daily Limits, Diminishing Returns, Anomalieerkennung und Admin-Korrekturen
+- Authority-Inquiry-End-to-End-Workflow bis Bürgerantwort und behördlicher Prüfung abschließen
+- Community um Follower, Favoriten und Gruppenchat ergänzen
+- Notification-Präferenzen als vollständige UI bereitstellen und mit E-Mail/Push verbinden
+- kontrollierte IndexedDB-Queue für Offline-Evidence evaluieren/umsetzen
+- Inline-CSS/JS aus Legacy-Views entfernen und CSP anschließend ohne `unsafe-inline` betreiben
+- produktive Retention-Fristen fachlich/rechtlich festlegen und Lösch-/Anonymisierungsengine aktivieren
+- vollständigen Deploy-, Backup-, Restore- und Rollback-Test auf dem ALL-INKL-Zielsystem durchführen
+- alle CI-Gates vor Stable grün
 
 ## Sicherheitsprinzipien
-- Backups liegen außerhalb von public und speichern DB-/Runtime-Payloads verschlüsselt.
-- jedes Backup wird vor Restore vollständig gegen Manifest und SHA-256 geprüft.
-- Restore ist destruktiv und deshalb nur per CLI mit expliziter Bestätigung möglich.
-- fehlgeschlagene Updates deaktivieren Maintenance nicht automatisch.
-- Release-Betrieb schreibt keine Secrets in Git.
-- Production darf nicht mit APP_DEBUG=true release-ready sein.
-- private Navigationen werden durch den Service Worker nie persistiert.
-- Offline-Entwürfe überschreiben keine neueren Serverstände ohne Nutzeraktion.
-- Authority-API-Burstschutz arbeitet serverseitig und speichert nur HMAC-Schlüssel.
-- Security-Header verbieten Fremdframes und externe Standardressourcen; bestehende Inline-UI bleibt vorerst CSP-kompatibel.
-
-## Bekannte Einschränkungen vor Stable
-- Backup-Verschlüsselung arbeitet dateiweise und begrenzt Einzeldateien sowie DB-Dump über BACKUP_MAX_FILE_BYTES; sehr große Installationen benötigen später Streaming-Backup.
-- Restore stellt die im Manifest enthaltenen Runtime-Dateien wieder her, entfernt aber bewusst keine zusätzlichen neueren Runtime-Dateien automatisch.
-- CSP erlaubt aktuell noch Inline-Scripts/Styles, weil bestehende Legacy-Views teilweise inline arbeiten; externe Origins bleiben dennoch gesperrt.
-- Offline-Modus speichert Form-Entwürfe, versendet aber bewusst nichts automatisch nach Wiederverbindung.
-- Evidence-Dateiuploads werden offline nicht gepuffert.
-- Authority-API nutzt weiterhin statische, gehashte Bearer-Tokens statt OAuth2/OIDC.
-- produktive Aufbewahrungsfristen müssen weiterhin fachlich/rechtlich festgelegt werden.
+- Originalbeweise bleiben außerhalb des öffentlichen Webroots.
+- Vorgangssnapshots überschreiben historische Aktenstände nicht.
+- Korrekturen werden als eigene Datensätze dokumentiert; ursprüngliche Angaben bleiben nachvollziehbar.
+- Abschlussakten und Vorgangsversionen tragen SHA-256-Integritätswerte.
+- Abschlussakten werden vor Download erneut gegen ihren gespeicherten Hash geprüft.
+- kritische Lifecycle-Aktionen werden in Timeline und Auditlog protokolliert.
+- private Navigationen werden durch den Service Worker nicht persistiert.
+- Production darf nicht mit `APP_DEBUG=true` als release-ready gelten.
 
 ## Release-Status
-0.12.0-rc1 ist der erste Release Candidate. Vor 1.0.0 müssen alle CI-Gates grün sein und das Deploy-/Restore-Runbook einmal auf der Zielumgebung durchgespielt werden.
+`0.13.0-dev` ist noch kein Stable-Release. Nach Integration von M13 müssen die verbleibenden 1.0-Punkte umgesetzt, CI vollständig ausgeführt und das Release-/Restore-Runbook auf der Zielumgebung erfolgreich durchgespielt werden.
 
-Siehe docs/RELEASE_RUNBOOK.md.
+Siehe `docs/RELEASE_RUNBOOK.md`.
