@@ -41,6 +41,7 @@ body{font-family:system-ui,sans-serif;background:#f5f7fa;color:#172033;margin:0}
  if(!stage||!img||!selection) return;
  let start=null;
  const values={x:document.getElementById('xPct'),y:document.getElementById('yPct'),w:document.getElementById('wPct'),h:document.getElementById('hPct')};
+ if(!values.x||!values.y||!values.w||!values.h) return;
  const point=e=>{const r=img.getBoundingClientRect();return{x:Math.max(0,Math.min(r.width,e.clientX-r.left)),y:Math.max(0,Math.min(r.height,e.clientY-r.top)),r};};
  stage.addEventListener('pointerdown',e=>{if(e.button!==0)return;start=point(e);stage.setPointerCapture(e.pointerId);selection.hidden=false;});
  stage.addEventListener('pointermove',e=>{if(!start)return;const p=point(e),x=Math.min(start.x,p.x),y=Math.min(start.y,p.y),w=Math.abs(p.x-start.x),h=Math.abs(p.y-start.y);selection.style.left=(x/p.r.width*100)+'%';selection.style.top=(y/p.r.height*100)+'%';selection.style.width=(w/p.r.width*100)+'%';selection.style.height=(h/p.r.height*100)+'%';});
