@@ -60,6 +60,7 @@ final class DashboardController
             new AuthorizationService($permissions),
             new SecretCipher((string) $this->app->config()->get('app.key', '')),
             (string) $this->app->config()->get('app.key', ''),
+            (string) $this->app->config()->get('app.timezone', 'Europe/Berlin'),
             new AuditLogger(
                 $this->app->database(),
                 (string) $this->app->config()->get('app.key', '')
