@@ -60,6 +60,7 @@ final class CaseService
             $this->audit->log('CASE_CREATED', 'case', $id, 'USER', $userId, [
                 'public_number' => $publicNumber,
             ]);
+            $this->recordVersion($id, 'BASELINE', $userId, 'Vorgang angelegt');
 
             return $this->findOwned($userId, $id) ?? throw new \RuntimeException('Created case could not be loaded.');
         } catch (Throwable $e) {
@@ -241,6 +242,7 @@ final class CaseService
         $this->refreshCaptureState($userId, $caseId);
         $this->timeline($caseId, 'USER', 'VEHICLE_UPDATED', $userId, ['vehicle_type' => $type]);
         $this->audit->log('CASE_VEHICLE_UPDATED', 'case', $caseId, 'USER', $userId);
+        $this->recordVersion($caseId, 'CORE_EDIT', $userId, 'Fahrzeugdaten geändert');
     }
 
     public function saveLocation(string $userId, string $caseId, array $input): void
@@ -313,6 +315,7 @@ final class CaseService
             'access_type' => $accessType,
         ]);
         $this->audit->log('CASE_LOCATION_UPDATED', 'case', $caseId, 'USER', $userId);
+        $this->recordVersion($caseId, 'CORE_EDIT', $userId, 'Standortdaten geändert');
     }
 
     public function saveObservation(string $userId, string $caseId, array $input): void
@@ -358,6 +361,7 @@ final class CaseService
             'damage' => $this->booleanInput($input['damage'] ?? null),
         ]);
         $this->audit->log('CASE_OBSERVATION_UPDATED', 'case', $caseId, 'USER', $userId);
+        $this->recordVersion($caseId, 'CORE_EDIT', $userId, 'Beobachtungsdaten geändert');
     }
 
     public function reviewSummary(string $userId, string $caseId): array
@@ -461,6 +465,7 @@ final class CaseService
         $this->audit->log('CASE_CORE_REVIEW_CONFIRMED', 'case', $caseId, 'USER', $userId, [
             'warnings_acknowledged' => $warningsAcknowledged,
         ]);
+        $this->recordVersion($caseId, 'REVIEW_CONFIRMED', $userId, 'Grunddaten-Review bestätigt');
     }
 
     public function setPrimaryOffense(string $userId, string $caseId, string $offenseVersionId): void
@@ -515,6 +520,7 @@ final class CaseService
         $this->refreshCaptureState($userId, $caseId);
         $this->timeline($caseId, 'USER', 'PRIMARY_OFFENSE_SET', $userId, ['offense_version_id' => $offenseVersionId]);
         $this->audit->log('CASE_PRIMARY_OFFENSE_SET', 'case', $caseId, 'USER', $userId);
+        $this->recordVersion($caseId, 'CORE_EDIT', $userId, 'Tatbestand geändert');
     }
 
     public function availableOffenses(): array
@@ -696,6 +702,15 @@ final class CaseService
                 'Grunddaten vollständig; Review erforderlich'
             );
         }
+    }
+
+    private function recordVersion(
+        string $caseId,
+        string $type,
+        ?string $actorId,
+        ?string $reason = null
+    ): void {
+        (new CaseVersionRecorder($this->pdo))->record($caseId, $type, $actorId, $reason);
     }
 
     private function findRaw(string $caseId): ?array

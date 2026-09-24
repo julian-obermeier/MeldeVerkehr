@@ -21,6 +21,7 @@ use MeldeVerkehr\Auth\Totp;
 use MeldeVerkehr\Auth\WebAuthn\CborDecoder;
 use MeldeVerkehr\Auth\WebAuthn\WebAuthnService;
 use MeldeVerkehr\Cases\CaseService;
+use MeldeVerkehr\Cases\CaseLifecycleService;
 use MeldeVerkehr\Cases\CaseStatus;
 use MeldeVerkehr\Cases\CaseStatusMachine;
 use MeldeVerkehr\Communication\AuthorityMessageClassifier;
@@ -3003,6 +3004,140 @@ try {
     $assert(
         ($warningAfterReview['case']['status'] ?? null) === CaseStatus::WAITING_FOR_EVIDENCE,
         'Acknowledged warnings allow transition to evidence'
+    );
+
+    $lifecycleCase = $caseService->createDraft((string) $user['id']);
+    $lifecycleCaseId = (string) $lifecycleCase['case']['id'];
+
+    $caseService->saveVehicle((string) $user['id'], $lifecycleCaseId, [
+        'license_plate' => 'GI-LC 130',
+        'vehicle_type' => 'PKW',
+    ]);
+
+    $caseLifecycle = new CaseLifecycleService(
+        $pdo,
+        new AuthorizationService($permissions),
+        new AuditLogger($pdo, 'test-audit-key')
+    );
+
+    $lifecycleInitial = $caseLifecycle->overview((string) $user['id'], $lifecycleCaseId);
+    $assert(
+        count($lifecycleInitial['versions']) >= 2
+        && count(array_filter(
+            $lifecycleInitial['versions'],
+            static fn(array $row): bool => ($row['integrity_valid'] ?? false) !== true
+        )) === 0,
+        'Case lifecycle automatically versions baseline and core changes with valid integrity hashes'
+    );
+
+    $amendment = $caseLifecycle->addAmendment(
+        (string) $user['id'],
+        $lifecycleCaseId,
+        'Nachtrag zum Standort',
+        'Zusätzliche Beobachtung wurde nachträglich dokumentiert.'
+    );
+    $assert(
+        (int) $amendment['amendment_no'] === 1
+        && (int) $amendment['version']['version_no'] >= 3,
+        'Case amendment is append-only and creates a new immutable version'
+    );
+
+    $pdo->prepare(
+        'UPDATE cases SET status = "SENT", updated_at = UTC_TIMESTAMP() WHERE id = :id'
+    )->execute(['id' => $lifecycleCaseId]);
+
+    $correction = $caseLifecycle->requestCorrection(
+        (string) $user['id'],
+        $lifecycleCaseId,
+        'VEHICLE',
+        'GI-LC 130',
+        'GI-LC 131',
+        'Kennzeichen wurde bei der Erstmeldung fehlerhaft übertragen.'
+    );
+    $afterCorrectionRequest = $caseLifecycle->overview((string) $user['id'], $lifecycleCaseId);
+    $assert(
+        ($afterCorrectionRequest['case']['status'] ?? null) === CaseStatus::CORRECTION_PENDING
+        && ($afterCorrectionRequest['corrections'][0]['status'] ?? null) === 'OPEN',
+        'Correction workflow freezes pre-correction state and enters CORRECTION_PENDING'
+    );
+
+    $completedCorrectionVersion = $caseLifecycle->completeCorrection(
+        (string) $user['id'],
+        $lifecycleCaseId,
+        (string) $correction['id'],
+        'Korrektur wurde dokumentiert und an die weitere Bearbeitung übergeben.'
+    );
+    $afterCorrectionComplete = $caseLifecycle->overview((string) $user['id'], $lifecycleCaseId);
+    $assert(
+        ($afterCorrectionComplete['case']['status'] ?? null) === CaseStatus::AUTHORITY_PROCESSING
+        && ($afterCorrectionComplete['corrections'][0]['status'] ?? null) === 'COMPLETED'
+        && (int) $completedCorrectionVersion['version_no'] > (int) $correction['before_version']['version_no'],
+        'Correction completion preserves history and returns case to authority processing'
+    );
+
+    $withdrawal = $caseLifecycle->requestWithdrawal(
+        (string) $user['id'],
+        $lifecycleCaseId,
+        'Der Vorgang soll nach Rücksprache zurückgenommen werden.'
+    );
+    $afterWithdrawalRequest = $caseLifecycle->overview((string) $user['id'], $lifecycleCaseId);
+    $assert(
+        ($afterWithdrawalRequest['case']['status'] ?? null) === CaseStatus::WITHDRAWAL_PENDING
+        && ($afterWithdrawalRequest['withdrawals'][0]['status'] ?? null) === 'OPEN',
+        'Withdrawal workflow freezes current state and enters WITHDRAWAL_PENDING'
+    );
+
+    $closure = $caseLifecycle->completeWithdrawal(
+        (string) $user['id'],
+        $lifecycleCaseId,
+        (string) $withdrawal['id'],
+        'Rücknahme als erledigt dokumentiert.'
+    );
+    $afterWithdrawalComplete = $caseLifecycle->overview((string) $user['id'], $lifecycleCaseId);
+    $assert(
+        ($afterWithdrawalComplete['case']['status'] ?? null) === CaseStatus::CLOSED
+        && (int) ($afterWithdrawalComplete['closures'][0]['closure_no'] ?? 0) === 1
+        && ($afterWithdrawalComplete['closures'][0]['integrity_valid'] ?? false) === true,
+        'Withdrawal completion closes case and generates integrity-protected closure dossier'
+    );
+
+    $closureExport = $caseLifecycle->closureDossier(
+        (string) $user['id'],
+        $lifecycleCaseId,
+        (string) $closure['id']
+    );
+    $assert(
+        str_contains((string) $closureExport['filename'], 'Abschlussakte_01.json')
+        && hash_equals(
+            (string) $closureExport['closure']['dossier_sha256'],
+            hash('sha256', (string) $closureExport['json'])
+        ),
+        'Closure dossier export verifies SHA-256 before download'
+    );
+
+    $closureDocuments = $documentCenter->list((string) $user['id'], 'CLOSURE_DOSSIER');
+    $assert(
+        count(array_filter(
+            $closureDocuments,
+            static fn(array $row): bool => ($row['case_id'] ?? null) === $lifecycleCaseId
+        )) === 1,
+        'Document center exposes generated closure dossier'
+    );
+
+    $foreignLifecycleBlocked = false;
+    try {
+        $caseLifecycle->overview((string) $other['id'], $lifecycleCaseId);
+    } catch (AuthorizationException $e) {
+        $foreignLifecycleBlocked = true;
+    }
+    $assert($foreignLifecycleBlocked, 'Case lifecycle enforces owner isolation');
+
+    $caseLifecycle->archiveCase((string) $user['id'], $lifecycleCaseId);
+    $afterArchive = $caseLifecycle->overview((string) $user['id'], $lifecycleCaseId);
+    $assert(
+        ($afterArchive['case']['status'] ?? null) === CaseStatus::ARCHIVED
+        && ($afterArchive['closures'][0]['archived_at'] ?? null) !== null,
+        'Closed case can be archived with its own immutable archive version'
     );
 
     $summary = $caseService->dashboardSummary((string) $user['id']);

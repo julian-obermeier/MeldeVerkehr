@@ -5,6 +5,17 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 ## [Unreleased]
 
 ### Added
+- M13-Vorgangsversionierung mit unveränderlichen JSON-Snapshots und SHA-256-Integritätsnachweis
+- automatische Versionen bei Anlage sowie Änderungen an Fahrzeug, Standort, Beobachtung und Tatbestand
+- revisionssichere Nachträge mit eigener fortlaufender Nummer und verknüpfter Vorgangsversion
+- Korrekturworkflow mit eingefrorenem Vorher-Stand, getrennten Alt-/Neu-Angaben und Status CORRECTION_PENDING
+- Rücknahmeworkflow mit Vorher-Snapshot, Status WITHDRAWAL_PENDING und Abschlussakte
+- Abschlussworkflow mit versionierter Abschlussakte, vollständigem Dossier und SHA-256
+- Archivworkflow mit eigenem Archiv-Snapshot
+- Lifecycle-Bürgeroberfläche für Versionen, Nachträge, Korrekturen, Rücknahmen und Abschluss
+- geschützter JSON-Download von Abschlussakten nach Integritätsprüfung
+- Abschlussakten im fallübergreifenden Dokumentencenter
+- M13-Integrationstests für Ownership, Versionierung, Korrektur, Rücknahme, Abschlussakte und Archivierung
 - HTTP-Liveness- und Readiness-Probes für Produktionsbetrieb
 - reproduzierbares Shared-Hosting-Release-ZIP mit SHA-256-Artefakt
 - kompakte RC-Release-Checkliste

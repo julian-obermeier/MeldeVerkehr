@@ -59,11 +59,11 @@ Die Plattform verbindet vier Bereiche:
 
 ## Entwicklungsreihenfolge
 
-M1 Fundament → M2 Vorgangskern → M3 Beweissystem → M4 Sachverhalt/Final Review → M5 Behördenrouting/Versand → M6 Kommunikation → M7 KI/OCR → M8 Analyse/Problemstellen → M9 Community → M10 Suche/Dokumente/Notifications → M11 Behördenportal/API → M12 Produktionshärtung/Release Candidate
+M1 Fundament → M2 Vorgangskern → M3 Beweissystem → M4 Sachverhalt/Final Review → M5 Behördenrouting/Versand → M6 Kommunikation → M7 KI/OCR → M8 Analyse/Problemstellen → M9 Community → M10 Suche/Dokumente/Notifications → M11 Behördenportal/API → M12 Produktionshärtung/Release Candidate → M13 Vorgangsversionierung/Lifecycle
 
 ## Status
 
-Der aktuelle Entwicklungsstand ist `0.12.0-rc1` – Produktionshärtung und Release Candidate. Siehe `PROJECT_STATUS.md`.
+Der aktuelle Entwicklungsstand ist `0.13.0-dev` – M13 schließt den noch offenen Masterprompt-Block für Vorgangsversionierung, Nachträge, Korrekturen, Rücknahmen und Abschlussakten. Siehe `PROJECT_STATUS.md`.
 
 
 ## Installation (Entwicklungsstand)
@@ -145,7 +145,7 @@ Die produktive Tatbestandsdatenbank enthält zunächst bewusst nur neutrale Kate
 
 ## Releasebetrieb
 
-Ab 0.12.0-rc1 steht eine Shared-Hosting-kompatible Release-CLI bereit:
+Seit 0.12.0-rc1 steht eine Shared-Hosting-kompatible Release-CLI bereit:
 
 ~~~bash
 php maintenance.php readiness
