@@ -22,6 +22,7 @@ final class CaseService
         private readonly AuthorizationService $authorization,
         private readonly SecretCipher $cipher,
         private readonly string $searchKey,
+        private readonly string $timezone,
         private readonly AuditLogger $audit
     ) {
     }
@@ -299,6 +300,79 @@ final class CaseService
         $this->audit->log('CASE_LOCATION_UPDATED', 'case', $caseId, 'USER', $userId);
     }
 
+    public function saveObservation(string $userId, string $caseId, array $input): void
+    {
+        $case = $this->editableCase($userId, $caseId);
+
+        $from = $this->parseLocalDateTime((string) ($input['observed_from'] ?? ''), true);
+        $until = $this->parseLocalDateTime((string) ($input['observed_until'] ?? ''), false);
+
+        if ($until !== null && $until < $from) {
+            throw new \InvalidArgumentException('Das Beobachtungsende darf nicht vor dem Beginn liegen.');
+        }
+
+        $stmt = $this->pdo->prepare(
+            'UPDATE cases
+             SET observed_from = :observed_from,
+                 observed_until = :observed_until,
+                 updated_at = UTC_TIMESTAMP()
+             WHERE id = :id'
+        );
+        $stmt->execute([
+            'observed_from' => $from->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d H:i:s'),
+            'observed_until' => $until?->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d H:i:s'),
+            'id' => $caseId,
+        ]);
+
+        $this->touchProgress($case, $userId);
+        $this->refreshCaptureState($userId, $caseId);
+        $this->timeline($caseId, 'USER', 'OBSERVATION_UPDATED', $userId, [
+            'has_end' => $until !== null,
+            'documented_duration_seconds' => $until !== null ? $until->getTimestamp() - $from->getTimestamp() : null,
+        ]);
+        $this->audit->log('CASE_OBSERVATION_UPDATED', 'case', $caseId, 'USER', $userId, [
+            'has_end' => $until !== null,
+        ]);
+    }
+
+    public function reviewChecklist(string $userId, string $caseId): array
+    {
+        $data = $this->findOwned($userId, $caseId);
+
+        if ($data === null) {
+            throw new \DomainException('Vorgang nicht gefunden.');
+        }
+
+        $primary = $data['offenses'][0] ?? null;
+        $checks = [
+            'vehicle' => $data['vehicle'] !== null,
+            'location' => $data['location'] !== null,
+            'observation_time' => !empty($data['case']['observed_from']),
+            'offense' => $primary !== null && ($primary['stable_key'] ?? '') !== 'UNCLASSIFIED_PARKING',
+        ];
+
+        $from = $data['case']['observed_from'] ?? null;
+        $until = $data['case']['observed_until'] ?? null;
+        $duration = null;
+
+        if (is_string($from) && is_string($until)) {
+            $startTs = strtotime($from . ' UTC');
+            $endTs = strtotime($until . ' UTC');
+            if ($startTs !== false && $endTs !== false && $endTs >= $startTs) {
+                $duration = $endTs - $startTs;
+            }
+        }
+
+        return [
+            'data' => $data,
+            'checks' => $checks,
+            'complete' => !in_array(false, $checks, true),
+            'documented_duration_seconds' => $duration,
+            'observed_from_local' => $this->formatUtcForLocalInput($from),
+            'observed_until_local' => $this->formatUtcForLocalInput($until),
+        ];
+    }
+
     public function setPrimaryOffense(string $userId, string $caseId, string $offenseVersionId): void
     {
         $case = $this->editableCase($userId, $caseId);
@@ -492,6 +566,8 @@ final class CaseService
             ['case_id' => $caseId]
         ) !== null;
 
+        $hasObservation = !empty($case['observed_from']);
+
         $offense = $this->fetchOne(
             'SELECT o.stable_key
              FROM case_offenses co
@@ -505,6 +581,7 @@ final class CaseService
         if (
             $vehicleExists
             && $locationExists
+            && $hasObservation
             && $offense !== null
             && ($offense['stable_key'] ?? '') !== 'UNCLASSIFIED_PARKING'
         ) {
@@ -514,6 +591,40 @@ final class CaseService
                 CaseStatus::WAITING_FOR_EVIDENCE,
                 'Grunddaten vollständig; Beweisdokumentation ausstehend'
             );
+        }
+    }
+
+    private function parseLocalDateTime(string $value, bool $required): ?\DateTimeImmutable
+    {
+        $value = trim($value);
+
+        if ($value === '') {
+            if ($required) {
+                throw new \InvalidArgumentException('Beobachtungsbeginn ist erforderlich.');
+            }
+
+            return null;
+        }
+
+        try {
+            return new \DateTimeImmutable($value, new \DateTimeZone($this->timezone));
+        } catch (\Throwable $e) {
+            throw new \InvalidArgumentException('Ungültige Beobachtungszeit.');
+        }
+    }
+
+    private function formatUtcForLocalInput(mixed $value): ?string
+    {
+        if (!is_string($value) || $value === '') {
+            return null;
+        }
+
+        try {
+            return (new \DateTimeImmutable($value, new \DateTimeZone('UTC')))
+                ->setTimezone(new \DateTimeZone($this->timezone))
+                ->format('Y-m-d\TH:i');
+        } catch (\Throwable $e) {
+            return null;
         }
     }
 
