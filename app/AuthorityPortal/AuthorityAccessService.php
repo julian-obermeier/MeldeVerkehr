@@ -11,6 +11,23 @@ use PDO;
 
 final class AuthorityAccessService
 {
+    private const SCOPE_PERMISSIONS = [
+        'AUTHORITY_USER' => [
+            'authority.case.view',
+            'authority.case.reply',
+            'authority.case.export',
+        ],
+        'AUTHORITY_ADMIN' => [
+            'authority.case.view',
+            'authority.case.reply',
+            'authority.case.export',
+            'authority.holder.read',
+            'authority.holder.write',
+            'authority.users.manage',
+            'authority.tokens.manage',
+        ],
+    ];
+
     public function __construct(
         private readonly PDO $pdo,
         private readonly PermissionService $permissions
@@ -47,10 +64,6 @@ final class AuthorityAccessService
         string $authorityId,
         string $permission
     ): array {
-        if (!$this->permissions->can($userId, $permission)) {
-            throw new AuthorizationException('Access denied.');
-        }
-
         if ($this->permissions->hasRole($userId, 'SUPER_ADMIN')) {
             $row = $this->authority($authorityId);
             if ($row === null) {
@@ -80,6 +93,16 @@ final class AuthorityAccessService
         $row = $stmt->fetch();
 
         if (!is_array($row)) {
+            throw new AuthorizationException('Access denied.');
+        }
+
+        $scopeRole = (string) $row['scope_role'];
+        $allowed = self::SCOPE_PERMISSIONS[$scopeRole] ?? [];
+
+        if (
+            !in_array($permission, $allowed, true)
+            || !$this->permissions->can($userId, $permission)
+        ) {
             throw new AuthorizationException('Access denied.');
         }
 
