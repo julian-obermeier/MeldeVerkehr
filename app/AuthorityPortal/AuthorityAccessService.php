@@ -100,6 +100,38 @@ final class AuthorityAccessService
         return $scope;
     }
 
+    public function assertCaseForAuthority(
+        string $userId,
+        string $authorityId,
+        string $caseId,
+        string $permission = 'authority.case.view'
+    ): array {
+        $this->assertAuthority($userId, $authorityId, $permission);
+
+        $stmt = $this->pdo->prepare(
+            'SELECT d.authority_id, a.name AS authority_name, d.id AS dispatch_id,
+                    d.dispatch_package_id, d.sent_at
+             FROM dispatches d
+             INNER JOIN authorities a ON a.id = d.authority_id
+             WHERE d.case_id = :case_id
+               AND d.authority_id = :authority_id
+               AND d.status = "SENT"
+             ORDER BY d.sent_at DESC, d.created_at DESC
+             LIMIT 1'
+        );
+        $stmt->execute([
+            'case_id' => $caseId,
+            'authority_id' => $authorityId,
+        ]);
+        $row = $stmt->fetch();
+
+        if (!is_array($row)) {
+            throw new AuthorizationException('Access denied.');
+        }
+
+        return $row;
+    }
+
     public function assertCase(
         string $userId,
         string $caseId,
