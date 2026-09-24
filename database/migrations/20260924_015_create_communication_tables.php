@@ -112,6 +112,24 @@ return new class implements MigrationInterface {
         );
 
         $pdo->exec(
+            'CREATE TABLE IF NOT EXISTS inbound_mail_quarantine (
+                id CHAR(36) NOT NULL PRIMARY KEY,
+                source_id VARCHAR(255) NULL,
+                message_fingerprint CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL UNIQUE,
+                sender_encrypted TEXT NOT NULL,
+                recipients_encrypted TEXT NOT NULL,
+                subject_encrypted TEXT NULL,
+                body_text_encrypted LONGTEXT NOT NULL,
+                body_sha256 CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+                reason VARCHAR(255) NOT NULL,
+                received_at DATETIME NULL,
+                created_at DATETIME NOT NULL,
+                resolved_at DATETIME NULL,
+                INDEX idx_mail_quarantine_open (resolved_at, created_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+
+        $pdo->exec(
             'CREATE TABLE IF NOT EXISTS authority_reply_drafts (
                 id CHAR(36) NOT NULL PRIMARY KEY,
                 case_id CHAR(36) NOT NULL,
@@ -120,10 +138,14 @@ return new class implements MigrationInterface {
                 body_encrypted LONGTEXT NOT NULL,
                 body_sha256 CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
                 created_by_user_id CHAR(36) NOT NULL,
+                status VARCHAR(20) NOT NULL DEFAULT "DRAFT",
+                queue_job_uuid CHAR(36) NULL,
                 created_at DATETIME NOT NULL,
                 confirmed_at DATETIME NULL,
+                sent_at DATETIME NULL,
                 UNIQUE KEY uq_reply_draft_version (inbound_message_id, version_no),
                 INDEX idx_reply_draft_case (case_id, created_at),
+                INDEX idx_reply_draft_queue (status, queue_job_uuid),
                 CONSTRAINT fk_reply_draft_case FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE,
                 CONSTRAINT fk_reply_draft_message FOREIGN KEY (inbound_message_id) REFERENCES authority_messages(id) ON DELETE CASCADE,
                 CONSTRAINT fk_reply_draft_user FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE RESTRICT
@@ -152,6 +174,7 @@ return new class implements MigrationInterface {
         $pdo->exec('ALTER TABLE dispatches DROP COLUMN outbound_message_id, DROP COLUMN reply_address_id');
         $pdo->exec('ALTER TABLE dispatch_dry_run_outbox DROP COLUMN message_id, DROP COLUMN reply_to');
         $pdo->exec('DROP TABLE IF EXISTS authority_reply_drafts');
+        $pdo->exec('DROP TABLE IF EXISTS inbound_mail_quarantine');
         $pdo->exec('DROP TABLE IF EXISTS case_deadlines');
         $pdo->exec('DROP TABLE IF EXISTS case_tasks');
         $pdo->exec('DROP TABLE IF EXISTS authority_message_attachments');
