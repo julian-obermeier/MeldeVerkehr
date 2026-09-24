@@ -10,6 +10,7 @@ use MeldeVerkehr\Auth\SecurityController;
 use MeldeVerkehr\Auth\TwoFactorController;
 use MeldeVerkehr\Cases\CaseController;
 use MeldeVerkehr\Core\Application;
+use MeldeVerkehr\Evidence\EvidenceController;
 use MeldeVerkehr\Http\Request;
 use MeldeVerkehr\Http\Response;
 use MeldeVerkehr\Install\InstallerController;
@@ -34,6 +35,7 @@ if ($installerService->isInstalled()) {
     $security = new SecurityController($app);
     $passkeyLogin = new PasskeyLoginController($app);
     $cases = new CaseController($app);
+    $evidence = new EvidenceController($app);
 
     $app->router()->get('/register', [$auth, 'registerForm']);
     $app->router()->post('/register', [$auth, 'register']);
@@ -68,6 +70,10 @@ if ($installerService->isInstalled()) {
     $app->router()->post('/cases/{id}/offense', [$cases, 'saveOffense']);
     $app->router()->get('/cases/{id}/review', [$cases, 'review']);
     $app->router()->post('/cases/{id}/review', [$cases, 'confirmReview']);
+
+    $app->router()->get('/cases/{id}/evidence', [$evidence, 'index']);
+    $app->router()->post('/cases/{id}/evidence', [$evidence, 'upload']);
+    $app->router()->post('/evidence/{id}/remove', [$evidence, 'remove']);
 
     $app->router()->get('/settings/security', [$security, 'index']);
     $app->router()->post('/settings/security/totp/start', [$security, 'startTotp']);
