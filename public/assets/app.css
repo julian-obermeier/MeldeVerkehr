@@ -4,3 +4,4 @@
 .mv-skip-link:focus{top:12px}
 .mv-offline-notice,.mv-offline-alert{margin:12px 0;padding:12px;border:1px solid #d6b36b;border-radius:8px;background:#fffaf0;color:#172033}
 .mv-button-gap{margin-left:8px}
+.mv-offline-page{max-width:680px;margin:60px auto;font-family:system-ui,sans-serif;padding:20px}
