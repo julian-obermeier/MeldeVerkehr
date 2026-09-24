@@ -1,10 +1,10 @@
 # Projektstatus
 
 ## Aktuelle Version
-0.13.0-dev
+0.14.0-dev
 
 ## Phase
-M13 – Vorgangsversionierung & Lifecycle
+M14 – Moderation & Safety
 
 ## Integrierter Stand bis M12
 Fundament, Vorgangskern, Beweissystem, Zeugenbericht/Final Review, Behördenrouting/Dispatch, Behördenkommunikation, intelligente Assistenz, private Karten/Analytics, Community, Suche/Dokumentcenter/Notifications/Exporte/Retention, Behördenportal/API sowie Produktionshärtung und Release-Operations sind auf `develop` integriert.
@@ -33,8 +33,19 @@ Fundament, Vorgangskern, Beweissystem, Zeugenbericht/Final Review, Behördenrout
 ## Synchronisationshinweis Zielserver
 Der Entwicklungsstand auf `develop` enthält bereits die Migrationen `020`, `021` und `022`. Ein Server, der nur bis Migration `019` anzeigt, ist nicht auf dem aktuellen Repository-Stand. Vor Funktionstests muss deshalb zuerst der aktuelle Entwicklungsstand sauber deployed und anschließend der Migrationslauf ausgeführt werden. M13 ergänzt danach Migration `023`.
 
+## M14 – auf Feature-Branch umgesetzt
+- Appeals/Einsprüche für HIDE, WARN und RESTRICT
+- gespeicherte Vorher-/Nachher-Snapshots für reversible Moderationsmaßnahmen
+- Abuse Flags und transparente Risikosignale
+- Reporter-Risikoscore in der Moderationsqueue
+- Eskalationsworkflow mit Prioritäten und Senior-Abschluss
+- zeitlich begrenzte Posting-, Messaging- und Reporting-Restriktionen
+- Duplicate-Report-Schutz
+- Duplicate-Content-, Velocity-, Bot-Burst- und Mass-Report-Erkennung
+- automatische Signale dienen ausschließlich als Prüfhinweise; endgültige Maßnahmen bleiben moderationsgesteuert
+- End-to-End-Tests für Einspruch, Wiederherstellung, Eskalation, Spam und Restriktion
+
 ## Noch offen vor 1.0.0
-- Moderation vollständig ausbauen: Appeals, Abuse Flags, Eskalationsworkflow sowie Anti-Spam-/Bot-/Mass-Report-Erkennung
 - Reputation erweitern: Achievements, Daily Limits, Diminishing Returns, Anomalieerkennung und Admin-Korrekturen
 - Authority-Inquiry-End-to-End-Workflow bis Bürgerantwort und behördlicher Prüfung abschließen
 - Community um Follower, Favoriten und Gruppenchat ergänzen
