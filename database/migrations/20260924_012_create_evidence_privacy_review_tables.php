@@ -34,6 +34,18 @@ return new class implements MigrationInterface {
         );
 
         $pdo->exec(
+            'CREATE TABLE IF NOT EXISTS evidence_privacy_reviews (
+                evidence_id CHAR(36) NOT NULL PRIMARY KEY,
+                public_version_no INT UNSIGNED NOT NULL,
+                regions_sha256 CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+                reviewed_by_user_id CHAR(36) NOT NULL,
+                reviewed_at DATETIME NOT NULL,
+                CONSTRAINT fk_privacy_review_evidence FOREIGN KEY (evidence_id) REFERENCES evidence_items(id) ON DELETE CASCADE,
+                CONSTRAINT fk_privacy_review_user FOREIGN KEY (reviewed_by_user_id) REFERENCES users(id) ON DELETE RESTRICT
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+
+        $pdo->exec(
             'CREATE TABLE IF NOT EXISTS case_evidence_reviews (
                 id CHAR(36) NOT NULL PRIMARY KEY,
                 case_id CHAR(36) NOT NULL,
@@ -91,6 +103,7 @@ return new class implements MigrationInterface {
         $pdo->exec('DROP TABLE IF EXISTS evidence_package_items');
         $pdo->exec('DROP TABLE IF EXISTS evidence_packages');
         $pdo->exec('DROP TABLE IF EXISTS case_evidence_reviews');
+        $pdo->exec('DROP TABLE IF EXISTS evidence_privacy_reviews');
         $pdo->exec('DROP TABLE IF EXISTS evidence_privacy_regions');
     }
 };
