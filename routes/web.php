@@ -109,6 +109,7 @@ if ($installerService->isInstalled()) {
     $app->router()->post('/cases/{id}/lifecycle/withdrawals/{withdrawal}/complete', [$caseLifecycle, 'completeWithdrawal']);
     $app->router()->post('/cases/{id}/lifecycle/close', [$caseLifecycle, 'close']);
     $app->router()->post('/cases/{id}/lifecycle/archive', [$caseLifecycle, 'archive']);
+    $app->router()->get('/cases/{id}/lifecycle/closures/{closure}/export', [$caseLifecycle, 'exportClosure']);
 
     $app->router()->get('/cases/{id}/evidence', [$evidence, 'index']);
     $app->router()->post('/cases/{id}/evidence', [$evidence, 'upload']);
