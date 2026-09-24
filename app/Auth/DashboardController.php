@@ -81,6 +81,7 @@ final class DashboardController
             'caseSummary' => $caseSummary,
             'unreadNotifications' => $unreadNotifications,
             'authorityScopes' => $authorityScopes,
+            'version' => trim((string) @file_get_contents($this->app->basePath() . '/VERSION')),
         ]));
     }
 }
