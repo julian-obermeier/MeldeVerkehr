@@ -124,10 +124,12 @@ return new class implements MigrationInterface {
             'CREATE TABLE IF NOT EXISTS community_case_release_evidence (
                 release_id CHAR(36) NOT NULL,
                 evidence_id CHAR(36) NOT NULL,
+                order_no INT UNSIGNED NOT NULL,
                 public_version_no INT UNSIGNED NOT NULL,
                 sha256_snapshot CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
                 category_snapshot VARCHAR(40) NOT NULL,
                 PRIMARY KEY (release_id, evidence_id),
+                UNIQUE KEY uq_case_release_evidence_order (release_id, order_no),
                 CONSTRAINT fk_case_release_evidence_release FOREIGN KEY (release_id) REFERENCES community_case_releases(id) ON DELETE CASCADE,
                 CONSTRAINT fk_case_release_evidence_evidence FOREIGN KEY (evidence_id) REFERENCES evidence_items(id) ON DELETE RESTRICT
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
