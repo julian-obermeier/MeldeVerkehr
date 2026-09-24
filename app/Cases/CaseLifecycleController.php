@@ -52,6 +52,35 @@ final class CaseLifecycleController
         ]));
     }
 
+    public function exportClosure(Request $request): Response
+    {
+        $userId = $this->requireUser();
+        if ($userId instanceof Response) {
+            return $userId;
+        }
+
+        $caseId = (string) $request->route('id', '');
+        $closureId = (string) $request->route('closure', '');
+
+        try {
+            $dossier = $this->service()->closureDossier($userId, $caseId, $closureId);
+        } catch (AuthorizationException) {
+            return Response::html('<h1>403</h1><p>Kein Zugriff auf diese Abschlussakte.</p>', 403);
+        } catch (\DomainException $e) {
+            return Response::html('<h1>404</h1><p>' . htmlspecialchars($e->getMessage(), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</p>', 404);
+        }
+
+        return Response::binary(
+            (string) $dossier['json'],
+            'application/json; charset=UTF-8',
+            200,
+            [
+                'Content-Disposition' => 'attachment; filename="' . (string) $dossier['filename'] . '"',
+                'X-Content-SHA256' => (string) $dossier['closure']['dossier_sha256'],
+            ]
+        );
+    }
+
     public function addAmendment(Request $request): Response
     {
         return $this->mutate($request, function (string $userId, string $caseId) use ($request): string {
