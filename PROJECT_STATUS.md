@@ -1,64 +1,59 @@
 # Projektstatus
 
 ## Aktuelle Version
-0.7.0-dev
+0.8.0-dev
 
 ## Phase
-M7 – Intelligente Assistenz
+M8 – Private Karten, Problemstellen, Analytics und kommunale Problemberichte
 
-## M1–M6
-Fundament, Vorgangskern, Beweissystem, Zeugenbericht/finaler Review, Behördenrouting/Dispatch und Behördenkommunikation sind abgeschlossen und auf `develop` integriert.
+## M1–M7
+Fundament, Vorgangskern, Beweissystem, Zeugenbericht/finaler Review, Behördenrouting/Dispatch, Behördenkommunikation und intelligente Assistenz sind abgeschlossen und auf `develop` integriert.
 
-## M7 – umgesetzt
-- lokale deterministische Fotoqualitätsanalyse ohne externen Dienst
-- Metriken für Auflösung, mittlere Helligkeit, Helligkeitskontrast und lokale Schärfe
-- technische Einstufungen `SUITABLE`, `LIMITED`, `RETAKE_RECOMMENDED`
-- versionierte Speicherung der Qualitätsmetriken je Evidence-Item
-- lokale Qualitätsanalyse aktualisiert ausschließlich den technischen Evidence-Qualitätsstatus
-- provider-neutrale Vision/OCR-Schnittstelle
-- sicherer Default `ASSIST_PROVIDER=disabled`
-- keine externe Bildübertragung ohne explizite Konfiguration
-- optionaler HTTPS-JSON-Provider
-- externer Provider akzeptiert nur HTTPS ohne eingebettete Zugangsdaten
-- Provider-Ziel darf nicht auf private/reservierte IP-Adressen auflösen
-- validierte DNS-Auflösung wird für den Request gepinnt
-- Uploadlimit für externe Analyse 12 MB
-- Provider-Antwortlimit 2 MB
-- Kennzeichen-OCR als verschlüsselter Vorschlag mit Confidence und optionaler Bildregion
-- Verkehrszeichen- und Zusatzzeichen-Vorschläge
-- Tatbestandsvorschläge ausschließlich auf Basis zuvor bestätigter Schild-/Zusatzzeichen-Hinweise
-- Tatbestandsvorschläge müssen auf lokal vorhandene, versionierte Tatbestände verweisen
-- Vorschlagsdaten werden verschlüsselt gespeichert
-- Vorschläge besitzen getrennte Zustände `PENDING`, `CONFIRMED`, `REJECTED`, `APPLIED`
-- Bestätigen allein verändert keine Vorgangsdaten
-- Kennzeichen/Tatbestand werden erst über einen separaten Übernahme-Schritt geändert
-- Übernahme rechtlich relevanter Daten erzwingt erneut den Grunddaten-Review
-- jeder externe Assistenzlauf protokolliert Provider, Zweck, Input-Hash, Output-Hash, Status und minimierte Metadaten
-- Provider-Rohmetadaten werden nicht vollständig persistiert; nur Schlüssel/technische Zusammenfassung
-- Assistenzcenter im Bürgerportal
-- Providerstatus, lokale Qualitätsmetriken, Confidence, Vorschläge und Run-Historie sichtbar
-- explizites Bestätigen/Verwerfen von Vorschlägen
-- Integrationstests mit lokalem Fake-Provider ohne externe Netzwerkzugriffe
+## M8 – umgesetzt
+- private Vorgangskarte mit ausschließlich eigenen Vorgängen
+- Karte selektiert keine Fahrzeug- oder Kennzeichendaten
+- schematische SVG-Karte ohne externe Kartentiles oder Drittanbieter-Requests
+- Statusfilter-Grundlage für private Kartendaten
+- private Hotspot-Erkennung aus ausschließlich eigenen geolokalisierten Vorgängen
+- private Problemstellen mit Eigentümerbindung, Mittelpunkt und Radius
+- automatische Fallzuordnung über Haversine-Distanz
+- serverseitige Ownership-Prüfung für Problemstellen
+- Problemstellen-Detail mit ausschließlich eigenen zugeordneten Fällen
+- Aggregation nach Status, Tatbestandskategorie und Tageszeit
+- versionierte Problemstellen-Snapshots für frei wählbare Zeiträume
+- SHA-256-Integrität je Snapshot
+- Analytics-Center mit eigenen Vorgängen
+- Auswertungen nach Status, Ort, Tatbestandskategorie und Monat
+- frei begrenzbare Analysezeiträume auf Serviceebene
+- anonymisierte kommunale Problemberichte
+- kommunale Reports enthalten standardmäßig keine Kennzeichen
+- kommunale Reports enthalten keine Halter-/Eigentümerdaten
+- kommunale Reports enthalten keine internen Vorgangs-IDs
+- kommunale Reports enthalten standardmäßig keine Fotos
+- Reportkoordinaten werden gegenüber den internen Fallkoordinaten reduziert dargestellt
+- versionierte kommunale Reports mit SHA-256-Integrität
+- Dashboard-Navigation für Karte, Problemstellen und Analytics
+- Integrationstests für Ownership, private Kartenabgrenzung, Hotspots, Aggregationen und anonymisierte Reports
 
-## M7-Status
-Der technische Assistenzkern ist abgeschlossen. Intelligente Funktionen sind strikt assistiv: Kein OCR-, Vision-, Schild- oder Tatbestandsvorschlag verändert rechtlich relevante Vorgangsdaten ohne separate Nutzeraktion.
+## M8-Status
+Der private Karten-/Analytics-Kern ist abgeschlossen. Alle Karten-, Hotspot- und Problemstellenfunktionen arbeiten ausschließlich mit dem Datenbestand des angemeldeten Nutzers. Es existiert weiterhin keine öffentliche Kennzeichen-, Fahrzeug- oder Fallkarte.
 
-## Sicherheitsprinzipien
-- externe Vision/OCR ist standardmäßig deaktiviert.
-- für externe Analyse wird bevorzugt die getrennte WORKING-Kopie statt des geschützten Originals verwendet.
-- die Analysequelle wird vor Übertragung per SHA-256 geprüft.
-- Providerantworten gelten als untrusted input und werden normalisiert/whitelisted.
-- Kennzeichen-, Schild- und Tatbestandsvorschläge werden verschlüsselt gespeichert.
-- Tatbestandsvorschläge brauchen bestätigte Signalgrundlagen.
-- ein externer Vorschlag ersetzt weder Nutzerbestätigung noch behördliche Würdigung.
-- lokale Qualitätsmetriken sind technische Heuristiken und keine Aussage über rechtliche Beweiskraft.
+## Datenschutzprinzipien
+- private Kartendaten verlassen beim Rendern der aktuellen Kartenansicht nicht automatisch den Server/Browser-Kontext zu einem externen Kartendienst.
+- die Karten-/Analytics-Abfragen lesen keine Kennzeichen aus der Fahrzeugtabelle.
+- Problemstellen sind private Benutzerressourcen.
+- Hotspots werden nur aus eigenen Fällen erzeugt.
+- kommunale Problemberichte sind eigenständige anonymisierte Aggregationsartefakte.
+- interne Case-IDs, Kennzeichen, Halterdaten und Fotos werden nicht in den kommunalen Report-Snapshot aufgenommen.
+- Report- und Snapshot-Inhalte sind versioniert und gehasht.
+- ein späteres öffentliches Problemstellenmodul muss technisch getrennt bleiben und darf nur ausdrücklich freigegebene, anonymisierte Kopien verwenden.
 
 ## Bekannte Einschränkungen
-- die lokale Schärfemetrik ist eine technische Laplace-Heuristik und keine motivbezogene Bildbewertung.
-- konkrete Vision/OCR-Qualität hängt vom später konfigurierten Provider ab.
-- produktive Tatbestandsdaten müssen weiterhin fachlich/rechtlich gepflegt werden.
-- automatische Verkehrszeichenlogik für Zeiträume/Ausnahmen wird in einer späteren Fachlogik-Ausbaustufe vertieft.
-- es gibt bewusst keine automatische Übernahme eines KI-Ergebnisses.
+- die aktuelle Karte ist bewusst eine schematische SVG-Darstellung ohne Straßen-/Basiskarte.
+- Clusterbildung verwendet derzeit eine einfache geografische Rasterung; komplexere räumliche Clusterverfahren können später ergänzt werden.
+- kommunale Reports enthalten noch keinen PDF-/Dokumentexport und noch keinen eigenen Behördenversandworkflow.
+- automatisch erkannte Hotspots werden aktuell als Vorschläge angezeigt; das Anlegen erfolgt bewusst durch den Nutzer.
+- Behördenreaktionsmetriken können in einer späteren Analytics-Ausbaustufe detaillierter aufbereitet werden.
 
 ## Nächster Schritt
-M7 per CI integrieren; danach M8 – Karten, persönliche Problemstellen, Analytics und strukturierte kommunale Problemberichte.
+M8 per CI integrieren; anschließend M9 – Community-Grundlage mit separaten öffentlichen Profilen, Beiträgen, regionalen Gruppen, moderierten öffentlichen Problemstellen und kontrollierter anonymisierter Freigabe privater Vorgänge.
