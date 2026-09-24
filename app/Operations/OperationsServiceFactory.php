@@ -6,6 +6,7 @@ namespace MeldeVerkehr\Operations;
 
 use MeldeVerkehr\Audit\AuditLogger;
 use MeldeVerkehr\Core\Application;
+use MeldeVerkehr\Mail\PhpMailTransport;
 use MeldeVerkehr\Security\SecretCipher;
 
 final class OperationsServiceFactory
@@ -23,9 +24,39 @@ final class OperationsServiceFactory
 
     public static function notifications(Application $app): NotificationService
     {
+        $pdo = $app->database();
+        $cipher = new SecretCipher((string) $app->config()->get('app.key', ''));
+        $from = trim((string) $app->config()->get('mail.from_address', ''));
+        $mail = filter_var($from, FILTER_VALIDATE_EMAIL)
+            ? new PhpMailTransport(
+                $from,
+                (string) $app->config()->get('mail.from_name', 'MeldeVerkehr')
+            )
+            : null;
+        $push = self::push($app);
+
         return new NotificationService(
+            $pdo,
+            $cipher,
+            new NotificationDeliveryService(
+                $pdo,
+                $cipher,
+                $mail,
+                $push,
+                (string) $app->config()->get('app.url', '')
+            )
+        );
+    }
+
+    public static function push(Application $app): WebPushService
+    {
+        return new WebPushService(
             $app->database(),
-            new SecretCipher((string) $app->config()->get('app.key', ''))
+            new SecretCipher((string) $app->config()->get('app.key', '')),
+            trim((string) $app->config()->get('notifications.push_vapid_public_key', '')),
+            trim((string) $app->config()->get('notifications.push_vapid_private_key', '')),
+            trim((string) $app->config()->get('notifications.push_vapid_subject', '')),
+            (int) $app->config()->get('notifications.push_ttl', 120)
         );
     }
 

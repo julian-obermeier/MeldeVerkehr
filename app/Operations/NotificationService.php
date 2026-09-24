@@ -10,9 +10,18 @@ use PDO;
 
 final class NotificationService
 {
+    private const EVENT_KEYS = [
+        'CASE_TASK_OPEN',
+        'CASE_DEADLINE_OPEN',
+        'CASE_STATUS_DELIVERY_FAILED',
+        'CASE_STATUS_USER_ACTION_REQUIRED',
+        'CASE_STATUS_AUTHORITY_REPLY',
+    ];
+
     public function __construct(
         private readonly PDO $pdo,
-        private readonly SecretCipher $cipher
+        private readonly SecretCipher $cipher,
+        private readonly ?NotificationDeliveryService $delivery = null
     ) {
     }
 
@@ -98,10 +107,6 @@ final class NotificationService
         ?string $body,
         ?string $actionUrl
     ): bool {
-        if (!$this->inAppEnabled($userId, $eventKey)) {
-            return false;
-        }
-
         $priority = strtoupper(trim($priority));
         if (!in_array($priority, ['LOW','NORMAL','HIGH','URGENT'], true)) {
             throw new \InvalidArgumentException('Ungültige Notification-Priorität.');
@@ -112,34 +117,52 @@ final class NotificationService
             throw new \InvalidArgumentException('Notification-Titel ist ungültig.');
         }
 
-        try {
-            $stmt = $this->pdo->prepare(
-                'INSERT INTO user_notifications
-                 (id, user_id, case_id, event_key, unique_key, priority, title,
-                  body_encrypted, action_url, created_at, read_at)
-                 VALUES
-                 (:id, :user_id, :case_id, :event_key, :unique_key, :priority, :title,
-                  :body, :action_url, UTC_TIMESTAMP(), NULL)'
-            );
-            $stmt->execute([
-                'id' => Uuid::v4(),
-                'user_id' => $userId,
-                'case_id' => $caseId,
-                'event_key' => mb_substr(trim($eventKey), 0, 100),
-                'unique_key' => $uniqueKey === null ? null : mb_substr($uniqueKey, 0, 190),
-                'priority' => $priority,
-                'title' => $title,
-                'body' => $body === null || trim($body) === '' ? null : $this->cipher->encrypt(trim($body)),
-                'action_url' => $this->safeActionUrl($actionUrl),
-            ]);
-        } catch (\PDOException $e) {
-            if ($e->getCode() === '23000' && $uniqueKey !== null) {
-                return false;
+        $eventKey = mb_substr(trim($eventKey), 0, 100);
+        $preference = $this->preference($userId, $eventKey);
+        $createdInApp = false;
+
+        if ($preference['in_app']) {
+            try {
+                $stmt = $this->pdo->prepare(
+                    'INSERT INTO user_notifications
+                     (id, user_id, case_id, event_key, unique_key, priority, title,
+                      body_encrypted, action_url, created_at, read_at)
+                     VALUES
+                     (:id, :user_id, :case_id, :event_key, :unique_key, :priority, :title,
+                      :body, :action_url, UTC_TIMESTAMP(), NULL)'
+                );
+                $stmt->execute([
+                    'id' => Uuid::v4(),
+                    'user_id' => $userId,
+                    'case_id' => $caseId,
+                    'event_key' => $eventKey,
+                    'unique_key' => $uniqueKey === null ? null : mb_substr($uniqueKey, 0, 190),
+                    'priority' => $priority,
+                    'title' => $title,
+                    'body' => $body === null || trim($body) === '' ? null : $this->cipher->encrypt(trim($body)),
+                    'action_url' => $this->safeActionUrl($actionUrl),
+                ]);
+                $createdInApp = true;
+            } catch (\PDOException $e) {
+                if ($e->getCode() !== '23000' || $uniqueKey === null) {
+                    throw $e;
+                }
             }
-            throw $e;
         }
 
-        return true;
+        $delivered = $this->delivery?->dispatch(
+            $userId,
+            $eventKey,
+            $uniqueKey,
+            $priority,
+            $title,
+            $body,
+            $this->safeActionUrl($actionUrl),
+            $preference['email'],
+            $preference['push']
+        ) ?? 0;
+
+        return $createdInApp || $delivered > 0;
     }
 
     public function list(string $userId, bool $unreadOnly = false, int $limit = 100): array
@@ -173,6 +196,35 @@ final class NotificationService
         unset($row);
 
         return $rows;
+    }
+
+    public function latestPushPayload(string $userId): ?array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT id, title, body_encrypted, action_url, sent_at
+             FROM notification_channel_deliveries
+             WHERE user_id = :user_id
+               AND channel = "PUSH"
+               AND status = "SENT"
+             ORDER BY sent_at DESC, updated_at DESC
+             LIMIT 1'
+        );
+        $stmt->execute(['user_id' => $userId]);
+        $row = $stmt->fetch();
+
+        if (!is_array($row)) {
+            return null;
+        }
+
+        return [
+            'id' => (string) $row['id'],
+            'title' => (string) $row['title'],
+            'body' => $row['body_encrypted'] === null
+                ? null
+                : $this->cipher->decrypt((string) $row['body_encrypted']),
+            'action_url' => $row['action_url'],
+            'sent_at' => $row['sent_at'],
+        ];
     }
 
     public function unreadCount(string $userId): int
@@ -217,6 +269,60 @@ final class NotificationService
         $stmt->execute(['user_id' => $userId]);
 
         return $stmt->rowCount();
+    }
+
+    public function eventKeys(): array
+    {
+        return self::EVENT_KEYS;
+    }
+
+    public function preferences(string $userId): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT event_key, in_app_enabled, email_enabled, push_enabled
+             FROM user_notification_preferences
+             WHERE user_id = :user_id'
+        );
+        $stmt->execute(['user_id' => $userId]);
+
+        $stored = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $stored[(string) $row['event_key']] = [
+                'in_app' => (bool) $row['in_app_enabled'],
+                'email' => (bool) $row['email_enabled'],
+                'push' => (bool) $row['push_enabled'],
+            ];
+        }
+
+        $result = [];
+        foreach (self::EVENT_KEYS as $eventKey) {
+            $result[$eventKey] = $stored[$eventKey] ?? [
+                'in_app' => true,
+                'email' => true,
+                'push' => true,
+            ];
+        }
+
+        return $result;
+    }
+
+    public function preference(string $userId, string $eventKey): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT in_app_enabled, email_enabled, push_enabled
+             FROM user_notification_preferences
+             WHERE user_id = :user_id AND event_key = :event_key LIMIT 1'
+        );
+        $stmt->execute(['user_id' => $userId, 'event_key' => $eventKey]);
+        $row = $stmt->fetch();
+
+        return is_array($row)
+            ? [
+                'in_app' => (bool) $row['in_app_enabled'],
+                'email' => (bool) $row['email_enabled'],
+                'push' => (bool) $row['push_enabled'],
+            ]
+            : ['in_app' => true, 'email' => true, 'push' => true];
     }
 
     public function savePreference(

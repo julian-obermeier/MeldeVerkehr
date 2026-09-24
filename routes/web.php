@@ -219,6 +219,12 @@ if ($installerService->isInstalled()) {
     $app->router()->post('/search/filters/{id}/delete', [$operations, 'deleteFilter']);
     $app->router()->get('/documents', [$operations, 'documents']);
     $app->router()->get('/notifications', [$operations, 'notifications']);
+    $app->router()->get('/notifications/settings', [$operations, 'notificationSettings']);
+    $app->router()->post('/notifications/settings', [$operations, 'saveNotificationSettings']);
+    $app->router()->get('/notifications/push/key', [$operations, 'pushKey']);
+    $app->router()->post('/notifications/push/subscriptions', [$operations, 'registerPush']);
+    $app->router()->post('/notifications/push/unsubscribe', [$operations, 'disablePush']);
+    $app->router()->get('/notifications/push-latest', [$operations, 'pushLatest']);
     $app->router()->post('/notifications/{id}/read', [$operations, 'markNotification']);
     $app->router()->post('/notifications/read-all', [$operations, 'markAllNotifications']);
     $app->router()->post('/exports/cases', [$operations, 'createExport']);

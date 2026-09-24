@@ -57,6 +57,7 @@ use MeldeVerkehr\Operations\ExportService;
 use MeldeVerkehr\Operations\ExportStorage;
 use MeldeVerkehr\Operations\NotificationService;
 use MeldeVerkehr\Operations\RetentionService;
+use MeldeVerkehr\Operations\WebPushService;
 use MeldeVerkehr\Queue\JobQueue;
 use MeldeVerkehr\Queue\JobWorker;
 use MeldeVerkehr\Release\BackupService;
@@ -2569,6 +2570,57 @@ try {
     $assert(
         is_array($readNotification) && $readNotification['read_at'] !== null,
         'Notification can be marked read by owner'
+    );
+
+    $defaultPreferences = $notificationService->preferences((string) $user['id']);
+    $assert(
+        isset($defaultPreferences['CASE_TASK_OPEN'])
+        && $defaultPreferences['CASE_TASK_OPEN']['in_app'] === true
+        && $defaultPreferences['CASE_TASK_OPEN']['email'] === true
+        && $defaultPreferences['CASE_TASK_OPEN']['push'] === true,
+        'Notification channels default to enabled'
+    );
+
+    $notificationService->savePreference(
+        (string) $user['id'],
+        'CASE_TASK_OPEN',
+        true,
+        false,
+        false
+    );
+    $savedChannelPreference = $notificationService->preference(
+        (string) $user['id'],
+        'CASE_TASK_OPEN'
+    );
+    $assert(
+        $savedChannelPreference['in_app'] === true
+        && $savedChannelPreference['email'] === false
+        && $savedChannelPreference['push'] === false,
+        'Notification channel preferences are persisted per event'
+    );
+
+    $testPush = new WebPushService(
+        $pdo,
+        new SecretCipher('test-app-key'),
+        '',
+        '',
+        ''
+    );
+    $testPush->register(
+        (string) $user['id'],
+        'https://push.example.test/subscription/test',
+        'p256dh-test',
+        'auth-test',
+        'Integration Test'
+    );
+    $assert(
+        $testPush->activeCount((string) $user['id']) === 1,
+        'Web push subscription is stored for the authenticated user'
+    );
+    $testPush->revokeAll((string) $user['id']);
+    $assert(
+        $testPush->activeCount((string) $user['id']) === 0,
+        'Web push subscriptions can be revoked'
     );
 
     $notificationService->savePreference(

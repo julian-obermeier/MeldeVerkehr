@@ -185,6 +185,174 @@ final class OperationsController
         return Response::redirect('/notifications');
     }
 
+    public function notificationSettings(Request $request): Response
+    {
+        $userId = $this->requireUser();
+        if ($userId instanceof Response) {
+            return $userId;
+        }
+
+        $notifications = OperationsServiceFactory::notifications($this->app);
+        $push = OperationsServiceFactory::push($this->app);
+
+        return Response::html($this->view->render('operations/notification-settings', [
+            'preferences' => $notifications->preferences($userId),
+            'pushConfigured' => $push->configured(),
+            'pushSubscriptions' => $push->activeCount($userId),
+            'csrf' => Csrf::token(),
+            'message' => $this->pullFlash('operations_message'),
+            'error' => $this->pullFlash('operations_error'),
+        ]));
+    }
+
+    public function saveNotificationSettings(Request $request): Response
+    {
+        $userId = $this->requireUser();
+        if ($userId instanceof Response) {
+            return $userId;
+        }
+
+        if (!$this->validCsrf($request)) {
+            return Response::redirect('/notifications/settings');
+        }
+
+        $inApp = $request->input('in_app', []);
+        $email = $request->input('email', []);
+        $push = $request->input('push', []);
+        $inApp = is_array($inApp) ? $inApp : [];
+        $email = is_array($email) ? $email : [];
+        $push = is_array($push) ? $push : [];
+
+        $service = OperationsServiceFactory::notifications($this->app);
+        foreach ($service->eventKeys() as $eventKey) {
+            $service->savePreference(
+                $userId,
+                $eventKey,
+                isset($inApp[$eventKey]),
+                isset($email[$eventKey]),
+                isset($push[$eventKey])
+            );
+        }
+
+        $_SESSION['operations_message'] = 'Benachrichtigungseinstellungen gespeichert.';
+
+        return Response::redirect('/notifications/settings');
+    }
+
+    public function pushKey(Request $request): Response
+    {
+        $userId = $this->requireUser();
+        if ($userId instanceof Response) {
+            return $userId;
+        }
+
+        $key = OperationsServiceFactory::push($this->app)->publicKey();
+        if ($key === '') {
+            return Response::json([
+                'success' => false,
+                'data' => null,
+                'errors' => [['code' => 'PUSH_NOT_CONFIGURED', 'message' => 'Push ist nicht konfiguriert.']],
+                'meta' => [],
+            ], 503);
+        }
+
+        return Response::json([
+            'success' => true,
+            'data' => ['public_key' => $key],
+            'errors' => [],
+            'meta' => [],
+        ]);
+    }
+
+    public function registerPush(Request $request): Response
+    {
+        $userId = $this->requireUser();
+        if ($userId instanceof Response) {
+            return $userId;
+        }
+
+        if (!Csrf::validate((string) $request->input('_csrf', ''))) {
+            return Response::json([
+                'success' => false,
+                'data' => null,
+                'errors' => [['code' => 'CSRF', 'message' => 'Sitzung abgelaufen.']],
+                'meta' => [],
+            ], 419);
+        }
+
+        try {
+            OperationsServiceFactory::push($this->app)->register(
+                $userId,
+                (string) $request->input('endpoint', ''),
+                $this->nullable($request->input('p256dh')),
+                $this->nullable($request->input('auth')),
+                $this->nullable($request->server('HTTP_USER_AGENT', ''))
+            );
+        } catch (\InvalidArgumentException $e) {
+            return Response::json([
+                'success' => false,
+                'data' => null,
+                'errors' => [['code' => 'VALIDATION', 'message' => $e->getMessage()]],
+                'meta' => [],
+            ], 422);
+        }
+
+        return Response::json([
+            'success' => true,
+            'data' => ['registered' => true],
+            'errors' => [],
+            'meta' => [],
+        ]);
+    }
+
+    public function disablePush(Request $request): Response
+    {
+        $userId = $this->requireUser();
+        if ($userId instanceof Response) {
+            return $userId;
+        }
+
+        if (!Csrf::validate((string) $request->input('_csrf', ''))) {
+            return Response::json([
+                'success' => false,
+                'data' => null,
+                'errors' => [['code' => 'CSRF', 'message' => 'Sitzung abgelaufen.']],
+                'meta' => [],
+            ], 419);
+        }
+
+        OperationsServiceFactory::push($this->app)->revokeAll($userId);
+
+        return Response::json([
+            'success' => true,
+            'data' => ['revoked' => true],
+            'errors' => [],
+            'meta' => [],
+        ]);
+    }
+
+    public function pushLatest(Request $request): Response
+    {
+        $userId = $this->requireUser();
+        if ($userId instanceof Response) {
+            return Response::json([
+                'success' => false,
+                'data' => null,
+                'errors' => [['code' => 'AUTH_REQUIRED', 'message' => 'Anmeldung erforderlich.']],
+                'meta' => [],
+            ], 401);
+        }
+
+        $item = OperationsServiceFactory::notifications($this->app)->latestPushPayload($userId);
+
+        return Response::json([
+            'success' => true,
+            'data' => $item,
+            'errors' => [],
+            'meta' => [],
+        ], 200, ['Cache-Control' => 'private, no-store, max-age=0']);
+    }
+
     public function createExport(Request $request): Response
     {
         $userId = $this->requireUser();
