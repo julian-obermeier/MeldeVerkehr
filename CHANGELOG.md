@@ -5,6 +5,18 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 ## [Unreleased]
 
 ### Added
+- manuelle Evidence-Privacy-Bereiche mit normalisierten Bildkoordinaten
+- interaktive Privacy-Rechteckauswahl auf geschützten Vorschauen
+- versionierte Privacy-Review-Snapshots
+- redigierte PUBLIC-Evidence-Versionen
+- PUBLIC-Provenienz mit Quellvariante, Quellversion, Quellhash und Regionshash
+- geschützte private Binary-Responses für Evidence-Vorschauen
+- kategorienbasierter Evidence-Review
+- blockierende Privacy-/Integritätsprüfungen und bestätigbare Qualitäts-/Kategoriehinweise
+- versionierte Evidence-Review-Datensätze
+- eingefrorene Evidence-Packages mit gehashtem Manifest
+- Evidence-Package-Items mit exaktem PUBLIC-Versions-/Hash-Snapshot
+- End-to-End-Tests für Privacy-Redaktion und Package-Freeze
 - M3-Evidence-Datenmodell mit Items, Versionen, Metadaten und Ereignissen
 - geschützter Originalspeicher außerhalb des Webroots
 - SHA-256-Integrität je Evidence-Version
@@ -79,6 +91,8 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 - CSRF-Schutz für Installations- und Authentifizierungsformulare
 
 ### Changed
+- Evidence-Änderungen werden nach eingefrorener Beweismappe serverseitig gesperrt
+- READY_FOR_REVIEW wird in der Vorgangsansicht anhand des Evidence-Pakets eindeutig dem richtigen Review-Schritt zugeordnet
 - vollständige M2-Grunddaten wechseln jetzt zuerst zu READY_FOR_REVIEW
 - WAITING_FOR_EVIDENCE wird erst nach expliziter Grunddatenbestätigung gesetzt
 - nachträgliche Änderungen an bereits geprüften Grunddaten erzwingen erneut einen Review
@@ -101,6 +115,10 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 - native Mailheader werden gegen Zeilenumbrüche abgesichert und UTF-8-Betreffzeilen kodiert
 
 ### Security
+- Privacy-Redaktionen verändern ausschließlich PUBLIC-Kopien, niemals Originale
+- Evidence-Packages prüfen die Integrität von Original und PUBLIC-Kopie vor dem Einfrieren
+- interne Storage-Pfade werden nicht an Review-Views ausgegeben
+- Evidence-Vorschauen sind authentifiziert, private/no-store und mit nosniff geschützt
 - Evidence-Originale werden außerhalb des öffentlichen Webroots gespeichert
 - hochgeladene Dateitypen werden anhand des tatsächlichen MIME-Inhalts validiert
 - Evidence-Dateinamen im Storage werden ausschließlich aus serverseitigen UUIDs gebildet

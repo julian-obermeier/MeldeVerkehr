@@ -27,6 +27,24 @@ final class Response
         );
     }
 
+    public static function binary(
+        string $body,
+        string $contentType,
+        int $status = 200,
+        array $headers = []
+    ): self {
+        return new self(
+            $body,
+            $status,
+            array_merge([
+                'Content-Type' => $contentType,
+                'Content-Length' => (string) strlen($body),
+                'X-Content-Type-Options' => 'nosniff',
+                'Cache-Control' => 'private, no-store, max-age=0',
+            ], $headers)
+        );
+    }
+
     public static function redirect(string $location, int $status = 302): self
     {
         if (!str_starts_with($location, '/') && !preg_match('#^https?://#i', $location)) {

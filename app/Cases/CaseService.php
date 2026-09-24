@@ -167,6 +167,14 @@ final class CaseService
             ['case_id' => $caseId]
         );
 
+        $package = $this->fetchOne(
+            'SELECT id, version_no, status, manifest_sha256, frozen_at
+             FROM evidence_packages
+             WHERE case_id = :case_id
+             ORDER BY version_no DESC LIMIT 1',
+            ['case_id' => $caseId]
+        );
+
         return [
             'case' => $case,
             'vehicle' => $vehicle,
@@ -174,6 +182,7 @@ final class CaseService
             'offenses' => $offenses,
             'history' => $history,
             'timeline' => $timeline,
+            'evidence_package' => $package,
         ];
     }
 
@@ -430,6 +439,10 @@ final class CaseService
         }
 
         $status = (string) $summary['data']['case']['status'];
+
+        if (($summary['data']['evidence_package'] ?? null) !== null) {
+            throw new \DomainException('Der Grunddaten-Review ist bereits abgeschlossen; der Vorgang befindet sich im Evidence-Review.');
+        }
 
         if ($status !== CaseStatus::READY_FOR_REVIEW) {
             throw new \DomainException('Vorgang ist aktuell nicht für den Grunddaten-Review bereit.');

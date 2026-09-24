@@ -11,6 +11,8 @@ use MeldeVerkehr\Auth\TwoFactorController;
 use MeldeVerkehr\Cases\CaseController;
 use MeldeVerkehr\Core\Application;
 use MeldeVerkehr\Evidence\EvidenceController;
+use MeldeVerkehr\Evidence\EvidencePrivacyController;
+use MeldeVerkehr\Evidence\EvidenceReviewController;
 use MeldeVerkehr\Http\Request;
 use MeldeVerkehr\Http\Response;
 use MeldeVerkehr\Install\InstallerController;
@@ -36,6 +38,8 @@ if ($installerService->isInstalled()) {
     $passkeyLogin = new PasskeyLoginController($app);
     $cases = new CaseController($app);
     $evidence = new EvidenceController($app);
+    $privacy = new EvidencePrivacyController($app);
+    $evidenceReview = new EvidenceReviewController($app);
 
     $app->router()->get('/register', [$auth, 'registerForm']);
     $app->router()->post('/register', [$auth, 'register']);
@@ -74,6 +78,15 @@ if ($installerService->isInstalled()) {
     $app->router()->get('/cases/{id}/evidence', [$evidence, 'index']);
     $app->router()->post('/cases/{id}/evidence', [$evidence, 'upload']);
     $app->router()->post('/evidence/{id}/remove', [$evidence, 'remove']);
+
+    $app->router()->get('/evidence/{id}/privacy', [$privacy, 'index']);
+    $app->router()->post('/evidence/{id}/privacy/regions', [$privacy, 'addRegion']);
+    $app->router()->post('/privacy-regions/{id}/dismiss', [$privacy, 'dismissRegion']);
+    $app->router()->post('/evidence/{id}/privacy/confirm', [$privacy, 'confirm']);
+    $app->router()->get('/evidence/{id}/preview', [$privacy, 'preview']);
+
+    $app->router()->get('/cases/{id}/evidence/review', [$evidenceReview, 'index']);
+    $app->router()->post('/cases/{id}/evidence/review', [$evidenceReview, 'confirm']);
 
     $app->router()->get('/settings/security', [$security, 'index']);
     $app->router()->post('/settings/security/totp/start', [$security, 'startTotp']);
