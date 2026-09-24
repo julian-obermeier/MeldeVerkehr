@@ -477,9 +477,12 @@ final class CommunityController
 
         $caseId = (string) $request->route('id', '');
 
+        $releaseService = CommunityServiceFactory::releases($this->app);
+
         return Response::html($this->view->render('community/releases', [
             'caseId' => $caseId,
-            'releases' => CommunityServiceFactory::releases($this->app)->ownedReleases($userId, $caseId),
+            'releases' => $releaseService->ownedReleases($userId, $caseId),
+            'availableEvidence' => $releaseService->availableEvidence($userId, $caseId),
             'csrf' => Csrf::token(),
             'message' => $this->pullFlash('community_message'),
             'error' => $this->pullFlash('community_error'),
