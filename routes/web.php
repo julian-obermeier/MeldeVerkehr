@@ -17,6 +17,8 @@ use MeldeVerkehr\Http\Request;
 use MeldeVerkehr\Http\Response;
 use MeldeVerkehr\Install\InstallerController;
 use MeldeVerkehr\Install\InstallerService;
+use MeldeVerkehr\Witness\FinalReviewController;
+use MeldeVerkehr\Witness\WitnessController;
 
 /** @var Application $app */
 
@@ -40,6 +42,8 @@ if ($installerService->isInstalled()) {
     $evidence = new EvidenceController($app);
     $privacy = new EvidencePrivacyController($app);
     $evidenceReview = new EvidenceReviewController($app);
+    $witness = new WitnessController($app);
+    $finalReview = new FinalReviewController($app);
 
     $app->router()->get('/register', [$auth, 'registerForm']);
     $app->router()->post('/register', [$auth, 'register']);
@@ -87,6 +91,16 @@ if ($installerService->isInstalled()) {
 
     $app->router()->get('/cases/{id}/evidence/review', [$evidenceReview, 'index']);
     $app->router()->post('/cases/{id}/evidence/review', [$evidenceReview, 'confirm']);
+
+    $app->router()->get('/cases/{id}/witness', [$witness, 'index']);
+    $app->router()->post('/cases/{id}/witness/observation', [$witness, 'saveObservation']);
+    $app->router()->post('/cases/{id}/witness/narrative/generate', [$witness, 'generateNarrative']);
+    $app->router()->post('/cases/{id}/witness/narrative', [$witness, 'saveNarrative']);
+    $app->router()->post('/cases/{id}/witness/report', [$witness, 'createReport']);
+    $app->router()->post('/witness-reports/{id}/confirm', [$witness, 'confirmReport']);
+
+    $app->router()->get('/cases/{id}/final-review', [$finalReview, 'index']);
+    $app->router()->post('/cases/{id}/final-review', [$finalReview, 'confirm']);
 
     $app->router()->get('/settings/security', [$security, 'index']);
     $app->router()->post('/settings/security/totp/start', [$security, 'startTotp']);
