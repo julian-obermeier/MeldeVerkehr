@@ -349,7 +349,17 @@ final class WitnessService
             return null;
         }
 
-        $report['snapshot'] = $this->decryptSnapshot((string) $report['snapshot_json']);
+        $snapshotJson = $this->cipher->decrypt((string) $report['snapshot_json']);
+        if (!hash_equals((string) $report['snapshot_sha256'], hash('sha256', $snapshotJson))) {
+            throw new \RuntimeException('Integrität des aktuellen Zeugenbericht-Snapshots ist verletzt.');
+        }
+
+        $decoded = json_decode($snapshotJson, true, 512, JSON_THROW_ON_ERROR);
+        if (!is_array($decoded)) {
+            throw new \RuntimeException('Zeugenbericht-Snapshot ist ungültig.');
+        }
+
+        $report['snapshot'] = $decoded;
         unset($report['snapshot_json']);
         $report['declaration'] = $declaration;
 
