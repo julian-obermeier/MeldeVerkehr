@@ -17,6 +17,8 @@ $request = Request::fromGlobals();
 $maintenance = ReleaseServiceFactory::maintenance($app);
 
 $maintenanceAllowed = $request->path() === '/health'
+    || $request->path() === '/health/live'
+    || $request->path() === '/health/ready'
     || $request->path() === '/login'
     || $request->path() === '/logout'
     || $request->path() === '/two-factor'

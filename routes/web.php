@@ -26,6 +26,7 @@ use MeldeVerkehr\Install\InstallerController;
 use MeldeVerkehr\Install\InstallerService;
 use MeldeVerkehr\Operations\OperationsController;
 use MeldeVerkehr\Release\ReleaseAdminController;
+use MeldeVerkehr\Release\ReleaseHealthController;
 use MeldeVerkehr\Release\ReleaseServiceFactory;
 use MeldeVerkehr\Witness\FinalReviewController;
 use MeldeVerkehr\Witness\WitnessController;
@@ -34,6 +35,7 @@ use MeldeVerkehr\Witness\WitnessController;
 
 $installer = new InstallerController($app->basePath());
 $installerService = new InstallerService($app->basePath());
+$releaseHealth = new ReleaseHealthController($app);
 
 $app->router()->get('/install', [$installer, 'index']);
 $app->router()->post('/install/database', [$installer, 'database']);
@@ -229,6 +231,9 @@ $app->router()->get('/', static function (Request $request) use ($installerServi
 
     return Response::redirect('/dashboard');
 });
+
+$app->router()->get('/health/live', [$releaseHealth, 'live']);
+$app->router()->get('/health/ready', [$releaseHealth, 'ready']);
 
 $app->router()->get('/health', static function (Request $request) use ($installerService, $app): Response {
     return Response::json([

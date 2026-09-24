@@ -41,6 +41,13 @@ Fundament, Vorgangskern, Beweissystem, Zeugenbericht/Final Review, Behördenrout
 - gemeinsame Accessibility-Helfer auf Bürger-, Authority- und Operations-Flächen
 - Dashboard-Version kommt dynamisch aus VERSION
 - M12-Regressionsblock für Backup, Verschlüsselung, Verify, Restore-Guard, Rate-Limit, Maintenance, Update-Preflight, Readiness, PWA und Security-Invarianten
+- HTTP-Liveness unter `/health/live`
+- HTTP-Readiness unter `/health/ready` mit HTTP 503 bei Maintenance oder blockierender Readiness
+- reproduzierbares Shared-Hosting-Release-ZIP via GitHub Actions
+- SHA-256-Checksumme für Release-Artefakte
+- Release-Paket schließt .env und Runtime-Storage aus
+- explizite Batch-Grenzregression für Notification-Center, globale Suche und Authority-Inbox
+- kompakte RC-Release-Checkliste zusätzlich zum ausführlichen Runbook
 
 ## Sicherheitsprinzipien
 - Backups liegen außerhalb von public und speichern DB-/Runtime-Payloads verschlüsselt.
