@@ -1,4 +1,4 @@
-const STATIC_CACHE = 'meldeverkehr-static-v1';
+const STATIC_CACHE = 'meldeverkehr-static-v2';
 const STATIC_ASSETS = [
   '/offline.html',
   '/assets/app.js',
@@ -29,7 +29,7 @@ self.addEventListener('fetch', event => {
 
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request).catch(() => caches.match('/offline.html'))
+      fetch(request, { cache: 'no-store' }).catch(() => caches.match('/offline.html'))
     );
     return;
   }
