@@ -2284,6 +2284,130 @@ try {
     }
     $assert($reportingRestrictionWorks, 'Resolved abuse flag can enforce temporary reporting restriction');
 
+    $reputationGovernanceUser = $auth->register([
+        'first_name' => 'Reputation',
+        'last_name' => 'Governance',
+        'email' => 'reputation-' . bin2hex(random_bytes(5)) . '@example.test',
+        'password' => 'VeryStrongReputationTest-123!',
+    ]);
+    $communityService->saveProfile((string) $reputationGovernanceUser['id'], [
+        'username' => 'reputationtest',
+        'region_state' => 'Hessen',
+        'region_district' => 'Gießen',
+        'region_city' => 'Gießen',
+        'visibility_state' => 'PUBLIC',
+        'visibility_district' => 'LOGGED_IN',
+        'visibility_city' => 'PRIVATE',
+        'leaderboard_opt_in' => false,
+    ]);
+
+    $governedReputation = new ReputationService(
+        $pdo,
+        $permissions,
+        new AuditLogger($pdo, 'test-audit-key')
+    );
+
+    for ($i = 1; $i <= 6; $i++) {
+        $governedReputation->award(
+            (string) $reputationGovernanceUser['id'],
+            'COMMUNITY',
+            2,
+            'GOVERNANCE_DIMINISH_TEST',
+            'TEST',
+            (string) $i,
+            'governance-diminish:' . $reputationGovernanceUser['id'] . ':' . $i
+        );
+    }
+
+    $governedHistory = $governedReputation->history((string) $reputationGovernanceUser['id']);
+    $sixthGovernedEvent = array_values(array_filter(
+        $governedHistory,
+        static fn(array $row): bool => ($row['source_id'] ?? null) === '6'
+    ))[0] ?? null;
+    $assert(
+        is_array($sixthGovernedEvent)
+        && (float) $sixthGovernedEvent['multiplier'] === 0.5
+        && (int) $sixthGovernedEvent['effective_points'] === 1,
+        'Reputation applies diminishing returns after configured full-rate event count'
+    );
+
+    $governedScore = $governedReputation->score((string) $reputationGovernanceUser['id']);
+    $firstImpact = array_values(array_filter(
+        $governedScore['achievements'],
+        static fn(array $row): bool => ($row['achievement_key'] ?? null) === 'FIRST_IMPACT'
+    ))[0] ?? null;
+    $assert(
+        is_array($firstImpact) && !empty($firstImpact['unlocked_at']),
+        'Reputation achievements unlock from transparent event metrics'
+    );
+
+    for ($i = 1; $i <= 3; $i++) {
+        $governedReputation->award(
+            (string) $reputationGovernanceUser['id'],
+            'PROBLEM_REPORT',
+            10,
+            'GOVERNANCE_CAP_TEST',
+            'TEST',
+            'cap-' . $i,
+            'governance-cap:' . $reputationGovernanceUser['id'] . ':' . $i
+        );
+    }
+    $capBlocked = !$governedReputation->award(
+        (string) $reputationGovernanceUser['id'],
+        'PROBLEM_REPORT',
+        10,
+        'GOVERNANCE_CAP_TEST',
+        'TEST',
+        'cap-4',
+        'governance-cap:' . $reputationGovernanceUser['id'] . ':4'
+    );
+    $capScore = $governedReputation->score((string) $reputationGovernanceUser['id']);
+    $assert(
+        $capBlocked
+        && ($capScore['daily']['PROBLEM_REPORT']['awarded_positive_points'] ?? 0) === 30,
+        'Daily reputation cap prevents further positive farming while preserving event trace'
+    );
+
+    $reputationAnomalies = $governedReputation->anomalies((string) $moderationAdmin['id'], 'OPEN');
+    $capAnomaly = array_values(array_filter(
+        $reputationAnomalies,
+        static fn(array $row): bool =>
+            ($row['user_id'] ?? null) === $reputationGovernanceUser['id']
+            && ($row['anomaly_type'] ?? null) === 'DAILY_CAP_REACHED'
+    ))[0] ?? null;
+    $assert(is_array($capAnomaly), 'Reputation cap produces reviewable anomaly without automatic punishment');
+
+    $beforeCorrectionScore = $governedReputation->score((string) $reputationGovernanceUser['id'])['total'];
+    $correctionId = $governedReputation->adminCorrectionByUsername(
+        (string) $moderationAdmin['id'],
+        'reputationtest',
+        'COMMUNITY',
+        7,
+        'Integrationstest einer transparenten administrativen Punkte-Korrektur.'
+    );
+    $afterCorrectionScore = $governedReputation->score((string) $reputationGovernanceUser['id'])['total'];
+    $assert(
+        $afterCorrectionScore === $beforeCorrectionScore + 7
+        && count(array_filter(
+            $governedReputation->recentCorrections((string) $moderationAdmin['id']),
+            static fn(array $row): bool => ($row['id'] ?? null) === $correctionId
+        )) === 1,
+        'Admin correction is appended as a separate auditable reputation event'
+    );
+
+    $governedReputation->resolveAnomaly(
+        (string) $moderationAdmin['id'],
+        (string) $capAnomaly['id'],
+        'Tageslimit im Integrationstest erwartungsgemäß erreicht; keine weitere Maßnahme.'
+    );
+    $assert(
+        count(array_filter(
+            $governedReputation->anomalies((string) $moderationAdmin['id'], 'OPEN'),
+            static fn(array $row): bool => ($row['id'] ?? null) === $capAnomaly['id']
+        )) === 0,
+        'Reputation anomaly can be explicitly reviewed and closed'
+    );
+
     $caseSearch = new CaseSearchService(
         $pdo,
         new SecretCipher('test-app-key'),

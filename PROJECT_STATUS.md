@@ -1,10 +1,10 @@
 # Projektstatus
 
 ## Aktuelle Version
-0.14.0-dev
+0.15.0-dev
 
 ## Phase
-M14 – Moderation & Safety
+M15 – Reputation & Governance
 
 ## Integrierter Stand bis M13
 Fundament, Vorgangskern, Beweissystem, Zeugenbericht/Final Review, Behördenrouting/Dispatch, Behördenkommunikation, intelligente Assistenz, private Karten/Analytics, Community, Suche/Dokumentcenter/Notifications/Exporte/Retention, Behördenportal/API Produktionshärtung/Release-Operations sowie M13-Vorgangsversionierung und Lifecycle sind auf `develop` integriert.
@@ -31,9 +31,9 @@ Fundament, Vorgangskern, Beweissystem, Zeugenbericht/Final Review, Behördenrout
 - Integrationstests für Versionierung, Nachträge, Korrekturen, Rücknahmen, Abschluss, Export, Ownership und Archivierung
 
 ## Synchronisationshinweis Zielserver
-Der Entwicklungsstand auf `develop` enthält bereits die Migrationen `020`, `021` und `022`. Ein Server, der nur bis Migration `019` anzeigt, ist nicht auf dem aktuellen Repository-Stand. Vor Funktionstests muss deshalb zuerst der aktuelle Entwicklungsstand sauber deployed und anschließend der Migrationslauf ausgeführt werden. M13 ergänzt Migration `023`; M14 ergänzt Migration `024`.
+Der Entwicklungsstand auf `develop` enthält bereits die Migrationen `020`, `021` und `022`. Ein Server, der nur bis Migration `019` anzeigt, ist nicht auf dem aktuellen Repository-Stand. Vor Funktionstests muss deshalb zuerst der aktuelle Entwicklungsstand sauber deployed und anschließend der Migrationslauf ausgeführt werden. M13 ergänzt Migration `023`; M14 Migration `024`; M15 Migration `025`.
 
-## M14 – auf Feature-Branch umgesetzt
+## M14 – in `develop` integriert
 - Appeals/Einsprüche für HIDE, WARN und RESTRICT
 - gespeicherte Vorher-/Nachher-Snapshots für reversible Moderationsmaßnahmen
 - Abuse Flags und transparente Risikosignale
@@ -45,8 +45,17 @@ Der Entwicklungsstand auf `develop` enthält bereits die Migrationen `020`, `021
 - automatische Signale dienen ausschließlich als Prüfhinweise; endgültige Maßnahmen bleiben moderationsgesteuert
 - End-to-End-Tests für Einspruch, Wiederherstellung, Eskalation, Spam und Restriktion
 
+## M15 – auf Feature-Branch umgesetzt
+- Achievements mit transparentem Fortschritt
+- Tageslimits je Reputationskategorie
+- Diminishing Returns nach täglicher Eventanzahl
+- append-only Event-Details für angeforderte/effektive Punkte und Multiplikatoren
+- Anomalieerkennung für Velocity, Burst-Muster und Tagescaps
+- Admin-Korrekturen als separate, auditierbare Reputationsevents
+- Admin-Oberfläche für Regeln, Anomalien und Korrekturen
+- Integrationstests für Governance-Regeln
+
 ## Noch offen vor 1.0.0
-- Reputation erweitern: Achievements, Daily Limits, Diminishing Returns, Anomalieerkennung und Admin-Korrekturen
 - Authority-Inquiry-End-to-End-Workflow bis Bürgerantwort und behördlicher Prüfung abschließen
 - Community um Follower, Favoriten und Gruppenchat ergänzen
 - Notification-Präferenzen als vollständige UI bereitstellen und mit E-Mail/Push verbinden
@@ -67,6 +76,6 @@ Der Entwicklungsstand auf `develop` enthält bereits die Migrationen `020`, `021
 - Production darf nicht mit `APP_DEBUG=true` als release-ready gelten.
 
 ## Release-Status
-`0.14.0-dev` ist noch kein Stable-Release. Nach Integration von M14 müssen die verbleibenden 1.0-Punkte umgesetzt, CI vollständig ausgeführt und das Release-/Restore-Runbook auf der Zielumgebung erfolgreich durchgespielt werden.
+`0.15.0-dev` ist noch kein Stable-Release. Nach Integration von M15 müssen die verbleibenden 1.0-Punkte umgesetzt, CI vollständig ausgeführt und das Release-/Restore-Runbook auf der Zielumgebung erfolgreich durchgespielt werden.
 
 Siehe `docs/RELEASE_RUNBOOK.md`.

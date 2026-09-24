@@ -54,7 +54,14 @@ final class CommunityServiceFactory
 
     public static function reputation(Application $app): ReputationService
     {
-        return new ReputationService($app->database());
+        $pdo = $app->database();
+        $key = (string) $app->config()->get('app.key', '');
+
+        return new ReputationService(
+            $pdo,
+            new PermissionService($pdo),
+            new AuditLogger($pdo, $key)
+        );
     }
 
     public static function moderation(Application $app): ModerationService

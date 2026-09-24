@@ -869,6 +869,81 @@ final class CommunityController
         return Response::redirect('/community/moderation');
     }
 
+    public function reputationAdmin(Request $request): Response
+    {
+        $userId = $this->requireUser();
+        if ($userId instanceof Response) {
+            return $userId;
+        }
+
+        try {
+            $service = CommunityServiceFactory::reputation($this->app);
+
+            return Response::html($this->view->render('community/reputation-admin', [
+                'anomalies' => $service->anomalies($userId, 'OPEN'),
+                'policies' => $service->policies(),
+                'corrections' => $service->recentCorrections($userId),
+                'csrf' => Csrf::token(),
+                'message' => $this->pullFlash('community_message'),
+                'error' => $this->pullFlash('community_error'),
+            ]));
+        } catch (\MeldeVerkehr\Auth\AuthorizationException $e) {
+            return Response::html('<h1>403</h1><p>Kein Zugriff auf die Reputationsverwaltung.</p>', 403);
+        }
+    }
+
+    public function correctReputation(Request $request): Response
+    {
+        $userId = $this->requireUser();
+        if ($userId instanceof Response) {
+            return $userId;
+        }
+
+        if (!$this->csrf($request, '/community/moderation/reputation')) {
+            return Response::redirect('/community/moderation/reputation');
+        }
+
+        try {
+            CommunityServiceFactory::reputation($this->app)->adminCorrectionByUsername(
+                $userId,
+                (string) $request->input('username', ''),
+                (string) $request->input('category', ''),
+                (int) $request->input('points', 0),
+                (string) $request->input('reason', '')
+            );
+            $_SESSION['community_message'] = 'Reputationskorrektur wurde revisionssicher gebucht.';
+        } catch (\InvalidArgumentException|\DomainException|\MeldeVerkehr\Auth\AuthorizationException $e) {
+            $_SESSION['community_error'] = $e->getMessage();
+        }
+
+        return Response::redirect('/community/moderation/reputation');
+    }
+
+    public function resolveReputationAnomaly(Request $request): Response
+    {
+        $userId = $this->requireUser();
+        if ($userId instanceof Response) {
+            return $userId;
+        }
+
+        if (!$this->csrf($request, '/community/moderation/reputation')) {
+            return Response::redirect('/community/moderation/reputation');
+        }
+
+        try {
+            CommunityServiceFactory::reputation($this->app)->resolveAnomaly(
+                $userId,
+                (string) $request->route('id', ''),
+                (string) $request->input('resolution', '')
+            );
+            $_SESSION['community_message'] = 'Reputationsanomalie wurde geprüft.';
+        } catch (\InvalidArgumentException|\DomainException|\MeldeVerkehr\Auth\AuthorizationException $e) {
+            $_SESSION['community_error'] = $e->getMessage();
+        }
+
+        return Response::redirect('/community/moderation/reputation');
+    }
+
     private function csrf(Request $request, string $redirect): bool
     {
         if (!Csrf::validate((string) $request->input('_csrf', ''))) {

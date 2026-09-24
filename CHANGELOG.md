@@ -5,6 +5,15 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 ## [Unreleased]
 
 ### Added
+- M15-Reputation-Governance mit konfigurierbaren Tageslimits pro Kategorie
+- Diminishing Returns nach Anzahl täglicher Events
+- transparente Event-Details mit angeforderten/effektiven Punkten und Multiplikator
+- Achievements mit Fortschritt und Freischaltzeitpunkt
+- Reputationsanomalien für Event-Velocity, Burst-Muster und erreichte Tagescaps
+- Admin-Korrekturen als neue append-only Reputationsevents statt nachträglicher Manipulation
+- Reputations-Adminoberfläche für Regeln, Anomalien und Korrekturen
+- Profilanzeige für Tageslimits und Achievement-Fortschritt
+- Integrationstests für Diminishing Returns, Caps, Achievements, Anomalien und Admin-Korrekturen
 - M14-Moderation-Safety-Datenmodell für Appeals, Abuse Flags, Eskalationen, Action-Snapshots und Nutzerrestriktionen
 - Einspruchscenter für betroffene Community-Nutzer
 - reversible Moderationsentscheidungen durch gespeicherte Vorher-/Nachher-Zustände

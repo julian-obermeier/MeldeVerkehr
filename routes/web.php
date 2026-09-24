@@ -198,6 +198,9 @@ if ($installerService->isInstalled()) {
     $app->router()->post('/community/moderation/abuse/{id}/resolve', [$community, 'resolveAbuseFlag']);
     $app->router()->post('/community/moderation/escalations', [$community, 'escalateModeration']);
     $app->router()->post('/community/moderation/escalations/{id}/resolve', [$community, 'resolveEscalation']);
+    $app->router()->get('/community/moderation/reputation', [$community, 'reputationAdmin']);
+    $app->router()->post('/community/moderation/reputation/corrections', [$community, 'correctReputation']);
+    $app->router()->post('/community/moderation/reputation/anomalies/{id}/resolve', [$community, 'resolveReputationAnomaly']);
 
     $app->router()->get('/search', [$operations, 'search']);
     $app->router()->post('/search/filters', [$operations, 'saveFilter']);
