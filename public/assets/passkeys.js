@@ -67,11 +67,8 @@
         registerButton.disabled = true;
         if (output) output.textContent = '';
 
-        const password = document.querySelector('[data-passkey-password]')?.value || '';
         const label = document.querySelector('[data-passkey-label]')?.value || 'Passkey';
         const csrf = registerButton.dataset.csrf || '';
-
-        if (!password) throw new Error('Bitte zuerst das aktuelle Passwort eingeben.');
 
         const response = await fetch('/settings/security/passkeys/options', {credentials: 'same-origin'});
         const envelope = await response.json();
@@ -95,7 +92,6 @@
 
         const body = new URLSearchParams({
           _csrf: csrf,
-          password,
           label,
           payload: JSON.stringify(payload)
         });
