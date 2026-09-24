@@ -20,7 +20,8 @@ final class EvidenceService
         private readonly PDO $pdo,
         private readonly AuthorizationService $authorization,
         private readonly EvidenceStorage $storage,
-        private readonly AuditLogger $audit
+        private readonly AuditLogger $audit,
+        private readonly ?EvidenceImageProcessor $processor = null
     ) {
     }
 
@@ -70,6 +71,12 @@ final class EvidenceService
         $quality = $this->qualityState($width, $height, $size);
         $evidenceId = Uuid::v4();
         $stored = $this->storage->storeOriginal($caseId, $evidenceId, $sourcePath, $mime);
+        $working = $this->processor?->createWorkingCopy(
+            $caseId,
+            $evidenceId,
+            (string) $stored['relative_path'],
+            $mime
+        );
 
         try {
             $this->pdo->beginTransaction();
@@ -112,6 +119,37 @@ final class EvidenceService
                 'height' => $height,
             ]);
 
+            if (is_array($working)) {
+                $workingVersion = $this->pdo->prepare(
+                    'INSERT INTO evidence_versions
+                     (id, evidence_id, variant, version_no, storage_path, mime_type, file_size, sha256,
+                      width, height, processing_json, created_at)
+                     VALUES
+                     (:id, :evidence_id, "WORKING", 1, :path, :mime, :size, :sha256,
+                      :width, :height, :processing, UTC_TIMESTAMP())'
+                );
+                $workingVersion->execute([
+                    'id' => Uuid::v4(),
+                    'evidence_id' => $evidenceId,
+                    'path' => $working['relative_path'],
+                    'mime' => $working['mime_type'],
+                    'size' => $working['size'],
+                    'sha256' => $working['sha256'],
+                    'width' => $working['width'],
+                    'height' => $working['height'],
+                    'processing' => json_encode(
+                        $working['processing'],
+                        JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+                    ),
+                ]);
+
+                $this->event($evidenceId, 'WORKING_COPY_CREATED', $userId, [
+                    'sha256' => $working['sha256'],
+                    'width' => $working['width'],
+                    'height' => $working['height'],
+                ]);
+            }
+
             $this->event($evidenceId, 'ORIGINAL_STORED', $userId, [
                 'category' => $category,
                 'quality_state' => $quality,
@@ -125,6 +163,9 @@ final class EvidenceService
             }
 
             $this->storage->deletePhysical($stored['relative_path']);
+            if (is_array($working)) {
+                $this->storage->deletePhysical((string) $working['relative_path']);
+            }
             throw $e;
         }
 
@@ -146,7 +187,11 @@ final class EvidenceService
         $stmt = $this->pdo->prepare(
             'SELECT e.id, e.category, e.source, e.original_filename, e.captured_at, e.status,
                     e.quality_state, e.created_at,
-                    v.mime_type, v.file_size, v.sha256, v.width, v.height
+                    v.mime_type, v.file_size, v.sha256, v.width, v.height,
+                    EXISTS(
+                        SELECT 1 FROM evidence_versions w
+                        WHERE w.evidence_id = e.id AND w.variant = "WORKING"
+                    ) AS has_working_copy
              FROM evidence_items e
              INNER JOIN evidence_versions v
                ON v.evidence_id = e.id AND v.variant = "ORIGINAL" AND v.version_no = 1
