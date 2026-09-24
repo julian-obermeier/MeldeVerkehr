@@ -18,6 +18,7 @@ $offenseDone=$primaryOffense!==null && ($primaryOffense['stable_key']??'')!=='UN
 $coreComplete=$vehicleDone&&$locationDone&&$observationDone&&$offenseDone;
 $reviewDone=$c['status']===MeldeVerkehrCasesCaseStatus::WAITING_FOR_EVIDENCE;
 $duration=$c['observation_duration_seconds']??null;
+$submissionReady=$c['status']===\MeldeVerkehr\Cases\CaseStatus::READY_FOR_SUBMISSION;
 ?>
 <!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#172033"><link rel="manifest" href="/manifest.webmanifest"><title><?= $e($c['public_number']) ?> – MeldeVerkehr</title>
 <style>
@@ -41,13 +42,15 @@ textarea{min-height:80px}button,.button{display:inline-block;margin-top:12px;pad
 <div><span class="step <?= $offenseDone?'done':'todo' ?>">4. Tatbestand <?= $offenseDone?'✓':'' ?></span></div>
 <div><span class="step <?= $reviewDone?'done':'todo' ?>">5. Grunddaten-Review <?= $reviewDone?'✓':'' ?></span></div>
 <div><span class="step <?= $evidencePackage?'done':'todo' ?>">6. Beweise – M3 <?= $evidencePackage?'✓':'' ?></span></div>
+<div><span class="step <?= $submissionReady?'done':'todo' ?>">7. Sachverhalt & Final Review <?= $submissionReady?'✓':'' ?></span></div>
 </div>
 <?php if(!$vehicleDone):?><p class="muted">Als Nächstes: Fahrzeug erfassen.</p>
 <?php elseif(!$locationDone):?><p class="muted">Als Nächstes: Standort erfassen.</p>
 <?php elseif(!$observationDone):?><p class="muted">Als Nächstes: Beobachtungsbeginn und optional Beobachtungsende erfassen.</p>
 <?php elseif(!$offenseDone):?><p class="muted">Als Nächstes: konkreten Tatbestand auswählen.</p>
 <?php elseif($coreReviewReady):?><p><a class="button" href="/cases/<?= rawurlencode($c['id']) ?>/review">Grunddaten jetzt prüfen</a></p>
-<?php elseif($evidencePackage):?><p class="muted">Beweismappe Version <?= $e($evidencePackage['version_no']) ?> ist eingefroren. Der Vorgang ist bereit für den nächsten Gesamt-Review.</p><a class="button" href="/cases/<?= rawurlencode($c['id']) ?>/evidence/review">Evidence-Review ansehen</a>
+<?php elseif($evidencePackage&&$submissionReady):?><p class="done">Beweismappe und finaler Qualitätsreview sind abgeschlossen. Der Vorgang ist versandbereit.</p><a class="button" href="/cases/<?= rawurlencode($c['id']) ?>/final-review">Finalen Review ansehen</a>
+<?php elseif($evidencePackage):?><p class="muted">Beweismappe Version <?= $e($evidencePackage['version_no']) ?> ist eingefroren. Sachverhalt und Zeugenbericht können jetzt erstellt werden.</p><a class="button" href="/cases/<?= rawurlencode($c['id']) ?>/witness">Sachverhalt & Zeugenbericht</a>
 <?php elseif($reviewDone):?><p class="muted">Grunddaten bestätigt. Der Vorgang wartet auf die Beweiserfassung in M3.</p>
 <?php endif;?>
 </section>
@@ -95,7 +98,8 @@ textarea{min-height:80px}button,.button{display:inline-block;margin-top:12px;pad
 <?php if($coreComplete):?>
 <section class="card <?= $coreReviewReady?'next':'' ?>"><h2>5. Grunddaten-Review</h2>
 <?php if($coreReviewReady):?><p>Die Grunddaten sind vollständig. Prüfe sie vor dem Übergang zur Beweiserfassung.</p><a class="button" href="/cases/<?= rawurlencode($c['id']) ?>/review">Review öffnen</a>
-<?php elseif($evidencePackage):?><p class="done">Beweismappe Version <?= $e($evidencePackage['version_no']) ?> wurde eingefroren.</p><a class="button" href="/cases/<?= rawurlencode($c['id']) ?>/evidence/review">Beweismappe ansehen</a>
+<?php elseif($evidencePackage&&$submissionReady):?><p class="done">Beweismappe Version <?= $e($evidencePackage['version_no']) ?> und finaler Review abgeschlossen.</p><a class="button" href="/cases/<?= rawurlencode($c['id']) ?>/final-review">Abschlussreview ansehen</a>
+<?php elseif($evidencePackage):?><p class="done">Beweismappe Version <?= $e($evidencePackage['version_no']) ?> wurde eingefroren.</p><a class="button" href="/cases/<?= rawurlencode($c['id']) ?>/witness">Sachverhalt & Zeugenbericht</a>
 <?php elseif($reviewDone):?><p class="done">Grunddaten wurden bestätigt. Die Beweiserfassung ist freigeschaltet.</p><a class="button" href="/cases/<?= rawurlencode($c['id']) ?>/evidence">Beweise erfassen</a>
 <?php else:?><p class="muted">Der Review wird verfügbar, sobald der Vorgang den Prüfstatus erreicht.</p><?php endif;?>
 </section>

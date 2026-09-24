@@ -25,6 +25,9 @@ use MeldeVerkehr\Queue\JobQueue;
 use MeldeVerkehr\Security\SecretCipher;
 use MeldeVerkehr\Support\Env;
 use MeldeVerkehr\Support\Uuid;
+use MeldeVerkehr\Witness\FinalReviewService;
+use MeldeVerkehr\Witness\NeutralNarrativeBuilder;
+use MeldeVerkehr\Witness\WitnessService;
 
 $basePath = dirname(__DIR__);
 require $basePath . '/bootstrap/autoload.php';
@@ -469,6 +472,218 @@ try {
         $frozenEditBlocked = true;
     }
     $assert($frozenEditBlocked, 'Evidence edits are blocked after package freeze');
+
+    $witnessCipher = new SecretCipher('test-app-key');
+    $witnessService = new WitnessService(
+        $pdo,
+        new AuthorizationService($permissions),
+        $caseService,
+        $witnessCipher,
+        new NeutralNarrativeBuilder('Europe/Berlin'),
+        new AuditLogger($pdo, 'test-audit-key')
+    );
+
+    $observationStatement = $witnessService->saveObservation(
+        (string) $user['id'],
+        $caseId,
+        [
+            'observation_text' => 'Ich beobachtete das Fahrzeug während des dokumentierten Zeitraums an der angegebenen Stelle.',
+            'impact_text' => 'Der Gehweg war im Bereich des Fahrzeugs nur eingeschränkt nutzbar.',
+            'context_text' => 'Die Angaben beruhen auf meiner eigenen Wahrnehmung vor Ort.',
+        ]
+    );
+    $assert(
+        (int) $observationStatement['version_no'] === 1,
+        'Own observation is stored as version 1'
+    );
+
+    $encryptedObservationStmt = $pdo->prepare(
+        'SELECT observation_text FROM case_observation_statements WHERE id = :id LIMIT 1'
+    );
+    $encryptedObservationStmt->execute(['id' => $observationStatement['id']]);
+    $encryptedObservation = (string) $encryptedObservationStmt->fetchColumn();
+    $assert(
+        $encryptedObservation !== $observationStatement['observation_text']
+        && !str_contains($encryptedObservation, 'Ich beobachtete das Fahrzeug'),
+        'Own observation is encrypted at rest'
+    );
+
+    $generatedNarrative = $witnessService->generateNarrative(
+        (string) $user['id'],
+        $caseId
+    );
+    $assert(
+        (int) $generatedNarrative['version_no'] === 1
+        && str_contains((string) $generatedNarrative['final_text'], 'Teststraße 1')
+        && str_contains((string) $generatedNarrative['final_text'], 'abschließende Würdigung'),
+        'Neutral narrative is generated from confirmed case facts'
+    );
+
+    $editedNarrative = $witnessService->saveNarrative(
+        (string) $user['id'],
+        $caseId,
+        (string) $generatedNarrative['final_text'] . "\n\nZusätzliche sachliche Klarstellung durch den meldenden Nutzer."
+    );
+    $assert(
+        (int) $editedNarrative['version_no'] === 2,
+        'Edited narrative creates a new immutable version'
+    );
+
+    $encryptedNarrativeStmt = $pdo->prepare(
+        'SELECT final_text FROM case_narratives WHERE id = :id LIMIT 1'
+    );
+    $encryptedNarrativeStmt->execute(['id' => $editedNarrative['id']]);
+    $assert(
+        (string) $encryptedNarrativeStmt->fetchColumn() !== $editedNarrative['final_text'],
+        'Narrative text is encrypted at rest'
+    );
+
+    $witnessReport = $witnessService->createReport(
+        (string) $user['id'],
+        $caseId
+    );
+    $assert(
+        (int) $witnessReport['version_no'] === 1
+        && ($witnessReport['snapshot']['evidence_package']['version_no'] ?? null) === 1,
+        'Witness report freezes current observation narrative and evidence package'
+    );
+
+    $reportStorageStmt = $pdo->prepare(
+        'SELECT snapshot_json, snapshot_sha256 FROM witness_reports WHERE id = :id LIMIT 1'
+    );
+    $reportStorageStmt->execute(['id' => $witnessReport['id']]);
+    $reportStorage = $reportStorageStmt->fetch();
+    $assert(
+        is_array($reportStorage)
+        && !str_contains((string) $reportStorage['snapshot_json'], 'Teststraße')
+        && hash_equals(
+            (string) $reportStorage['snapshot_sha256'],
+            hash(
+                'sha256',
+                json_encode(
+                    $witnessReport['snapshot'],
+                    JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+                )
+            )
+        ),
+        'Witness snapshot is encrypted at rest and hash matches canonical plaintext snapshot'
+    );
+
+    $declarationBlocked = false;
+    try {
+        $witnessService->confirmReport(
+            (string) $user['id'],
+            (string) $witnessReport['id'],
+            false
+        );
+    } catch (InvalidArgumentException $e) {
+        $declarationBlocked = true;
+    }
+    $assert($declarationBlocked, 'Witness report requires explicit electronic declaration');
+
+    $confirmedReport = $witnessService->confirmReport(
+        (string) $user['id'],
+        (string) $witnessReport['id'],
+        true,
+        [
+            'ip_hash' => hash('sha256', 'test-ip'),
+            'user_agent_hash' => hash('sha256', 'test-agent'),
+            'session_id_hash' => hash('sha256', 'test-session'),
+        ]
+    );
+    $assert(
+        $confirmedReport['confirmed_at'] !== null,
+        'Witness report can be electronically confirmed'
+    );
+
+    $currentReport = $witnessService->currentConfirmedReport(
+        (string) $user['id'],
+        $caseId
+    );
+    $assert(
+        is_array($currentReport)
+        && is_array($currentReport['declaration'] ?? null),
+        'Current confirmed witness report includes declaration'
+    );
+
+    $declarationStmt = $pdo->prepare(
+        'SELECT metadata_json FROM case_declarations WHERE witness_report_id = :id LIMIT 1'
+    );
+    $declarationStmt->execute(['id' => $witnessReport['id']]);
+    $declarationMetadata = json_decode((string) $declarationStmt->fetchColumn(), true);
+    $assert(
+        is_array($declarationMetadata)
+        && isset($declarationMetadata['ip_hash'])
+        && !isset($declarationMetadata['ip']),
+        'Electronic declaration stores minimized hashed audit metadata'
+    );
+
+    $finalReviewService = new FinalReviewService(
+        $pdo,
+        new AuthorizationService($permissions),
+        $caseService,
+        $witnessService,
+        new AuditLogger($pdo, 'test-audit-key')
+    );
+    $finalSummary = $finalReviewService->summary(
+        (string) $user['id'],
+        $caseId
+    );
+    $assert(
+        $finalSummary['red'] === []
+        && $finalSummary['ready'] === true,
+        'Final review has no blocking items after confirmed witness report'
+    );
+    $assert(
+        $finalSummary['yellow'] !== [],
+        'Final review carries forward non-blocking evidence warnings'
+    );
+
+    $finalWarningsBlocked = false;
+    try {
+        $finalReviewService->confirm(
+            (string) $user['id'],
+            $caseId,
+            false
+        );
+    } catch (DomainException $e) {
+        $finalWarningsBlocked = true;
+    }
+    $assert(
+        $finalWarningsBlocked,
+        'Final review requires explicit acknowledgement of yellow warnings'
+    );
+
+    $finalResult = $finalReviewService->confirm(
+        (string) $user['id'],
+        $caseId,
+        true
+    );
+    $assert(
+        ($finalResult['status'] ?? null) === CaseStatus::READY_FOR_SUBMISSION,
+        'Final review advances case to READY_FOR_SUBMISSION'
+    );
+
+    $afterFinalReview = $caseService->findOwned((string) $user['id'], $caseId);
+    $assert(
+        ($afterFinalReview['case']['status'] ?? null) === CaseStatus::READY_FOR_SUBMISSION,
+        'Case persists READY_FOR_SUBMISSION after M4 completion'
+    );
+
+    $qualityStmt = $pdo->prepare(
+        'SELECT version_no, red_json, yellow_json, green_json, acknowledged_yellow, confirmed_at
+         FROM case_quality_reviews WHERE case_id = :case_id ORDER BY version_no DESC LIMIT 1'
+    );
+    $qualityStmt->execute(['case_id' => $caseId]);
+    $qualityReview = $qualityStmt->fetch();
+    $assert(
+        is_array($qualityReview)
+        && (int) $qualityReview['version_no'] === 1
+        && json_decode((string) $qualityReview['red_json'], true) === []
+        && (int) $qualityReview['acknowledged_yellow'] === 1
+        && $qualityReview['confirmed_at'] !== null,
+        'Final quality review is versioned and stores traffic-light snapshot'
+    );
 
     @unlink($evidenceSource);
 
