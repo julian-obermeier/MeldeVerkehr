@@ -2900,11 +2900,74 @@ try {
         'PWA offline drafts require explicit conflict resolution and never silently overwrite'
     );
     $assert(
+        str_contains($pwaScript, 'enhanceAccessibility')
+        && str_contains($pwaScript, 'data.skipLink')
+        && str_contains($pwaScript, ':focus-visible')
+        && str_contains($pwaScript, "setAttribute('role', 'alert')")
+        && str_contains($pwaScript, "setAttribute('aria-live', 'polite')"),
+        'Accessibility helper provides skip link focus visibility alerts and live regions'
+    );
+    $assert(
         str_contains($securityHeaderSource, 'Content-Security-Policy')
         && str_contains($securityHeaderSource, 'Strict-Transport-Security')
         && str_contains($rootHtaccess, 'maintenance\\.php')
         && str_contains($publicEntry, '503'),
         'Production entrypoint contains CSP HSTS maintenance gate and CLI web denial'
+    );
+
+    $releaseRoutesSource = (string) file_get_contents($basePath . '/routes/web.php');
+    $releasePackageWorkflow = (string) file_get_contents(
+        $basePath . '/.github/workflows/release-package.yml'
+    );
+    $assert(
+        str_contains($releaseRoutesSource, "'/health/live'")
+        && str_contains($releaseRoutesSource, "'/health/ready'")
+        && str_contains($publicEntry, "'/health/live'")
+        && str_contains($publicEntry, "'/health/ready'"),
+        'Liveness and readiness probes remain reachable during maintenance'
+    );
+    $assert(
+        str_contains($releasePackageWorkflow, "--exclude='.env'")
+        && str_contains($releasePackageWorkflow, "--exclude='storage/app/*'")
+        && str_contains($releasePackageWorkflow, 'sha256sum')
+        && str_contains($releasePackageWorkflow, 'actions/upload-artifact@v4'),
+        'Release packaging excludes runtime secrets and emits SHA-256 artifact'
+    );
+
+    for ($batchIndex = 0; $batchIndex < 260; $batchIndex++) {
+        $notificationService->create(
+            (string) $user['id'],
+            null,
+            'M12_BATCH_BOUNDARY',
+            'm12-batch:' . $user['id'] . ':' . $batchIndex,
+            'LOW',
+            'M12 Batch ' . $batchIndex,
+            null,
+            '/dashboard'
+        );
+    }
+    $batchNotificationRows = $notificationService->list(
+        (string) $user['id'],
+        false,
+        1000
+    );
+    $assert(
+        count($batchNotificationRows) === 250,
+        'Notification center clamps oversized batch request to 250'
+    );
+    $assert(
+        count($caseSearch->search((string) $user['id'], [], 1000)['results']) <= 250,
+        'Global case search clamps oversized batch request to 250'
+    );
+    $assert(
+        count($authorityPortal->inbox(
+            (string) $authorityOperator['id'],
+            $authorityId,
+            null,
+            null,
+            1000
+        )) <= 250,
+        'Authority inbox clamps oversized batch request to 250'
     );
 
     $warningCase = $caseService->createDraft((string) $user['id']);
