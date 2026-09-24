@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 use MeldeVerkehr\Cron\CronHeartbeat;
 use MeldeVerkehr\Cron\CronRegistry;
+use MeldeVerkehr\Communication\AuthorityReplyJobHandler;
+use MeldeVerkehr\Communication\CommunicationServiceFactory;
+use MeldeVerkehr\Communication\InboundMailPoller;
 use MeldeVerkehr\Dispatch\DispatchJobHandler;
 use MeldeVerkehr\Dispatch\DispatchServiceFactory;
 use MeldeVerkehr\Queue\JobQueue;
@@ -24,10 +27,33 @@ $registry->register('queue', static function () use ($app): array {
     $workerId = gethostname() . ':' . getmypid();
     $worker = new JobWorker(
         new JobQueue($app->database()),
-        [new DispatchJobHandler(DispatchServiceFactory::make($app))]
+        [
+            new DispatchJobHandler(DispatchServiceFactory::make($app)),
+            new AuthorityReplyJobHandler(
+                CommunicationServiceFactory::services($app)['replies']
+            ),
+        ]
     );
 
     return $worker->run($workerId, 20);
+});
+
+$registry->register('inbound-mail', static function () use ($app): array {
+    if (!(bool) $app->config()->get('communications.inbound_enabled', false)) {
+        return [
+            'processed' => 0,
+            'errors' => 0,
+            'message' => 'Inbound mail is disabled.',
+        ];
+    }
+
+    $services = CommunicationServiceFactory::services($app);
+    $poller = new InboundMailPoller(
+        CommunicationServiceFactory::inboundSource($app),
+        $services['communications']
+    );
+
+    return $poller->run(20);
 });
 
 $registry->register('health', static function (): array {

@@ -17,7 +17,8 @@ final class PhpMailDispatchTransport implements DispatchTransportInterface
         string $recipient,
         string $subject,
         string $text,
-        array $attachments = []
+        array $attachments = [],
+        array $headers = []
     ): array {
         if (
             !function_exists('mail')
@@ -30,10 +31,35 @@ final class PhpMailDispatchTransport implements DispatchTransportInterface
                 'accepted' => false,
                 'provider_reference' => null,
                 'response' => ['reason' => 'mail_transport_not_available_or_invalid_headers'],
+                'message_id' => null,
             ];
         }
 
         $boundary = 'mv_dispatch_' . bin2hex(random_bytes(16));
+        $messageId = $headers['Message-ID'] ?? ('<mv-' . bin2hex(random_bytes(16)) . '@localhost>');
+        $replyTo = $headers['Reply-To'] ?? null;
+        $inReplyTo = $headers['In-Reply-To'] ?? null;
+
+        if ($inReplyTo !== null && !$this->validHeaderValue($inReplyTo)) {
+            return [
+                'accepted' => false,
+                'provider_reference' => null,
+                'response' => ['reason' => 'invalid_in_reply_to_header'],
+                'message_id' => null,
+            ];
+        }
+
+        if (
+            !$this->validHeaderValue($messageId)
+            || ($replyTo !== null && (!filter_var($replyTo, FILTER_VALIDATE_EMAIL) || !$this->validHeaderValue($replyTo)))
+        ) {
+            return [
+                'accepted' => false,
+                'provider_reference' => null,
+                'response' => ['reason' => 'invalid_reply_or_message_header'],
+                'message_id' => null,
+            ];
+        }
         $encodedSubject = function_exists('mb_encode_mimeheader')
             ? mb_encode_mimeheader($subject, 'UTF-8')
             : $subject;
@@ -46,7 +72,16 @@ final class PhpMailDispatchTransport implements DispatchTransportInterface
             sprintf('From: %s <%s>', $encodedFrom, $this->fromAddress),
             'Content-Type: multipart/mixed; boundary="' . $boundary . '"',
             'X-MeldeVerkehr-Dispatch: ' . $dispatchId,
+            'Message-ID: ' . $messageId,
         ];
+
+        if ($replyTo !== null) {
+            $headers[] = 'Reply-To: ' . $replyTo;
+        }
+        if ($inReplyTo !== null) {
+            $headers[] = 'In-Reply-To: ' . $inReplyTo;
+            $headers[] = 'References: ' . $inReplyTo;
+        }
 
         $body = '--' . $boundary . "\r\n"
             . "Content-Type: text/plain; charset=UTF-8\r\n"
@@ -63,6 +98,7 @@ final class PhpMailDispatchTransport implements DispatchTransportInterface
                     'accepted' => false,
                     'provider_reference' => null,
                     'response' => ['reason' => 'attachment_missing', 'name' => $name],
+                    'message_id' => null,
                 ];
             }
 
@@ -72,6 +108,7 @@ final class PhpMailDispatchTransport implements DispatchTransportInterface
                     'accepted' => false,
                     'provider_reference' => null,
                     'response' => ['reason' => 'attachment_unreadable', 'name' => $name],
+                    'message_id' => null,
                 ];
             }
 
@@ -88,7 +125,8 @@ final class PhpMailDispatchTransport implements DispatchTransportInterface
         return [
             'accepted' => $accepted,
             'provider_reference' => $accepted ? 'php-mail:' . $dispatchId : null,
-            'response' => ['mode' => 'php_mail'],
+            'response' => ['mode' => 'php_mail', 'reply_to' => $replyTo, 'in_reply_to' => $inReplyTo],
+            'message_id' => $accepted ? $messageId : null,
         ];
     }
 

@@ -5,6 +5,19 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 ## [Unreleased]
 
 ### Added
+- M6-Kommunikationsdatenmodell für Reply-Adressen, Behördennachrichten, Anhänge, Aufgaben, Fristen, Quarantäne und Antwortentwürfe
+- zufällige Reply-Adresse je Dispatch
+- Message-ID-/Reply-To-/In-Reply-To-Threading
+- optionaler SMTP-Transport mit TLS/SSL und Authentifizierung
+- IMAP-Inbound-Adapter und deaktivierter-by-default Inbound-Cron
+- Inbound-Deduplizierung und verschlüsselte Quarantäne
+- deterministische Behördenantwort-Klassifikation inklusive Unzustellbarkeit
+- Fristerkennung und automatische Aufgaben-/Fristanlage
+- geschützter Behördenanhang-Storage mit Hashprüfung
+- versionierte verschlüsselte Antwortentwürfe
+- explizit bestätigte Reply-Queue und OUTBOUND-Kommunikationshistorie
+- Bürger-Kommunikationszentrum mit Timeline, Aufgaben, Fristen und Anhängen
+- Integrationstests für Kommunikations- und Reply-Lifecycle
 - M5-Behördenverzeichnis mit Endpunkten, Routingregeln und versionierten Anforderungen
 - deterministische Zuständigkeitslogik mit Spezifitätsscore und Ambiguitätserkennung
 - verschlüsselte und gehashte Dispatch-Packages
@@ -112,6 +125,10 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 - CSRF-Schutz für Installations- und Authentifizierungsformulare
 
 ### Changed
+- SMTP-Dispatch nutzt die vorgangsbezogene Reply-Adresse als Envelope-Sender für Bounce-Routing
+- Queue verarbeitet neben DISPATCH_SEND jetzt auch AUTHORITY_REPLY_SEND
+- Cron bietet zusätzlich inbound-mail für kontrolliertes IMAP-Polling
+- Behördeneingänge können den Fallstatus kontrolliert auf DELIVERED, AUTHORITY_REPLY, USER_ACTION_REQUIRED, AUTHORITY_PROCESSING oder DELIVERY_FAILED fortschreiben
 - Installer und Beispielkonfiguration setzen DISPATCH_TRANSPORT standardmäßig auf dry_run
 - Cron-Queue registriert den DISPATCH_SEND-Handler
 - READY_FOR_SUBMISSION kann nach bestätigtem Versandauftrag in SUBMISSION_PENDING wechseln
@@ -141,6 +158,11 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 - native Mailheader werden gegen Zeilenumbrüche abgesichert und UTF-8-Betreffzeilen kodiert
 
 ### Security
+- eingehende Behördeninhalte und Quarantäne-Mails werden verschlüsselt gespeichert
+- Behördenanhänge liegen außerhalb des Webroots und werden bei Abruf per SHA-256 geprüft
+- unbekannte eingehende Mails werden nicht still verworfen
+- IMAP ist standardmäßig deaktiviert und Reply-Domain nutzt standardmäßig .invalid
+- Antwortentwürfe werden verschlüsselt gespeichert und benötigen explizite Nutzerbestätigung vor Queueing
 - Dispatch-Manifeste werden feldseitig verschlüsselt gespeichert und per SHA-256 verifiziert
 - Evidence-Anlagen werden direkt vor dem Transport erneut gegen eingefrorene Hashes geprüft
 - reale Behördenmails sind standardmäßig deaktiviert; Dry-Run muss explizit auf php_mail umgestellt werden

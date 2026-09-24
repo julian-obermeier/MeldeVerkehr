@@ -86,6 +86,15 @@ final class InstallerService
             'PUSH_VAPID_PUBLIC_KEY' => '',
             'PUSH_VAPID_PRIVATE_KEY' => '',
             'DISPATCH_TRANSPORT' => 'dry_run',
+            'COMM_REPLY_DOMAIN' => 'reply.invalid',
+            'COMM_REPLY_LOCAL_PREFIX' => 'reply',
+            'COMM_INBOUND_ENABLED' => 'false',
+            'IMAP_HOST' => '',
+            'IMAP_PORT' => '993',
+            'IMAP_ENCRYPTION' => 'ssl',
+            'IMAP_USERNAME' => '',
+            'IMAP_PASSWORD' => '',
+            'IMAP_FOLDER' => 'INBOX',
         ]);
 
         $directory = dirname($this->lockPath());

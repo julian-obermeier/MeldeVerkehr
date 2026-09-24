@@ -8,6 +8,7 @@ use MeldeVerkehr\Audit\AuditLogger;
 use MeldeVerkehr\Auth\AuthorizationService;
 use MeldeVerkehr\Cases\CaseService;
 use MeldeVerkehr\Cases\CaseStatus;
+use MeldeVerkehr\Communication\ReplyAddressService;
 use MeldeVerkehr\Evidence\EvidenceStorage;
 use MeldeVerkehr\Queue\JobQueue;
 use MeldeVerkehr\Support\Uuid;
@@ -26,6 +27,7 @@ final class DispatchService
         private readonly DispatchPackageService $packages,
         private readonly JobQueue $queue,
         private readonly DispatchTransportInterface $transport,
+        private readonly ReplyAddressService $replyAddresses,
         private readonly EvidenceStorage $storage,
         private readonly AuditLogger $audit
     ) {
@@ -139,14 +141,15 @@ final class DispatchService
         );
 
         $dispatchId = Uuid::v4();
+        $replyAddress = $this->replyAddresses->create($caseId);
 
         $stmt = $this->pdo->prepare(
             'INSERT INTO dispatches
-             (id, case_id, dispatch_package_id, authority_id, endpoint_id, channel, status,
-              queue_job_uuid, requested_by_user_id, created_at, queued_at, sent_at, completed_at, last_error)
+             (id, case_id, dispatch_package_id, authority_id, endpoint_id, reply_address_id, channel, status,
+              queue_job_uuid, outbound_message_id, requested_by_user_id, created_at, queued_at, sent_at, completed_at, last_error)
              VALUES
-             (:id, :case_id, :package_id, :authority_id, :endpoint_id, :channel, "CREATED",
-              NULL, :user_id, UTC_TIMESTAMP(), NULL, NULL, NULL, NULL)'
+             (:id, :case_id, :package_id, :authority_id, :endpoint_id, :reply_address_id, :channel, "CREATED",
+              NULL, NULL, :user_id, UTC_TIMESTAMP(), NULL, NULL, NULL, NULL)'
         );
         $stmt->execute([
             'id' => $dispatchId,
@@ -154,9 +157,12 @@ final class DispatchService
             'package_id' => $package['id'],
             'authority_id' => $selected['authority_id'],
             'endpoint_id' => $selected['endpoint_id'],
+            'reply_address_id' => $replyAddress['id'],
             'channel' => $selected['channel'],
             'user_id' => $userId,
         ]);
+
+        $this->replyAddresses->attachToDispatch((string) $replyAddress['id'], $dispatchId);
 
         $jobUuid = $this->queue->push(
             self::JOB_TYPE,
@@ -202,6 +208,7 @@ final class DispatchService
             'package_id' => $package['id'],
             'job_uuid' => $jobUuid,
             'status' => DispatchStatus::QUEUED,
+            'reply_address' => $replyAddress['address'],
         ];
     }
 
@@ -248,12 +255,23 @@ final class DispatchService
             $message = $this->message($manifest);
             $attachments = $this->attachments($manifest);
 
+            $replyAddress = $this->replyAddressForDispatch($dispatchId);
+            if ($replyAddress === null) {
+                throw new \RuntimeException('Reply-Adresse für Dispatch fehlt.');
+            }
+
+            $messageId = '<mv-' . str_replace('-', '', $dispatchId) . '@' . $this->addressDomain((string) $replyAddress['full_address']) . '>';
+
             $result = $this->transport->send(
                 $dispatchId,
                 (string) $manifest['authority']['endpoint_value'],
                 $message['subject'],
                 $message['text'],
-                $attachments
+                $attachments,
+                [
+                    'Reply-To' => (string) $replyAddress['full_address'],
+                    'Message-ID' => $messageId,
+                ]
             );
 
             if (!$result['accepted']) {
@@ -280,9 +298,13 @@ final class DispatchService
 
             $this->pdo->prepare(
                 'UPDATE dispatches
-                 SET status = "SENT", sent_at = UTC_TIMESTAMP(), completed_at = UTC_TIMESTAMP(), last_error = NULL
+                 SET status = "SENT", outbound_message_id = :message_id,
+                     sent_at = UTC_TIMESTAMP(), completed_at = UTC_TIMESTAMP(), last_error = NULL
                  WHERE id = :id'
-            )->execute(['id' => $dispatchId]);
+            )->execute([
+                'message_id' => $result['message_id'] ?? $messageId,
+                'id' => $dispatchId,
+            ]);
 
             $this->cases->changeStatus(
                 (string) $dispatch['requested_by_user_id'],
@@ -451,6 +473,29 @@ final class DispatchService
         }
 
         return $row;
+    }
+
+    private function replyAddressForDispatch(string $dispatchId): ?array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT ra.id, ra.full_address
+             FROM dispatches d
+             INNER JOIN case_reply_addresses ra ON ra.id = d.reply_address_id
+             WHERE d.id = :id AND ra.status = "ACTIVE"
+             LIMIT 1'
+        );
+        $stmt->execute(['id' => $dispatchId]);
+        $row = $stmt->fetch();
+
+        return is_array($row) ? $row : null;
+    }
+
+    private function addressDomain(string $address): string
+    {
+        $parts = explode('@', $address, 2);
+        $domain = strtolower(trim($parts[1] ?? ''));
+
+        return preg_match('/^[a-z0-9.-]+$/', $domain) ? $domain : 'reply.invalid';
     }
 
     private function nextAttempt(string $dispatchId): int

@@ -8,9 +8,9 @@ use MeldeVerkehr\Audit\AuditLogger;
 use MeldeVerkehr\Auth\AuthorizationService;
 use MeldeVerkehr\Auth\PermissionService;
 use MeldeVerkehr\Cases\CaseService;
+use MeldeVerkehr\Communication\ReplyAddressService;
 use MeldeVerkehr\Core\Application;
 use MeldeVerkehr\Evidence\EvidenceStorage;
-use MeldeVerkehr\Mail\PhpMailTransport;
 use MeldeVerkehr\Queue\JobQueue;
 use MeldeVerkehr\Security\SecretCipher;
 use MeldeVerkehr\Witness\NeutralNarrativeBuilder;
@@ -60,6 +60,13 @@ final class DispatchServiceFactory
 
         $transport ??= self::transport($app);
 
+        $replyAddresses = new ReplyAddressService(
+            $pdo,
+            (string) $app->config()->get('communications.reply_domain', 'reply.invalid'),
+            (string) $app->config()->get('communications.reply_local_prefix', 'reply'),
+            $key
+        );
+
         return new DispatchService(
             $pdo,
             $authorization,
@@ -68,6 +75,7 @@ final class DispatchServiceFactory
             $packages,
             new JobQueue($pdo),
             $transport,
+            $replyAddresses,
             new EvidenceStorage($app->basePath() . '/storage/app'),
             $audit
         );
@@ -76,6 +84,18 @@ final class DispatchServiceFactory
     public static function transport(Application $app): DispatchTransportInterface
     {
         $mode = strtolower((string) $app->config()->get('dispatch.transport', 'dry_run'));
+
+        if ($mode === 'smtp') {
+            return new SmtpDispatchTransport(
+                (string) $app->config()->get('mail.host', ''),
+                (int) $app->config()->get('mail.port', 587),
+                (string) $app->config()->get('mail.username', ''),
+                (string) $app->config()->get('mail.password', ''),
+                strtolower((string) $app->config()->get('mail.encryption', 'tls')),
+                (string) $app->config()->get('mail.from_address', ''),
+                (string) $app->config()->get('mail.from_name', 'MeldeVerkehr')
+            );
+        }
 
         if ($mode === 'php_mail') {
             return new PhpMailDispatchTransport(

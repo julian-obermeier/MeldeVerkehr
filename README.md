@@ -57,11 +57,11 @@ Die Plattform verbindet vier Bereiche:
 
 ## Entwicklungsreihenfolge
 
-M1 Fundament → M2 Bürgerportal → M3 Beweissystem → M4 Behördenrouting → M5 Kommunikation → M6 Vorgangsmanagement → M7 KI/OCR → M8 Analyse → M9 Community → M10 Reputation → M11 Moderation → M12 Behördenportal
+M1 Fundament → M2 Bürgerportal → M3 Beweissystem → M4 Sachverhalt/Final Review → M5 Behördenrouting/Versand → M6 Kommunikation → M7 KI/OCR → M8 Analyse/Problemstellen → M9 Community → M10 Reputation → M11 Moderation → M12 Behördenportal
 
 ## Status
 
-Das Repository befindet sich im initialen Aufbau. Siehe `PROJECT_STATUS.md`.
+Der Entwicklungsstand reicht aktuell bis M6 – Behördenkommunikation. Siehe `PROJECT_STATUS.md`.
 
 
 ## Installation (Entwicklungsstand)
@@ -90,10 +90,12 @@ Die M1-Infrastruktur stellt einen CLI-Einstiegspunkt bereit:
 ```bash
 php cron.php health
 php cron.php queue
+php cron.php inbound-mail
 ```
 
 `health` schreibt einen erfolgreichen Heartbeat in `cron_runs`.  
-`queue` verarbeitet verfügbare Jobs über die DB-basierte Queue. Fachliche Job-Handler werden durch spätere Module registriert.
+`queue` verarbeitet verfügbare Jobs über die DB-basierte Queue, einschließlich Behördenversand und bestätigter Nutzerantworten.  
+`inbound-mail` pollt das konfigurierte IMAP-Postfach; der Lauf bleibt wirkungslos, solange `COMM_INBOUND_ENABLED=false` gesetzt ist.
 
 Auf Shared Hosting können diese Befehle über reguläre Cronjobs aufgerufen werden. Jeder Lauf wird mit Status, Start-/Endzeit sowie Fehler- und Verarbeitungszähler protokolliert.
 
