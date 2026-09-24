@@ -58,9 +58,40 @@ final class CommunicationController
         ]));
     }
 
+    public function attachment(Request $request): Response
+    {
+        $userId = $this->requireUser();
+        if ($userId instanceof Response) {
+            return $userId;
+        }
+
+        try {
+            $attachment = CommunicationServiceFactory::services($this->app)['communications']->attachment(
+                $userId,
+                (string) $request->route('id', '')
+            );
+
+            $filename = preg_replace('/[^A-Za-z0-9._-]+/', '_', basename((string) $attachment['filename'])) ?: 'anlage';
+
+            return Response::binary(
+                (string) $attachment['body'],
+                (string) $attachment['mime_type'],
+                200,
+                [
+                    'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+                    'X-Content-SHA256' => (string) $attachment['sha256'],
+                ]
+            );
+        } catch (\MeldeVerkehr\Auth\AuthorizationException $e) {
+            return Response::html('<h1>403</h1>', 403);
+        } catch (\DomainException $e) {
+            return Response::html('<h1>404</h1><p>Anhang nicht gefunden.</p>', 404);
+        }
+    }
+
     public function completeTask(Request $request): Response
     {
-        return $this->caseMutation($request, function (array $services, string $userId): string {
+        return $this->caseMutation($request, function (array $services, string $userId) use ($request): string {
             return $services['communications']->completeTask(
                 $userId,
                 (string) $request->route('id', '')
@@ -70,7 +101,7 @@ final class CommunicationController
 
     public function resolveDeadline(Request $request): Response
     {
-        return $this->caseMutation($request, function (array $services, string $userId): string {
+        return $this->caseMutation($request, function (array $services, string $userId) use ($request): string {
             return $services['communications']->resolveDeadline(
                 $userId,
                 (string) $request->route('id', '')
