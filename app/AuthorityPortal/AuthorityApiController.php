@@ -9,6 +9,7 @@ use MeldeVerkehr\Auth\AuthorizationException;
 use MeldeVerkehr\Core\Application;
 use MeldeVerkehr\Http\Request;
 use MeldeVerkehr\Http\Response;
+use MeldeVerkehr\Release\ReleaseServiceFactory;
 
 final class AuthorityApiController
 {
@@ -18,6 +19,10 @@ final class AuthorityApiController
 
     public function cases(Request $request): Response
     {
+        if (($limited = $this->throttle($request, 'authority-api-cases')) !== null) {
+            return $limited;
+        }
+
         try {
             $ctx = $this->authenticate($request, 'cases:read');
             $rows = AuthorityPortalServiceFactory::portal($this->app)->inbox(
@@ -39,6 +44,10 @@ final class AuthorityApiController
 
     public function case(Request $request): Response
     {
+        if (($limited = $this->throttle($request, 'authority-api-case')) !== null) {
+            return $limited;
+        }
+
         try {
             $ctx = $this->authenticate($request, 'cases:read');
             $detail = AuthorityPortalServiceFactory::portal($this->app)->caseDetail(
@@ -55,6 +64,10 @@ final class AuthorityApiController
 
     public function inquiry(Request $request): Response
     {
+        if (($limited = $this->throttle($request, 'authority-api-inquiry')) !== null) {
+            return $limited;
+        }
+
         try {
             $ctx = $this->authenticate($request, 'inquiries:write');
             $json = $request->json();
@@ -77,6 +90,37 @@ final class AuthorityApiController
         } catch (\DomainException $e) {
             return $this->error('CASE_NOT_FOUND', 'Behördenvorgang nicht gefunden.', 404);
         }
+    }
+
+    private function throttle(Request $request, string $bucket): ?Response
+    {
+        $ip = trim((string) $request->server('REMOTE_ADDR', 'unknown'));
+        $result = ReleaseServiceFactory::rateLimiter($this->app)->consume(
+            $bucket,
+            $ip,
+            (int) $this->app->config()->get('release.api_rate_limit_attempts', 120),
+            (int) $this->app->config()->get('release.api_rate_limit_window_seconds', 60),
+            60
+        );
+
+        if ($result['allowed']) {
+            return null;
+        }
+
+        return Response::json([
+            'success' => false,
+            'data' => null,
+            'errors' => [[
+                'code' => 'RATE_LIMITED',
+                'message' => 'Zu viele Anfragen. Bitte später erneut versuchen.',
+            ]],
+            'meta' => [
+                'retry_after' => $result['retry_after'],
+            ],
+        ], 429, [
+            'Retry-After' => (string) $result['retry_after'],
+            'Cache-Control' => 'no-store',
+        ]);
     }
 
     private function authenticate(Request $request, string $scope): array

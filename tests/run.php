@@ -34,6 +34,7 @@ use MeldeVerkehr\Community\CommunityService;
 use MeldeVerkehr\Community\ModerationService;
 use MeldeVerkehr\Community\ReputationService;
 use MeldeVerkehr\Config\Config;
+use MeldeVerkehr\Core\Application;
 use MeldeVerkehr\Database\Connection;
 use MeldeVerkehr\Database\MigrationRunner;
 use MeldeVerkehr\Dispatch\AuthorityRoutingService;
@@ -55,6 +56,13 @@ use MeldeVerkehr\Operations\NotificationService;
 use MeldeVerkehr\Operations\RetentionService;
 use MeldeVerkehr\Queue\JobQueue;
 use MeldeVerkehr\Queue\JobWorker;
+use MeldeVerkehr\Release\BackupService;
+use MeldeVerkehr\Release\MaintenanceService;
+use MeldeVerkehr\Release\ReleaseReadinessService;
+use MeldeVerkehr\Release\ReleaseRepository;
+use MeldeVerkehr\Release\RequestRateLimiter;
+use MeldeVerkehr\Release\UpdateService;
+use MeldeVerkehr\Routing\Router;
 use MeldeVerkehr\Security\SecretCipher;
 use MeldeVerkehr\Support\Env;
 use MeldeVerkehr\Support\Uuid;
@@ -2724,6 +2732,179 @@ try {
     $assert(
         $revokedTokenBlocked,
         'Revoked authority API token is immediately rejected'
+    );
+
+    ReleaseRepository::ensure($pdo);
+
+    $testBackupRoot = $basePath . '/storage/test-backups-' . bin2hex(random_bytes(4));
+    $releaseCipher = new SecretCipher('test-app-key');
+    $backupService = new BackupService(
+        $pdo,
+        $releaseCipher,
+        $testBackupRoot,
+        $basePath . '/storage/app',
+        52428800
+    );
+
+    $databaseBackup = $backupService->create(null, false);
+    $databaseBackupVerified = $backupService->verify((string) $databaseBackup['id']);
+    $databaseEncryptedPath =
+        $testBackupRoot . '/' . $databaseBackup['id'] . '/database.jsonl.enc';
+
+    $assert(
+        ($databaseBackup['status'] ?? null) === 'READY'
+        && ($databaseBackupVerified['status'] ?? null) === 'VERIFIED'
+        && (int) $databaseBackupVerified['runtime_files_verified'] === 0,
+        'Encrypted database backup can be created and verified'
+    );
+    $assert(
+        is_file($databaseEncryptedPath)
+        && !str_contains(
+            (string) file_get_contents($databaseEncryptedPath),
+            $email
+        ),
+        'Database backup payload is encrypted at rest'
+    );
+
+    $runtimeMarkerPath = $basePath . '/storage/app/m12-runtime-marker.txt';
+    $runtimeMarker = 'M12-RUNTIME-' . bin2hex(random_bytes(8));
+    file_put_contents($runtimeMarkerPath, $runtimeMarker, LOCK_EX);
+
+    $fullBackup = $backupService->create(null, true);
+    $fullBackupVerified = $backupService->verify((string) $fullBackup['id']);
+    $fullManifestPath =
+        $testBackupRoot . '/' . $fullBackup['id'] . '/manifest.json';
+    $fullManifest = json_decode(
+        (string) file_get_contents($fullManifestPath),
+        true,
+        512,
+        JSON_THROW_ON_ERROR
+    );
+    $markerManifest = null;
+
+    foreach ($fullManifest['runtime']['files'] ?? [] as $file) {
+        if (($file['path'] ?? null) === 'm12-runtime-marker.txt') {
+            $markerManifest = $file;
+            break;
+        }
+    }
+
+    $assert(
+        ($fullBackupVerified['status'] ?? null) === 'VERIFIED'
+        && (int) $fullBackupVerified['runtime_files_verified'] >= 1
+        && is_array($markerManifest),
+        'Full backup includes and verifies runtime files'
+    );
+
+    $markerEncryptedBody = is_array($markerManifest)
+        ? (string) file_get_contents(
+            $testBackupRoot . '/' . $fullBackup['id'] . '/' .
+            $markerManifest['encrypted_path']
+        )
+        : '';
+
+    $assert(
+        $markerEncryptedBody !== ''
+        && !str_contains($markerEncryptedBody, $runtimeMarker),
+        'Runtime backup file is encrypted at rest'
+    );
+
+    $restoreConfirmationBlocked = false;
+    try {
+        $backupService->restore((string) $fullBackup['id'], false);
+    } catch (InvalidArgumentException $e) {
+        $restoreConfirmationBlocked = true;
+    }
+    $assert(
+        $restoreConfirmationBlocked,
+        'Restore cannot run without explicit confirmation'
+    );
+
+    @unlink($runtimeMarkerPath);
+
+    $releaseRateLimiter = new RequestRateLimiter($pdo, 'test-release-rate-key');
+    $rateSubject = 'integration-' . bin2hex(random_bytes(5));
+    $rate1 = $releaseRateLimiter->consume('TEST_BUCKET', $rateSubject, 2, 60, 60);
+    $rate2 = $releaseRateLimiter->consume('TEST_BUCKET', $rateSubject, 2, 60, 60);
+    $rate3 = $releaseRateLimiter->consume('TEST_BUCKET', $rateSubject, 2, 60, 60);
+
+    $assert(
+        $rate1['allowed'] === true
+        && $rate2['allowed'] === true
+        && $rate3['allowed'] === false
+        && (int) $rate3['retry_after'] > 0,
+        'Generic request limiter blocks burst after configured allowance'
+    );
+
+    $maintenancePath = $testBackupRoot . '/maintenance.flag';
+    $maintenanceService = new MaintenanceService($maintenancePath);
+    $maintenanceService->enable('Integrationstest');
+    $maintenanceStatus = $maintenanceService->status();
+    $assert(
+        $maintenanceStatus['active'] === true
+        && $maintenanceStatus['reason'] === 'Integrationstest',
+        'Maintenance mode persists reason and active state'
+    );
+    $maintenanceService->disable();
+    $assert(
+        $maintenanceService->active() === false,
+        'Maintenance mode can be disabled cleanly'
+    );
+
+    $updateService = new UpdateService(
+        $pdo,
+        $backupService,
+        $maintenanceService,
+        $runner,
+        new AuditLogger($pdo, 'test-audit-key'),
+        $testBackupRoot . '/last-version.txt'
+    );
+    $updatePreflight = $updateService->preflight('0.11.0-dev', '0.12.0-rc1');
+    $assert(
+        ($updatePreflight['from_version'] ?? null) === '0.11.0-dev'
+        && ($updatePreflight['to_version'] ?? null) === '0.12.0-rc1'
+        && ($updatePreflight['pending_migrations'] ?? ['unexpected']) === [],
+        'Update preflight reports versions and no pending migrations after test migration run'
+    );
+
+    $releaseApp = new Application(
+        new Router(),
+        $config,
+        $basePath,
+        false
+    );
+    $readiness = (new ReleaseReadinessService(
+        $releaseApp,
+        new MaintenanceService($testBackupRoot . '/readiness-maintenance.flag')
+    ))->check();
+    $readinessKeys = array_column($readiness['checks'], 'key');
+    $assert(
+        in_array('production_debug', $readinessKeys, true)
+        && in_array('install_lock', $readinessKeys, true)
+        && in_array('pwa', $readinessKeys, true)
+        && array_key_exists('blocking_failures', $readiness),
+        'Release readiness reports production debug install lock and PWA checks'
+    );
+
+    $pwaScript = (string) file_get_contents($basePath . '/public/assets/app.js');
+    $caseViewSource = (string) file_get_contents($basePath . '/resources/views/cases/show.php');
+    $securityHeaderSource = (string) file_get_contents($basePath . '/app/Release/SecurityHeaders.php');
+    $rootHtaccess = (string) file_get_contents($basePath . '/.htaccess');
+    $publicEntry = (string) file_get_contents($basePath . '/public/index.php');
+
+    $assert(
+        str_contains($pwaScript, 'indexedDB')
+        && str_contains($pwaScript, 'serverVersion')
+        && str_contains($pwaScript, 'Nichts wurde automatisch überschrieben')
+        && str_contains($caseViewSource, 'data-offline-draft="1"'),
+        'PWA offline drafts require explicit conflict resolution and never silently overwrite'
+    );
+    $assert(
+        str_contains($securityHeaderSource, 'Content-Security-Policy')
+        && str_contains($securityHeaderSource, 'Strict-Transport-Security')
+        && str_contains($rootHtaccess, 'maintenance\\.php')
+        && str_contains($publicEntry, '503'),
+        'Production entrypoint contains CSP HSTS maintenance gate and CLI web denial'
     );
 
     $warningCase = $caseService->createDraft((string) $user['id']);

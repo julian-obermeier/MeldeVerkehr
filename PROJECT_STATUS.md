@@ -1,74 +1,69 @@
 # Projektstatus
 
 ## Aktuelle Version
-0.11.0-dev
+0.12.0-rc1
 
 ## Phase
-M11 – Behördenportal, Authority-RBAC und API v1
+M12 – Produktionshärtung & Release Candidate
 
-## M1–M10
-Fundament, Vorgangskern, Beweissystem, Zeugenbericht/finaler Review, Behördenrouting/Dispatch, Behördenkommunikation, intelligente Assistenz, private Karten/Analytics, Community sowie Suche/Dokumentcenter/Notifications/Exporte/Retention sind abgeschlossen und auf `develop` integriert.
+## M1–M11
+Fundament, Vorgangskern, Beweissystem, Zeugenbericht/Final Review, Behördenrouting/Dispatch, Behördenkommunikation, intelligente Assistenz, private Karten/Analytics, Community, Suche/Dokumentcenter/Notifications/Exporte/Retention sowie Behördenportal/API sind abgeschlossen und auf develop integriert.
 
-## M11 – umgesetzt
-- Authority-Scope-Modell pro Nutzer und Behörde
-- getrennte Scope-Rollen `AUTHORITY_USER` und `AUTHORITY_ADMIN`
-- ein Nutzer kann je Behörde unterschiedliche Scope-Rollen besitzen
-- Scope-Rolle begrenzt Rechte zusätzlich zur globalen Rollen-/Permission-Zuordnung
-- globale AUTHORITY_ADMIN-Rolle kann einen schwächeren AUTHORITY_USER-Scope nicht eskalieren
-- Behördenportal unter `/authority`
-- Inbox ausschließlich für an die jeweilige Behörde tatsächlich als `SENT` übermittelte Vorgänge
-- Suche/Filter nach Vorgangsnummer, Straße, Ort und Status im Authority-Scope
-- Behördenfallansicht verwendet den eingefrorenen Dispatch-Snapshot statt einer veränderlichen Live-Bürgerakte
-- Dispatch-Snapshot wird vor Darstellung per SHA-256 verifiziert
-- strukturierte Behördenanfragen mit Typen TIME/PHOTO/LOCATION/WITNESS/OTHER
-- Portal-Anfragen werden verschlüsselt gespeichert
-- Portal-Anfragen erzeugen gleichzeitig offene Aufgaben im bestehenden Bürger-Kommunikationsworkflow
-- optionale Fristen je Authority-Inquiry
-- separater verschlüsselter Halterdaten-Speicher
-- Halterdaten sind nicht Bestandteil der Bürgerakte, Community, Analytics oder regulärer Authority-Exporte
-- Halterdatensätze werden per SHA-256 gegen Manipulation geprüft
-- Halterdatenzugriff nur mit Authority-Admin-Scope und `authority.holder.*`-Rechten
-- Authority-scoped CSV-/JSON-/XML-Exporte
-- Authority-Exporte enthalten keine isolierten Halterdaten
-- Authority-Administration für Benutzerzuordnungen und API-Tokens
-- API-Tokens werden nur als SHA-256-Hash gespeichert
-- Token-Klartext wird ausschließlich beim Erstellen zurückgegeben
-- Tokenablauf, Widerruf und Last-Used-Zeitpunkt
-- API-Scopes `cases:read`, `inquiries:write`, `exports:read`, `holder:read`, `holder:write`
-- API-Scope ersetzt niemals Authority-Scope
-- Token ist fest an eine Authority-ID gebunden
-- Cross-Authority-Zugriff über Token ist blockiert
-- API v1 unter `/api/v1/authority`
-- standardisierte JSON-Antworten mit `success`, `data`, `errors`, `meta`
-- API-Fallliste
-- API-Falldetail aus frozen dispatch snapshot
-- API-Erstellung strukturierter Authority-Inquiries
-- Webportal nutzt Session + CSRF
-- API nutzt ausschließlich Bearer-Token
-- Dashboard zeigt Behördenportal nur bei aktivem Authority-Scope
-- Integrationstests für Scope-Isolation, eingefrorene Dispatchdaten, Inquiry-Task-Brücke, Halterverschlüsselung, Exporte, Token-Hashing, Token-Scopes und Widerruf
+## M12 – umgesetzt
+- Release-Operations-Datenmodell für Backups, Updates und generisches Request-Rate-Limiting
+- idempotentes Release-Repository, damit der Updater nicht von seiner eigenen Migration abhängt
+- verschlüsselte Datenbank-Backups außerhalb des Webroots
+- verschlüsselte Runtime-Dateisicherung für storage/app
+- SHA-256-Integrität für Datenbank- und Runtime-Payloads
+- manifestbasierte Backup-Verifikation
+- Restore mit ausdrücklicher Bestätigung und vollständiger Verifikation vor Schreibzugriff
+- Release-/Rate-Limit-Tabellen werden nicht in ihre eigenen Restores zurückgespielt
+- konfigurierbare sichere Dateigrößenobergrenze; kein stilles Teilbackup
+- Maintenance-Modus mit persistiertem Grund und HTTP 503
+- Update-Workflow: Preflight → Maintenance → Backup → Verify → Migration → Versionsstatus → Audit → Maintenance off
+- fehlgeschlagenes Update lässt Maintenance absichtlich aktiv
+- CLI maintenance.php für Status, Readiness, Backup, Verify, Restore und Update
+- Admin-Releasecenter unter /admin/system/update
+- Restore bleibt bewusst CLI-only
+- Release-Readiness-Checks für DB, Storage, Audit, Production-Debug, Install-Lock, PWA, Backups, Queue und temporäre Exporte
+- zentrale Security-Header mit CSP, HSTS bei HTTPS, Frame-/MIME-/Referrer-/Permissions-Policy
+- maintenance.php wird durch Apache explizit vom Webzugriff ausgeschlossen
+- generisches serverseitiges Request-Rate-Limiting
+- Authority API v1 ist burst-limitiert und liefert 429 + Retry-After
+- PWA-Offline-Entwürfe via IndexedDB für den Kern-Wizard
+- serverVersion/localVersion-Konfliktmodell
+- lokale Entwürfe werden niemals still auf Serverdaten angewendet
+- explizite Aktionen „lokal übernehmen“ oder „verwerfen“
+- Offline-Submit wird abgefangen und klar als nur lokal gespeichert gekennzeichnet
+- Service Worker speichert keine privaten Navigationsantworten
+- PWA-Shortcuts für Vorgänge, Karte und Benachrichtigungen
+- Accessibility-Basis mit Skip-Link, :focus-visible und ARIA-Status/Alert
+- gemeinsame Accessibility-Helfer auf Bürger-, Authority- und Operations-Flächen
+- Dashboard-Version kommt dynamisch aus VERSION
+- M12-Regressionsblock für Backup, Verschlüsselung, Verify, Restore-Guard, Rate-Limit, Maintenance, Update-Preflight, Readiness, PWA und Security-Invarianten
 
 ## Sicherheitsprinzipien
-- Rollen allein gewähren keinen Authority-Fallzugriff; zusätzlich muss ein aktiver Scope zur konkreten Behörde existieren.
-- Authority-Permissions werden pro Scope-Rolle erneut begrenzt.
-- API-Tokens sind hochentropisch und werden nicht im Klartext persistiert.
-- API-Token-Scopes werden zusätzlich gegen die aktuelle Authority-Rolle des Token-Benutzers geprüft.
-- widerrufene oder abgelaufene Tokens sind sofort ungültig.
-- ein Token für Behörde A kann keinen Vorgang von Behörde B lesen, auch wenn der Benutzer beide Behörden kennt.
-- Behördenfallansichten lesen den tatsächlich versandten, unveränderlichen Dispatch-Snapshot.
-- Halterdaten sind in einer separaten verschlüsselten Tabelle isoliert.
-- reguläre Authority-Exporte enthalten keine Halterdaten.
-- Authority-Inquiries speichern Text verschlüsselt und erzeugen nur strukturierte Bürger-Aufgaben.
-- Webmutationen bleiben CSRF-geschützt; API-Aufrufe benötigen Bearer-Token.
+- Backups liegen außerhalb von public und speichern DB-/Runtime-Payloads verschlüsselt.
+- jedes Backup wird vor Restore vollständig gegen Manifest und SHA-256 geprüft.
+- Restore ist destruktiv und deshalb nur per CLI mit expliziter Bestätigung möglich.
+- fehlgeschlagene Updates deaktivieren Maintenance nicht automatisch.
+- Release-Betrieb schreibt keine Secrets in Git.
+- Production darf nicht mit APP_DEBUG=true release-ready sein.
+- private Navigationen werden durch den Service Worker nie persistiert.
+- Offline-Entwürfe überschreiben keine neueren Serverstände ohne Nutzeraktion.
+- Authority-API-Burstschutz arbeitet serverseitig und speichert nur HMAC-Schlüssel.
+- Security-Header verbieten Fremdframes und externe Standardressourcen; bestehende Inline-UI bleibt vorerst CSP-kompatibel.
 
-## Bekannte Einschränkungen
-- Authority-Accounts werden derzeit aus bereits existierenden MeldeVerkehr-Benutzern zugeordnet; ein separates Einladungs-/SSO-Onboarding ist noch offen.
-- OAuth2/OIDC ist noch nicht implementiert; API v1 nutzt gehashte statische Bearer-Tokens.
-- Authority-API stellt in M11 noch keinen Evidence-Dateidownload bereit.
-- Halterdaten werden bewusst nicht über die API ausgegeben.
-- Portal-Inquiries besitzen noch keinen eigenen strukturierten Authority-Antwortabschluss; die Bürgeraufgabe ist bereits integriert.
-- Authority-Exporte sind synchron und auf 250 Inbox-Zeilen begrenzt.
-- separate verifizierte Authority-Organisationseinstellungen, Billing und SLA-Funktionen sind noch offen.
+## Bekannte Einschränkungen vor Stable
+- Backup-Verschlüsselung arbeitet dateiweise und begrenzt Einzeldateien sowie DB-Dump über BACKUP_MAX_FILE_BYTES; sehr große Installationen benötigen später Streaming-Backup.
+- Restore stellt die im Manifest enthaltenen Runtime-Dateien wieder her, entfernt aber bewusst keine zusätzlichen neueren Runtime-Dateien automatisch.
+- CSP erlaubt aktuell noch Inline-Scripts/Styles, weil bestehende Legacy-Views teilweise inline arbeiten; externe Origins bleiben dennoch gesperrt.
+- Offline-Modus speichert Form-Entwürfe, versendet aber bewusst nichts automatisch nach Wiederverbindung.
+- Evidence-Dateiuploads werden offline nicht gepuffert.
+- Authority-API nutzt weiterhin statische, gehashte Bearer-Tokens statt OAuth2/OIDC.
+- produktive Aufbewahrungsfristen müssen weiterhin fachlich/rechtlich festgelegt werden.
 
-## Nächster Schritt
-M11 per CI integrieren; anschließend M12 – Produktionshärtung, Update-/Backup-Workflow, PWA-/Offline-Feinschliff, Accessibility, Last-/Abuse-Tests und Release Candidate.
+## Release-Status
+0.12.0-rc1 ist der erste Release Candidate. Vor 1.0.0 müssen alle CI-Gates grün sein und das Deploy-/Restore-Runbook einmal auf der Zielumgebung durchgespielt werden.
+
+Siehe docs/RELEASE_RUNBOOK.md.

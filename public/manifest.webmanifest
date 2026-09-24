@@ -15,5 +15,43 @@
       "type": "image/svg+xml",
       "purpose": "any maskable"
     }
+  ],
+  "shortcuts": [
+    {
+      "name": "Meine Vorgänge",
+      "short_name": "Vorgänge",
+      "url": "/cases",
+      "icons": [
+        {
+          "src": "/assets/icon.svg",
+          "sizes": "any",
+          "type": "image/svg+xml"
+        }
+      ]
+    },
+    {
+      "name": "Karte",
+      "short_name": "Karte",
+      "url": "/map",
+      "icons": [
+        {
+          "src": "/assets/icon.svg",
+          "sizes": "any",
+          "type": "image/svg+xml"
+        }
+      ]
+    },
+    {
+      "name": "Benachrichtigungen",
+      "short_name": "Hinweise",
+      "url": "/notifications",
+      "icons": [
+        {
+          "src": "/assets/icon.svg",
+          "sizes": "any",
+          "type": "image/svg+xml"
+        }
+      ]
+    }
   ]
 }

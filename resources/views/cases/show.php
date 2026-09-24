@@ -94,7 +94,7 @@ textarea{min-height:80px}button,.button{display:inline-block;margin-top:12px;pad
 
 <?php if($editable):?>
 <section class="card <?= !$vehicleDone?'next':'' ?>"><h2>1. Fahrzeug</h2>
-<form method="post" action="/cases/<?= rawurlencode($c['id']) ?>/vehicle"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>">
+<form method="post" action="/cases/<?= rawurlencode($c['id']) ?>/vehicle" data-offline-draft="1" data-draft-key="<?= $e($c['id']) ?>:vehicle" data-server-version="<?= $e($c['updated_at']) ?>"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>">
 <div class="fields">
 <div><label>Kennzeichen</label><input name="license_plate" value="<?= $e($v['license_plate']??'') ?>" autocomplete="off" autocapitalize="characters" required></div>
 <div><label>Fahrzeugart</label><select name="vehicle_type" required><?php foreach(['PKW','MOTORRAD','TRANSPORTER','LKW','BUS','ANHÄNGER','WOHNMOBIL','SONSTIGES'] as $type):?><option value="<?= $e($type) ?>" <?= (($v['vehicle_type']??'PKW')===$type)?'selected':'' ?>><?= $e($type) ?></option><?php endforeach;?></select></div>
@@ -103,7 +103,7 @@ textarea{min-height:80px}button,.button{display:inline-block;margin-top:12px;pad
 
 <?php if($vehicleDone):?>
 <section class="card <?= !$locationDone?'next':'' ?>"><h2>2. Standort</h2>
-<form method="post" action="/cases/<?= rawurlencode($c['id']) ?>/location"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>">
+<form method="post" action="/cases/<?= rawurlencode($c['id']) ?>/location" data-offline-draft="1" data-draft-key="<?= $e($c['id']) ?>:location" data-server-version="<?= $e($c['updated_at']) ?>"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>">
 <div class="fields"><div><label>Breitengrad</label><input id="latitude" name="latitude" inputmode="decimal" value="<?= $e($l['latitude']??'') ?>"></div><div><label>Längengrad</label><input id="longitude" name="longitude" inputmode="decimal" value="<?= $e($l['longitude']??'') ?>"></div></div>
 <button type="button" class="secondary" id="useGps">Aktuellen Standort übernehmen</button><span id="gpsStatus" class="muted" role="status"></span>
 <div class="fields" style="margin-top:12px">
@@ -118,7 +118,7 @@ textarea{min-height:80px}button,.button{display:inline-block;margin-top:12px;pad
 
 <?php if($vehicleDone && $locationDone):?>
 <section class="card <?= !$observationDone?'next':'' ?>"><h2>3. Beobachtungszeit und Umstände</h2>
-<form method="post" action="/cases/<?= rawurlencode($c['id']) ?>/observation"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>">
+<form method="post" action="/cases/<?= rawurlencode($c['id']) ?>/observation" data-offline-draft="1" data-draft-key="<?= $e($c['id']) ?>:observation" data-server-version="<?= $e($c['updated_at']) ?>"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>">
 <div class="fields"><div><label>Beobachtungsbeginn</label><input type="datetime-local" name="observed_from" value="<?= $e($c['observed_from_local']??'') ?>" required></div><div><label>Beobachtungsende optional</label><input type="datetime-local" name="observed_until" value="<?= $e($c['observed_until_local']??'') ?>"></div></div>
 <?php if($duration!==null):?><p class="muted">Erfasste Beobachtungsdauer: <?= $e(round($duration/60,1)) ?> Minuten.</p><?php endif;?>
 <div class="checks"><label><input type="checkbox" name="obstruction" value="1" <?= !empty($c['obstruction'])?'checked':'' ?>> Behinderung beobachtet</label><label><input type="checkbox" name="endangerment" value="1" <?= !empty($c['endangerment'])?'checked':'' ?>> Gefährdung beobachtet</label><label><input type="checkbox" name="damage" value="1" <?= !empty($c['damage'])?'checked':'' ?>> Sachschaden beobachtet</label></div>
@@ -128,7 +128,7 @@ textarea{min-height:80px}button,.button{display:inline-block;margin-top:12px;pad
 
 <?php if($vehicleDone && $locationDone && $observationDone):?>
 <section class="card <?= !$offenseDone?'next':'' ?>"><h2>4. Tatbestand</h2>
-<form method="post" action="/cases/<?= rawurlencode($c['id']) ?>/offense"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><label>Tatbestand</label><select name="offense_version_id" required><?php foreach($offenses as $offense):?><option value="<?= $e($offense['id']) ?>" <?= (($primaryOffense['offense_version_id']??'')===$offense['id'])?'selected':'' ?>><?= $e($offense['category'].' – '.$offense['title']) ?></option><?php endforeach;?></select><p class="muted">Die produktive Datenbank enthält bewusst keine ungeprüften Rechts- oder Bußgeldangaben.</p><button type="submit">Tatbestand speichern</button></form>
+<form method="post" action="/cases/<?= rawurlencode($c['id']) ?>/offense" data-offline-draft="1" data-draft-key="<?= $e($c['id']) ?>:offense" data-server-version="<?= $e($c['updated_at']) ?>"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><label>Tatbestand</label><select name="offense_version_id" required><?php foreach($offenses as $offense):?><option value="<?= $e($offense['id']) ?>" <?= (($primaryOffense['offense_version_id']??'')===$offense['id'])?'selected':'' ?>><?= $e($offense['category'].' – '.$offense['title']) ?></option><?php endforeach;?></select><p class="muted">Die produktive Datenbank enthält bewusst keine ungeprüften Rechts- oder Bußgeldangaben.</p><button type="submit">Tatbestand speichern</button></form>
 <?php if($primaryOffense):?><p><span class="tag"><?= $e($primaryOffense['category']) ?></span> <?= $e($primaryOffense['title']) ?></p><?php endif;?></section>
 <?php else:?><section class="card locked"><h2>4. Tatbestand</h2><p>Wird freigeschaltet, sobald Fahrzeug, Standort und Beobachtungsbeginn vollständig erfasst sind.</p></section><?php endif;?>
 
@@ -160,19 +160,4 @@ textarea{min-height:80px}button,.button{display:inline-block;margin-top:12px;pad
 <?php if($evidencePackage):?><section class="card"><h2>Community-Freigabe</h2><p>Erzeuge bei Bedarf eine separate anonymisierte öffentliche Kopie. Die private Akte wird dabei nicht verändert.</p><a class="button" href="/cases/<?= rawurlencode($c['id']) ?>/community-release">Freigaben verwalten</a></section><?php endif;?>
 
 <section class="card"><h2>Statushistorie</h2><?php if($history):?><div class="timeline"><?php foreach(array_reverse($history) as $item):?><div class="event"><strong><?= $e($statusLabels[$item['new_status']]??$item['new_status']) ?></strong><br><small class="muted"><?= $e($item['created_at']) ?><?php if($item['reason']):?> · <?= $e($item['reason']) ?><?php endif;?></small></div><?php endforeach;?></div><?php else:?><p class="muted">Noch keine Statushistorie vorhanden.</p><?php endif;?></section>
-</main><script src="/assets/app.js" defer></script><script>
-(() => {
- const button=document.getElementById('useGps');
- if(!button) return;
- const status=document.getElementById('gpsStatus');
- button.addEventListener('click',()=>{
-   if(!navigator.geolocation){status.textContent=' Geolocation wird von diesem Browser nicht unterstützt.';return;}
-   button.disabled=true; status.textContent=' Standort wird ermittelt …';
-   navigator.geolocation.getCurrentPosition(
-     pos=>{document.getElementById('latitude').value=pos.coords.latitude.toFixed(7);document.getElementById('longitude').value=pos.coords.longitude.toFixed(7);status.textContent=' Standort übernommen.';button.disabled=false;},
-     ()=>{status.textContent=' Standort konnte nicht ermittelt werden.';button.disabled=false;},
-     {enableHighAccuracy:true,timeout:10000,maximumAge:30000}
-   );
- });
-})();
-</script></body></html>
+</main><script src="/assets/app.js" defer></script></body></html>

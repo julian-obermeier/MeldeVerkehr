@@ -12,6 +12,7 @@ use MeldeVerkehr\Dispatch\DispatchServiceFactory;
 use MeldeVerkehr\Operations\OperationsServiceFactory;
 use MeldeVerkehr\Queue\JobQueue;
 use MeldeVerkehr\Queue\JobWorker;
+use MeldeVerkehr\Release\ReleaseServiceFactory;
 
 if (PHP_SAPI !== 'cli') {
     http_response_code(404);
@@ -107,6 +108,16 @@ $registry->register('retention-plan', static function () use ($app): array {
         'errors' => 0,
         'message' => 'Retention schedules created: ' . $planned
             . '; automatic case deletion remains disabled.',
+    ];
+});
+
+$registry->register('rate-limit-cleanup', static function () use ($app): array {
+    $count = ReleaseServiceFactory::rateLimiter($app)->cleanup();
+
+    return [
+        'processed' => $count,
+        'errors' => 0,
+        'message' => 'Expired request rate-limit buckets cleaned.',
     ];
 });
 

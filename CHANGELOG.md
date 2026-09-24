@@ -5,6 +5,21 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 ## [Unreleased]
 
 ### Added
+- M12-Release-Operations-Datenmodell für verschlüsselte Backups, Update-Historie und generisches Request-Rate-Limiting
+- verschlüsselte Datenbank- und Runtime-Backups mit SHA-256-Manifestprüfung
+- Backup-Verifikation und CLI-only Restore mit expliziter Bestätigung
+- Maintenance-Modus mit HTTP 503
+- sicherer Update-Workflow mit Preflight, Backup, Verify, Migrationen und Update-Historie
+- Shared-Hosting-CLI maintenance.php für Readiness, Backup, Verify, Restore, Update und Maintenance
+- Admin-Releasecenter unter /admin/system/update
+- Release-Readiness-Prüfungen
+- zentrale Production-Security-Header
+- generisches Request-Rate-Limiting und Authority-API-Burstschutz
+- IndexedDB-Offline-Entwürfe mit expliziter Konfliktauflösung
+- PWA-Shortcuts und aktualisierte Service-Worker-Cache-Strategie
+- Accessibility-Basis mit Skip-Link, sichtbarem Tastaturfokus und Live-Regions
+- M12-Regressionsprüfungen für Release-, Backup-, PWA- und Security-Invarianten
+- Produktions-/Restore-Runbook
 - M11-Datenmodell für Authority-Nutzerscopes, API-Tokens, strukturierte Portal-Inquiries und isolierte Halterdaten
 - Authority-Scope-Service mit per-Behörde-Rollen
 - Behördenportal mit Inbox und frozen Dispatch-Fallansicht
@@ -181,6 +196,11 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 - CSRF-Schutz für Installations- und Authentifizierungsformulare
 
 ### Changed
+- Version auf 0.12.0-rc1 angehoben
+- Dashboard rendert die Version dynamisch aus VERSION
+- private Navigationen verwenden im Service Worker network-first ohne persistentes Caching
+- Kern-Wizard markiert Offline-Drafts mit Serverversion und wendet lokale Stände niemals still an
+- Health-Endpunkt meldet den Maintenance-Status
 - Bürgerdashboard zeigt den Behördenportal-Link nur bei aktivem Authority-Scope
 - HTTP Request unterstützt jetzt testbaren Raw-/JSON-Body
 - Bürgerportal-Version auf 0.11.0-dev aktualisiert
@@ -230,6 +250,13 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 - native Mailheader werden gegen Zeilenumbrüche abgesichert und UTF-8-Betreffzeilen kodiert
 
 ### Security
+- Backuppayloads liegen verschlüsselt außerhalb des Webroots
+- jedes Backup wird vor Restore vollständig gegen SHA-256 geprüft
+- fehlgeschlagene Updates lassen Maintenance aktiv
+- maintenance.php ist über Apache explizit gesperrt
+- CSP, HSTS, X-Frame-Options, MIME-, Referrer- und Permissions-Policy werden zentral gesetzt
+- Authority API liefert bei Burst-Überschreitung HTTP 429 mit Retry-After
+- Offline-Entwürfe überschreiben keine neueren Serverstände ohne ausdrückliche Nutzeraktion
 - Authority-Fallzugriff benötigt neben Rollen immer einen aktiven Scope zur konkreten Behörde
 - Scope-Rollen begrenzen Rechte zusätzlich zu globalen Permissions
 - API-Token ist fest an eine Authority-ID gebunden
