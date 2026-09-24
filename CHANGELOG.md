@@ -5,6 +5,16 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 ## [Unreleased]
 
 ### Added
+- M14-Moderation-Safety-Datenmodell für Appeals, Abuse Flags, Eskalationen, Action-Snapshots und Nutzerrestriktionen
+- Einspruchscenter für betroffene Community-Nutzer
+- reversible Moderationsentscheidungen durch gespeicherte Vorher-/Nachher-Zustände
+- echte zeitlich begrenzte Posting-, Messaging- und Reporting-Einschränkungen
+- Moderationseskalationen mit NORMAL/HIGH/URGENT und Senior-Abschluss
+- Reporter-Risikoscore als Prüfhinweis in der Moderationsqueue
+- Anti-Spam-/Bot-Erkennung für Posting-, Kommentar-, Nachrichten- und Report-Geschwindigkeit
+- Duplicate-Content-Erkennung und Mass-Report-Erkennung
+- Abuse-Flag-Queue mit manueller Entscheidung; automatische Signale treffen keine endgültige Moderationsentscheidung
+- Integrationstests für Duplicate Reports, Appeals, Restore, Eskalationen, Duplicate Spam, Mass Reports und Restriktionen
 - M13-Vorgangsversionierung mit unveränderlichen JSON-Snapshots und SHA-256-Integritätsnachweis
 - automatische Versionen bei Anlage sowie Änderungen an Fahrzeug, Standort, Beobachtung und Tatbestand
 - revisionssichere Nachträge mit eigener fortlaufender Nummer und verknüpfter Vorgangsversion
