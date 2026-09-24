@@ -138,10 +138,11 @@ final class CaseService
         $offenses = $this->fetchAll(
             'SELECT co.is_primary, co.user_confirmed, co.ai_suggested, co.confidence,
                     ov.id AS offense_version_id, ov.version, ov.code, ov.title, ov.description,
-                    o.category, o.stable_key
+                    oc.label AS category, o.stable_key
              FROM case_offenses co
              INNER JOIN offense_versions ov ON ov.id = co.offense_version_id
              INNER JOIN offenses o ON o.id = ov.offense_id
+             INNER JOIN offense_categories oc ON oc.category_key = o.category_key
              WHERE co.case_id = :case_id
              ORDER BY co.is_primary DESC, co.id ASC',
             ['case_id' => $caseId]
@@ -342,16 +343,17 @@ final class CaseService
     public function availableOffenses(): array
     {
         return $this->fetchAll(
-            'SELECT ov.id, ov.version, ov.code, ov.title, ov.description, o.category, o.stable_key
+            'SELECT ov.id, ov.version, ov.code, ov.title, ov.description, oc.label AS category, o.stable_key
              FROM offense_versions ov
              INNER JOIN offenses o ON o.id = ov.offense_id
+             INNER JOIN offense_categories oc ON oc.category_key = o.category_key
              INNER JOIN (
                 SELECT offense_id, MAX(version) AS max_version
                 FROM offense_versions
                 GROUP BY offense_id
              ) latest ON latest.offense_id = ov.offense_id AND latest.max_version = ov.version
-             WHERE o.active = 1
-             ORDER BY o.category, ov.title',
+             WHERE o.active = 1 AND oc.active = 1
+             ORDER BY oc.sort_order, ov.title',
             []
         );
     }
