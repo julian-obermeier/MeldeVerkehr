@@ -36,7 +36,7 @@ final class ReleaseReadinessService
             $this->item(
                 'audit',
                 !empty($diagnostics['audit']['ok']),
-                'Audit-Kette muss integer sein.'
+                'Audit-Kette muss intakt sein.'
             ),
             $this->item(
                 'production_debug',
