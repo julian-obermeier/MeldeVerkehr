@@ -106,7 +106,7 @@ final class AuthorityInquiryWorkflowController
 
     private function requireUser(): string|Response
     {
-        $userId = $this->auth->userId();
+        $userId = $this->auth->id();
 
         if ($userId === null) {
             return Response::redirect('/login');
