@@ -13,6 +13,7 @@ use MeldeVerkehr\Core\Application;
 use MeldeVerkehr\Evidence\EvidenceController;
 use MeldeVerkehr\Evidence\EvidencePrivacyController;
 use MeldeVerkehr\Evidence\EvidenceReviewController;
+use MeldeVerkehr\Dispatch\DispatchController;
 use MeldeVerkehr\Http\Request;
 use MeldeVerkehr\Http\Response;
 use MeldeVerkehr\Install\InstallerController;
@@ -44,6 +45,7 @@ if ($installerService->isInstalled()) {
     $evidenceReview = new EvidenceReviewController($app);
     $witness = new WitnessController($app);
     $finalReview = new FinalReviewController($app);
+    $dispatch = new DispatchController($app);
 
     $app->router()->get('/register', [$auth, 'registerForm']);
     $app->router()->post('/register', [$auth, 'register']);
@@ -101,6 +103,9 @@ if ($installerService->isInstalled()) {
 
     $app->router()->get('/cases/{id}/final-review', [$finalReview, 'index']);
     $app->router()->post('/cases/{id}/final-review', [$finalReview, 'confirm']);
+
+    $app->router()->get('/cases/{id}/dispatch', [$dispatch, 'index']);
+    $app->router()->post('/cases/{id}/dispatch', [$dispatch, 'queue']);
 
     $app->router()->get('/settings/security', [$security, 'index']);
     $app->router()->post('/settings/security/totp/start', [$security, 'startTotp']);
