@@ -668,6 +668,13 @@ final class ModerationService
         $this->audit?->log('COMMUNITY_MODERATION_ESCALATION_RESOLVED', 'community_moderation_escalation', $escalationId, 'USER', $moderatorUserId);
     }
 
+    public function canResolveEscalations(string $moderatorUserId): bool
+    {
+        $this->assertModerator($moderatorUserId);
+
+        return $this->isSeniorModerator($moderatorUserId);
+    }
+
     public function pendingProblemAreas(string $moderatorUserId): array
     {
         $this->assertModerator($moderatorUserId);
