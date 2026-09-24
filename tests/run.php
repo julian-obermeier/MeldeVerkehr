@@ -46,6 +46,7 @@ use MeldeVerkehr\Dispatch\DispatchPackageService;
 use MeldeVerkehr\Dispatch\DispatchService;
 use MeldeVerkehr\Dispatch\DryRunDispatchTransport;
 use MeldeVerkehr\Evidence\EvidenceImageProcessor;
+use MeldeVerkehr\Evidence\OfflineEvidenceUploadService;
 use MeldeVerkehr\Evidence\EvidencePrivacyService;
 use MeldeVerkehr\Evidence\EvidenceReviewService;
 use MeldeVerkehr\Evidence\EvidenceService;
@@ -653,6 +654,50 @@ try {
     $assert(
         is_array($removedRow) && ($removedRow['status'] ?? null) === 'REMOVED',
         'Evidence removal is logical and retains original record'
+    );
+
+    $offlineEvidence = new OfflineEvidenceUploadService($pdo, $evidenceService);
+    $offlineClientId = Uuid::v4();
+    $offlineClientHash = hash_file('sha256', $evidenceSource);
+    if (!is_string($offlineClientHash)) {
+        throw new RuntimeException('Could not hash offline evidence fixture.');
+    }
+
+    $offlineStored = $offlineEvidence->process(
+        (string) $user['id'],
+        $caseId,
+        $offlineClientId,
+        $offlineClientHash,
+        $evidenceSource,
+        'offline-test.png',
+        'CONTEXT'
+    );
+    $offlineRetry = $offlineEvidence->process(
+        (string) $user['id'],
+        $caseId,
+        $offlineClientId,
+        $offlineClientHash,
+        $evidenceSource,
+        'offline-test.png',
+        'CONTEXT'
+    );
+
+    $assert(
+        ($offlineStored['duplicate'] ?? true) === false
+        && ($offlineRetry['duplicate'] ?? false) === true
+        && ($offlineStored['evidence']['id'] ?? null) === ($offlineRetry['evidence']['id'] ?? null),
+        'Offline evidence receipt makes repeated client upload idempotent'
+    );
+    $assert(
+        hash_equals(
+            $offlineClientHash,
+            (string) ($offlineRetry['evidence']['sha256'] ?? '')
+        ),
+        'Offline evidence server receipt confirms the client SHA-256'
+    );
+    $evidenceService->markRemoved(
+        (string) $user['id'],
+        (string) $offlineStored['evidence']['id']
     );
 
     $privacyService = new EvidencePrivacyService(
