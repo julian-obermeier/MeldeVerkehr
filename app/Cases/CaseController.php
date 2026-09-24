@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace MeldeVerkehr\Cases;
 
 use MeldeVerkehr\Audit\AuditLogger;
+use MeldeVerkehr\Auth\AuthorizationException;
 use MeldeVerkehr\Auth\AuthorizationService;
 use MeldeVerkehr\Auth\AuthManager;
+use MeldeVerkehr\Auth\AuthService;
 use MeldeVerkehr\Auth\PermissionService;
 use MeldeVerkehr\Core\Application;
 use MeldeVerkehr\Http\Request;
@@ -70,7 +72,7 @@ final class CaseController
 
         try {
             $case = $this->service()->findOwned($userId, (string) $request->route('id', ''));
-        } catch (Throwable $e) {
+        } catch (AuthorizationException $e) {
             return Response::html('<h1>403</h1><p>Kein Zugriff auf diesen Vorgang.</p>', 403);
         }
 
@@ -163,6 +165,17 @@ final class CaseController
             return Response::redirect('/login');
         }
 
+        $user = (new AuthService($this->app->database()))->findById($userId);
+
+        if ($user === null || $user['status'] !== 'ACTIVE') {
+            $this->auth->logout();
+            return Response::redirect('/login');
+        }
+
+        if ($user['email_verified_at'] === null) {
+            return Response::redirect('/verify-email/pending');
+        }
+
         return $userId;
     }
 
@@ -174,6 +187,7 @@ final class CaseController
             $this->app->database(),
             new AuthorizationService($permissions),
             new SecretCipher((string) $this->app->config()->get('app.key', '')),
+            (string) $this->app->config()->get('app.key', ''),
             new AuditLogger(
                 $this->app->database(),
                 (string) $this->app->config()->get('app.key', '')
