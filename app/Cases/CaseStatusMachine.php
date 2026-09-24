@@ -13,7 +13,6 @@ final class CaseStatusMachine
         ],
         CaseStatus::CAPTURE_IN_PROGRESS => [
             CaseStatus::DRAFT,
-            CaseStatus::WAITING_FOR_EVIDENCE,
             CaseStatus::READY_FOR_REVIEW,
             CaseStatus::DELETION_PENDING,
         ],
@@ -24,6 +23,7 @@ final class CaseStatusMachine
         ],
         CaseStatus::READY_FOR_REVIEW => [
             CaseStatus::CAPTURE_IN_PROGRESS,
+            CaseStatus::WAITING_FOR_EVIDENCE,
             CaseStatus::REVIEW_REQUIRED,
             CaseStatus::READY_FOR_SUBMISSION,
         ],

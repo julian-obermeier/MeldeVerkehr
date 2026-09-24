@@ -95,6 +95,7 @@ try {
 
     $machine = new CaseStatusMachine();
     $assert($machine->can(CaseStatus::DRAFT, CaseStatus::CAPTURE_IN_PROGRESS), 'Valid draft transition');
+    $assert($machine->can(CaseStatus::READY_FOR_REVIEW, CaseStatus::WAITING_FOR_EVIDENCE), 'Review can advance to evidence');
     $assert(!$machine->can(CaseStatus::DRAFT, CaseStatus::SENT), 'Invalid draft to sent transition rejected');
 
     $caseId = (string) $caseA['case']['id'];
@@ -118,6 +119,23 @@ try {
     ]);
     $afterLocation = $caseService->findOwned((string) $user['id'], $caseId);
     $assert(($afterLocation['location']['city'] ?? null) === 'Gießen', 'Location saved');
+
+    $caseService->saveObservation((string) $user['id'], $caseId, [
+        'observed_from' => '2026-09-24T10:00',
+        'observed_until' => '2026-09-24T10:15',
+        'obstruction' => '1',
+        'endangerment' => null,
+        'damage' => null,
+    ]);
+    $afterObservation = $caseService->findOwned((string) $user['id'], $caseId);
+    $assert(
+        ($afterObservation['case']['observation_duration_seconds'] ?? null) === 900,
+        'Observation duration derived from start and end'
+    );
+    $assert(
+        ($afterObservation['case']['observed_from_local'] ?? null) === '2026-09-24T10:00',
+        'Observation time roundtrips in application timezone'
+    );
 
     $plateSearch = $caseService->listOwned((string) $user['id'], null, 'GI-AB 123');
     $assert(
@@ -189,8 +207,19 @@ try {
     $caseService->setPrimaryOffense((string) $user['id'], $caseId, $newerVersionId);
     $afterOffense = $caseService->findOwned((string) $user['id'], $caseId);
     $assert(
-        ($afterOffense['case']['status'] ?? null) === CaseStatus::WAITING_FOR_EVIDENCE,
-        'Complete M2 core advances to WAITING_FOR_EVIDENCE'
+        ($afterOffense['case']['status'] ?? null) === CaseStatus::READY_FOR_REVIEW,
+        'Complete M2 core advances to READY_FOR_REVIEW'
+    );
+
+    $review = $caseService->reviewSummary((string) $user['id'], $caseId);
+    $assert($review['ready'] === true, 'M2 core review reports complete data');
+    $assert($review['warnings'] === [], 'Complete test data has no review warnings');
+
+    $caseService->confirmCoreReview((string) $user['id'], $caseId, false);
+    $afterReview = $caseService->findOwned((string) $user['id'], $caseId);
+    $assert(
+        ($afterReview['case']['status'] ?? null) === CaseStatus::WAITING_FOR_EVIDENCE,
+        'Confirmed M2 review advances to WAITING_FOR_EVIDENCE'
     );
 
     $other = $auth->register([
@@ -206,6 +235,41 @@ try {
         $foreignBlocked = true;
     }
     $assert($foreignBlocked, 'Foreign user cannot read another user case');
+
+    $warningCase = $caseService->createDraft((string) $user['id']);
+    $warningCaseId = (string) $warningCase['case']['id'];
+    $caseService->saveVehicle((string) $user['id'], $warningCaseId, [
+        'license_plate' => 'GI-CD 456',
+        'vehicle_type' => 'PKW',
+    ]);
+    $caseService->saveLocation((string) $user['id'], $warningCaseId, [
+        'street' => 'Warnstraße',
+        'city' => 'Gießen',
+        'traffic_space_type' => 'UNKNOWN',
+        'access_type' => 'UNCLEAR',
+    ]);
+    $caseService->saveObservation((string) $user['id'], $warningCaseId, [
+        'observed_from' => '2026-09-24T11:00',
+        'observed_until' => null,
+    ]);
+    $caseService->setPrimaryOffense((string) $user['id'], $warningCaseId, $newerVersionId);
+    $warningReview = $caseService->reviewSummary((string) $user['id'], $warningCaseId);
+    $assert(count($warningReview['warnings']) >= 2, 'Review exposes quality warnings');
+
+    $warningBlocked = false;
+    try {
+        $caseService->confirmCoreReview((string) $user['id'], $warningCaseId, false);
+    } catch (DomainException $e) {
+        $warningBlocked = true;
+    }
+    $assert($warningBlocked, 'Review warnings require explicit acknowledgement');
+
+    $caseService->confirmCoreReview((string) $user['id'], $warningCaseId, true);
+    $warningAfterReview = $caseService->findOwned((string) $user['id'], $warningCaseId);
+    $assert(
+        ($warningAfterReview['case']['status'] ?? null) === CaseStatus::WAITING_FOR_EVIDENCE,
+        'Acknowledged warnings allow transition to evidence'
+    );
 
     $summary = $caseService->dashboardSummary((string) $user['id']);
     $assert($summary['open'] >= 2, 'Dashboard counts own open cases');

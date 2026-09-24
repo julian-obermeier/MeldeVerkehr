@@ -5,6 +5,15 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 ## [Unreleased]
 
 ### Added
+- Beobachtungsbeginn und optionales Beobachtungsende im Vorgang
+- UTC-Speicherung mit lokaler Zeitdarstellung
+- automatische Ableitung der Beobachtungsdauer
+- strukturierte Beobachtungsmerkmale für Behinderung, Gefährdung und Sachschaden
+- separate Grunddaten-Review-Seite
+- Review-Vollständigkeitsprüfung und Qualitätswarnungen
+- explizite Bestätigung gelber Review-Hinweise
+- sauberer M2→M3-Übergang über READY_FOR_REVIEW → WAITING_FOR_EVIDENCE
+- Integrationstests für Beobachtungszeit und Review-Warnungen
 - M2-Vorgangskern mit UUID und öffentlicher OWI-Jahresnummer
 - Statusmaschine, Statushistorie und Vorgangstimeline
 - Fahrzeug- und Standortmodell
@@ -57,6 +66,9 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 - CSRF-Schutz für Installations- und Authentifizierungsformulare
 
 ### Changed
+- vollständige M2-Grunddaten wechseln jetzt zuerst zu READY_FOR_REVIEW
+- WAITING_FOR_EVIDENCE wird erst nach expliziter Grunddatenbestätigung gesetzt
+- nachträgliche Änderungen an bereits geprüften Grunddaten erzwingen erneut einen Review
 - Bürger-Dashboard nutzt reale Vorgangsdaten statt Platzhalter
 - Vorgänge wechseln nach erster Eingabe von DRAFT zu CAPTURE_IN_PROGRESS
 - vollständig erfasste M2-Grunddaten wechseln bei konkretem Tatbestand zu WAITING_FOR_EVIDENCE

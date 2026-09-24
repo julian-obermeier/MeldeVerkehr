@@ -22,7 +22,8 @@ final class CaseService
         private readonly AuthorizationService $authorization,
         private readonly SecretCipher $cipher,
         private readonly string $searchKey,
-        private readonly AuditLogger $audit
+        private readonly AuditLogger $audit,
+        private readonly string $timezone = 'Europe/Berlin'
     ) {
     }
 
@@ -126,6 +127,12 @@ final class CaseService
         }
 
         $this->authorization->authorize($userId, 'case.view_own', (string) $case['user_id']);
+        $case['observed_from_local'] = $this->toLocalInput($case['observed_from'] ?? null);
+        $case['observed_until_local'] = $this->toLocalInput($case['observed_until'] ?? null);
+        $case['observation_duration_seconds'] = $this->durationSeconds(
+            $case['observed_from'] ?? null,
+            $case['observed_until'] ?? null
+        );
 
         $vehicle = $this->fetchOne('SELECT * FROM vehicles WHERE case_id = :case_id LIMIT 1', ['case_id' => $caseId]);
         if ($vehicle !== null) {
@@ -297,6 +304,150 @@ final class CaseService
             'access_type' => $accessType,
         ]);
         $this->audit->log('CASE_LOCATION_UPDATED', 'case', $caseId, 'USER', $userId);
+    }
+
+    public function saveObservation(string $userId, string $caseId, array $input): void
+    {
+        $case = $this->editableCase($userId, $caseId);
+
+        $from = $this->parseLocalDateTime($input['observed_from'] ?? null, 'Beobachtungsbeginn', false);
+        $until = $this->parseLocalDateTime($input['observed_until'] ?? null, 'Beobachtungsende', true);
+
+        if ($from === null) {
+            throw new \InvalidArgumentException('Beobachtungsbeginn ist erforderlich.');
+        }
+
+        if ($until !== null && $until < $from) {
+            throw new \InvalidArgumentException('Beobachtungsende darf nicht vor dem Beginn liegen.');
+        }
+
+        $stmt = $this->pdo->prepare(
+            'UPDATE cases
+             SET observed_from = :observed_from,
+                 observed_until = :observed_until,
+                 obstruction = :obstruction,
+                 endangerment = :endangerment,
+                 damage = :damage,
+                 updated_at = UTC_TIMESTAMP()
+             WHERE id = :id'
+        );
+        $stmt->execute([
+            'observed_from' => $from->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d H:i:s'),
+            'observed_until' => $until?->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d H:i:s'),
+            'obstruction' => $this->booleanInput($input['obstruction'] ?? null) ? 1 : 0,
+            'endangerment' => $this->booleanInput($input['endangerment'] ?? null) ? 1 : 0,
+            'damage' => $this->booleanInput($input['damage'] ?? null) ? 1 : 0,
+            'id' => $caseId,
+        ]);
+
+        $this->touchProgress($case, $userId);
+        $this->refreshCaptureState($userId, $caseId);
+        $this->timeline($caseId, 'USER', 'OBSERVATION_UPDATED', $userId, [
+            'has_end' => $until !== null,
+            'obstruction' => $this->booleanInput($input['obstruction'] ?? null),
+            'endangerment' => $this->booleanInput($input['endangerment'] ?? null),
+            'damage' => $this->booleanInput($input['damage'] ?? null),
+        ]);
+        $this->audit->log('CASE_OBSERVATION_UPDATED', 'case', $caseId, 'USER', $userId);
+    }
+
+    public function reviewSummary(string $userId, string $caseId): array
+    {
+        $data = $this->findOwned($userId, $caseId);
+
+        if ($data === null) {
+            throw new \DomainException('Vorgang nicht gefunden.');
+        }
+
+        $case = $data['case'];
+        $vehicle = $data['vehicle'];
+        $location = $data['location'];
+        $offense = $data['offenses'][0] ?? null;
+
+        $missing = [];
+        $warnings = [];
+
+        if ($vehicle === null || empty($vehicle['license_plate']) || empty($vehicle['vehicle_type'])) {
+            $missing[] = 'Fahrzeug und Kennzeichen vollständig erfassen.';
+        }
+
+        $hasCoordinates = $location !== null
+            && $location['latitude'] !== null
+            && $location['longitude'] !== null;
+        $hasAddress = $location !== null
+            && trim((string) ($location['street'] ?? '')) !== ''
+            && trim((string) ($location['city'] ?? '')) !== '';
+
+        if (!$hasCoordinates && !$hasAddress) {
+            $missing[] = 'Standort per GPS oder mit Straße und Ort erfassen.';
+        }
+
+        if (($case['observed_from'] ?? null) === null) {
+            $missing[] = 'Beobachtungsbeginn erfassen.';
+        }
+
+        if (
+            $offense === null
+            || ($offense['stable_key'] ?? '') === 'UNCLASSIFIED_PARKING'
+            || (int) ($offense['user_confirmed'] ?? 0) !== 1
+        ) {
+            $missing[] = 'Konkreten Tatbestand auswählen und bestätigen.';
+        }
+
+        if ($location !== null && ($location['traffic_space_type'] ?? 'UNKNOWN') === 'UNKNOWN') {
+            $warnings[] = 'Der konkrete Verkehrsraum ist noch als unklar markiert.';
+        }
+
+        if ($location !== null && ($location['access_type'] ?? 'UNCLEAR') === 'UNCLEAR') {
+            $warnings[] = 'Es ist noch unklar, ob der Ort öffentlich oder privat ist.';
+        }
+
+        if (($case['observed_until'] ?? null) === null) {
+            $warnings[] = 'Es wurde kein Beobachtungsende erfasst; eine Mindestdauer kann so nicht abgeleitet werden.';
+        }
+
+        return [
+            'data' => $data,
+            'missing' => $missing,
+            'warnings' => $warnings,
+            'ready' => $missing === [],
+        ];
+    }
+
+    public function confirmCoreReview(
+        string $userId,
+        string $caseId,
+        bool $warningsAcknowledged = false
+    ): void {
+        $summary = $this->reviewSummary($userId, $caseId);
+
+        if (!$summary['ready']) {
+            throw new \DomainException('Grunddaten sind noch nicht vollständig.');
+        }
+
+        if ($summary['warnings'] !== [] && !$warningsAcknowledged) {
+            throw new \DomainException('Die Hinweise müssen vor dem Übergang zur Beweiserfassung bestätigt werden.');
+        }
+
+        $status = (string) $summary['data']['case']['status'];
+
+        if ($status !== CaseStatus::READY_FOR_REVIEW) {
+            throw new \DomainException('Vorgang ist aktuell nicht für den Grunddaten-Review bereit.');
+        }
+
+        $this->changeStatus(
+            $userId,
+            $caseId,
+            CaseStatus::WAITING_FOR_EVIDENCE,
+            'Grunddaten geprüft; Übergang zur Beweiserfassung'
+        );
+
+        $this->timeline($caseId, 'USER', 'CORE_REVIEW_CONFIRMED', $userId, [
+            'warnings_acknowledged' => $warningsAcknowledged,
+        ]);
+        $this->audit->log('CASE_CORE_REVIEW_CONFIRMED', 'case', $caseId, 'USER', $userId, [
+            'warnings_acknowledged' => $warningsAcknowledged,
+        ]);
     }
 
     public function setPrimaryOffense(string $userId, string $caseId, string $offenseVersionId): void
@@ -471,6 +622,20 @@ final class CaseService
 
         if ($case['status'] === CaseStatus::DRAFT) {
             $this->changeStatus($userId, (string) $case['id'], CaseStatus::CAPTURE_IN_PROGRESS, 'Erfassung begonnen');
+            return;
+        }
+
+        if (in_array($case['status'], [
+            CaseStatus::READY_FOR_REVIEW,
+            CaseStatus::REVIEW_REQUIRED,
+            CaseStatus::WAITING_FOR_EVIDENCE,
+        ], true)) {
+            $this->changeStatus(
+                $userId,
+                (string) $case['id'],
+                CaseStatus::CAPTURE_IN_PROGRESS,
+                'Grunddaten nachträglich geändert'
+            );
         }
     }
 
@@ -492,6 +657,8 @@ final class CaseService
             ['case_id' => $caseId]
         ) !== null;
 
+        $observationComplete = ($case['observed_from'] ?? null) !== null;
+
         $offense = $this->fetchOne(
             'SELECT o.stable_key
              FROM case_offenses co
@@ -505,14 +672,15 @@ final class CaseService
         if (
             $vehicleExists
             && $locationExists
+            && $observationComplete
             && $offense !== null
             && ($offense['stable_key'] ?? '') !== 'UNCLASSIFIED_PARKING'
         ) {
             $this->changeStatus(
                 $userId,
                 $caseId,
-                CaseStatus::WAITING_FOR_EVIDENCE,
-                'Grunddaten vollständig; Beweisdokumentation ausstehend'
+                CaseStatus::READY_FOR_REVIEW,
+                'Grunddaten vollständig; Review erforderlich'
             );
         }
     }
@@ -579,6 +747,56 @@ final class CaseService
         $stmt->execute($params);
 
         return $stmt->fetchAll();
+    }
+
+    private function parseLocalDateTime(mixed $value, string $label, bool $nullable): ?\DateTimeImmutable
+    {
+        $value = trim((string) ($value ?? ''));
+
+        if ($value === '') {
+            if ($nullable) {
+                return null;
+            }
+
+            throw new \InvalidArgumentException($label . ' ist erforderlich.');
+        }
+
+        $timezone = new \DateTimeZone($this->timezone);
+        $date = \DateTimeImmutable::createFromFormat('!Y-m-d\\TH:i', $value, $timezone);
+
+        if (!$date || $date->format('Y-m-d\\TH:i') !== $value) {
+            throw new \InvalidArgumentException($label . ' ist ungültig.');
+        }
+
+        return $date;
+    }
+
+    private function toLocalInput(mixed $value): ?string
+    {
+        if (!is_string($value) || $value === '') {
+            return null;
+        }
+
+        $date = new \DateTimeImmutable($value, new \DateTimeZone('UTC'));
+
+        return $date->setTimezone(new \DateTimeZone($this->timezone))->format('Y-m-d\\TH:i');
+    }
+
+    private function durationSeconds(mixed $from, mixed $until): ?int
+    {
+        if (!is_string($from) || $from === '' || !is_string($until) || $until === '') {
+            return null;
+        }
+
+        $start = new \DateTimeImmutable($from, new \DateTimeZone('UTC'));
+        $end = new \DateTimeImmutable($until, new \DateTimeZone('UTC'));
+
+        return max(0, $end->getTimestamp() - $start->getTimestamp());
+    }
+
+    private function booleanInput(mixed $value): bool
+    {
+        return in_array($value, [1, '1', true, 'true', 'on', 'yes'], true);
     }
 
     private function decryptNullable(mixed $value): ?string
