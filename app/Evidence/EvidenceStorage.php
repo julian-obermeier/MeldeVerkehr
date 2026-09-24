@@ -56,6 +56,55 @@ final class EvidenceStorage
         ];
     }
 
+    public function storeVariant(
+        string $caseId,
+        string $evidenceId,
+        string $variant,
+        int $version,
+        string $sourcePath,
+        string $mimeType
+    ): array {
+        $extension = self::EXTENSIONS[$mimeType] ?? null;
+
+        if ($extension === null) {
+            throw new \InvalidArgumentException('Nicht unterstützter Dateityp.');
+        }
+
+        $variantDirectory = strtolower($variant);
+        if (!in_array($variantDirectory, ['working', 'public'], true)) {
+            throw new \InvalidArgumentException('Ungültige Evidence-Variante.');
+        }
+
+        $relativeDirectory = 'evidence/' . $variantDirectory . '/' . $caseId;
+        $absoluteDirectory = $this->absolute($relativeDirectory);
+
+        if (!is_dir($absoluteDirectory) && !mkdir($absoluteDirectory, 0770, true) && !is_dir($absoluteDirectory)) {
+            throw new \RuntimeException('Evidence-Verzeichnis konnte nicht angelegt werden.');
+        }
+
+        $relativePath = sprintf(
+            '%s/%s-v%d.%s',
+            $relativeDirectory,
+            $evidenceId,
+            $version,
+            $extension
+        );
+        $absolutePath = $this->absolute($relativePath);
+
+        if (!copy($sourcePath, $absolutePath)) {
+            throw new \RuntimeException('Evidence-Variante konnte nicht gespeichert werden.');
+        }
+
+        @chmod($absolutePath, 0440);
+
+        return [
+            'relative_path' => $relativePath,
+            'absolute_path' => $absolutePath,
+            'sha256' => hash_file('sha256', $absolutePath),
+            'size' => filesize($absolutePath) ?: 0,
+        ];
+    }
+
     public function absolute(string $relativePath): string
     {
         $clean = str_replace('\\', '/', $relativePath);
