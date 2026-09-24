@@ -230,7 +230,7 @@ $app->router()->get('/', static function (Request $request) use ($installerServi
     return Response::redirect('/dashboard');
 });
 
-$app->router()->get('/health', static function (Request $request) use ($installerService): Response {
+$app->router()->get('/health', static function (Request $request) use ($installerService, $app): Response {
     return Response::json([
         'success' => true,
         'data' => [
