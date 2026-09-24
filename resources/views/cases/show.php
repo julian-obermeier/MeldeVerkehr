@@ -69,7 +69,7 @@ textarea{min-height:80px}button,.button{display:inline-block;margin-top:12px;pad
 </style></head>
 <body><main>
 <p><a href="/cases">← Vorgänge</a></p>
-<section class="hero"><div class="number"><?= $e($c['public_number']) ?></div><p><strong><?= $e($statusLabels[$c['status']]??$c['status']) ?></strong></p><p class="muted">Angelegt: <?= $e($c['created_at']) ?> · Zuletzt geändert: <?= $e($c['updated_at']) ?></p></section>
+<section class="hero"><div class="number"><?= $e($c['public_number']) ?></div><p><strong><?= $e($statusLabels[$c['status']]??$c['status']) ?></strong></p><p class="muted">Angelegt: <?= $e($c['created_at']) ?> · Zuletzt geändert: <?= $e($c['updated_at']) ?></p><p><a class="button secondary" href="/cases/<?= rawurlencode($c['id']) ?>/lifecycle">Versionen · Nachträge · Korrekturen · Abschluss</a></p></section>
 <?php if($message):?><div class="message"><?= $e($message) ?></div><?php endif;?><?php if($error):?><div class="error"><?= $e($error) ?></div><?php endif;?>
 
 <section class="card"><h2>Erfassungsfortschritt</h2><div class="grid">
