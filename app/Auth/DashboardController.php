@@ -70,6 +70,7 @@ final class DashboardController
         $notifications = OperationsServiceFactory::notifications($this->app);
         $notifications->syncForUser($id);
         $unreadNotifications = $notifications->unreadCount($id);
+        $authorityScopes = AuthorityPortalServiceFactory::access($this->app)->scopes($id);
 
         return Response::html($this->view->render('dashboard/index', [
             'user' => $user,
@@ -79,6 +80,7 @@ final class DashboardController
             'passkeyCount' => count($passkeys),
             'caseSummary' => $caseSummary,
             'unreadNotifications' => $unreadNotifications,
+            'authorityScopes' => $authorityScopes,
         ]));
     }
 }

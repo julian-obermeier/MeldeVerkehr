@@ -5,8 +5,14 @@ declare(strict_types=1);
 use MeldeVerkehr\Assist\AssistService;
 use MeldeVerkehr\Assist\ImageQualityAnalyzer;
 use MeldeVerkehr\Assist\VisionProviderInterface;
+use MeldeVerkehr\AuthorityPortal\AuthorityAccessService;
+use MeldeVerkehr\AuthorityPortal\AuthorityApiTokenService;
+use MeldeVerkehr\AuthorityPortal\AuthorityExportService;
+use MeldeVerkehr\AuthorityPortal\AuthorityHolderService;
+use MeldeVerkehr\AuthorityPortal\AuthorityPortalService;
 use MeldeVerkehr\Analytics\MapAnalyticsService;
 use MeldeVerkehr\Audit\AuditLogger;
+use MeldeVerkehr\Auth\AuthorizationException;
 use MeldeVerkehr\Auth\AuthorizationService;
 use MeldeVerkehr\Auth\AuthService;
 use MeldeVerkehr\Auth\LoginRateLimiter;
@@ -2368,6 +2374,356 @@ try {
     $assert(
         $exportService->cleanupExpired() >= 1,
         'Expired export cleanup removes protected export artifacts'
+    );
+
+    $authorityAccess = new AuthorityAccessService($pdo, $permissions);
+    $authorityPortal = new AuthorityPortalService(
+        $pdo,
+        $authorityAccess,
+        new SecretCipher('test-app-key'),
+        new AuditLogger($pdo, 'test-audit-key')
+    );
+    $authorityTokens = new AuthorityApiTokenService($pdo, $authorityAccess);
+    $authorityHolders = new AuthorityHolderService(
+        $pdo,
+        $authorityAccess,
+        new SecretCipher('test-app-key'),
+        new AuditLogger($pdo, 'test-audit-key')
+    );
+    $authorityExports = new AuthorityExportService(
+        $authorityPortal,
+        $authorityAccess
+    );
+
+    $authoritySuper = $auth->register([
+        'first_name' => 'Authority',
+        'last_name' => 'Super',
+        'email' => 'authority-super-' . bin2hex(random_bytes(5)) . '@example.test',
+        'password' => 'VeryStrongAuthoritySuper-123!',
+    ]);
+    $pdo->prepare(
+        'INSERT IGNORE INTO user_roles (user_id, role_id, created_at)
+         SELECT :user_id, id, UTC_TIMESTAMP()
+         FROM roles WHERE name = "SUPER_ADMIN"'
+    )->execute(['user_id' => $authoritySuper['id']]);
+
+    $authorityOperator = $auth->register([
+        'first_name' => 'Authority',
+        'last_name' => 'Operator',
+        'email' => 'authority-operator-' . bin2hex(random_bytes(5)) . '@example.test',
+        'password' => 'VeryStrongAuthorityOperator-123!',
+    ]);
+
+    $authorityAccess->assignScope(
+        (string) $authoritySuper['id'],
+        (string) $authorityOperator['id'],
+        $authorityId,
+        'AUTHORITY_ADMIN'
+    );
+    $authorityAccess->assignScope(
+        (string) $authoritySuper['id'],
+        (string) $authorityOperator['id'],
+        $broadAuthorityId,
+        'AUTHORITY_USER'
+    );
+
+    $operatorScopes = $authorityAccess->scopes((string) $authorityOperator['id']);
+    $assert(
+        count($operatorScopes) === 2
+        && count(array_filter(
+            $operatorScopes,
+            static fn(array $scope): bool =>
+                $scope['authority_id'] === $authorityId
+                && $scope['scope_role'] === 'AUTHORITY_ADMIN'
+        )) === 1
+        && count(array_filter(
+            $operatorScopes,
+            static fn(array $scope): bool =>
+                $scope['authority_id'] === $broadAuthorityId
+                && $scope['scope_role'] === 'AUTHORITY_USER'
+        )) === 1,
+        'Authority user can hold different roles per authority scope'
+    );
+
+    $scopeEscalationBlocked = false;
+    try {
+        $authorityAccess->assertAuthority(
+            (string) $authorityOperator['id'],
+            $broadAuthorityId,
+            'authority.holder.write'
+        );
+    } catch (AuthorizationException $e) {
+        $scopeEscalationBlocked = true;
+    }
+    $assert(
+        $scopeEscalationBlocked,
+        'Global AUTHORITY_ADMIN role cannot escalate an AUTHORITY_USER scope'
+    );
+
+    $authorityInbox = $authorityPortal->inbox(
+        (string) $authorityOperator['id'],
+        $authorityId
+    );
+    $assert(
+        count(array_filter(
+            $authorityInbox,
+            static fn(array $row): bool => ($row['id'] ?? null) === $caseId
+        )) === 1,
+        'Authority inbox contains sent case for matching authority scope'
+    );
+
+    $broadInbox = $authorityPortal->inbox(
+        (string) $authorityOperator['id'],
+        $broadAuthorityId
+    );
+    $assert(
+        count(array_filter(
+            $broadInbox,
+            static fn(array $row): bool => ($row['id'] ?? null) === $caseId
+        )) === 0,
+        'Authority inbox excludes case not sent to that authority'
+    );
+
+    $authorityDetail = $authorityPortal->caseDetail(
+        (string) $authorityOperator['id'],
+        $caseId,
+        $authorityId
+    );
+    $assert(
+        ($authorityDetail['manifest']['case']['public_number'] ?? null)
+            === ($afterDispatch['case']['public_number'] ?? null)
+        && hash_equals(
+            (string) $authorityDetail['dispatch']['package_sha256'],
+            (string) $loadedDispatchPackage['manifest_sha256']
+        ),
+        'Authority case view uses frozen transmitted dispatch snapshot'
+    );
+
+    $crossAuthorityCaseBlocked = false;
+    try {
+        $authorityPortal->caseDetail(
+            (string) $authorityOperator['id'],
+            $caseId,
+            $broadAuthorityId
+        );
+    } catch (AuthorizationException $e) {
+        $crossAuthorityCaseBlocked = true;
+    }
+    $assert(
+        $crossAuthorityCaseBlocked,
+        'Exact authority binding blocks cross-authority case access'
+    );
+
+    $portalInquiry = $authorityPortal->createInquiry(
+        (string) $authorityOperator['id'],
+        $caseId,
+        'PHOTO',
+        'Weiteren Fotobeleg nachreichen',
+        'Bitte reichen Sie einen zusätzlichen anonymisierten Fotobeleg nach.',
+        new DateTimeImmutable('2026-10-01T12:00:00+02:00'),
+        $authorityId
+    );
+    $assert(
+        ($portalInquiry['status'] ?? null) === 'OPEN'
+        && ($portalInquiry['inquiry_type'] ?? null) === 'PHOTO',
+        'Authority portal creates structured inquiry'
+    );
+
+    $portalInquiryStorage = $pdo->prepare(
+        'SELECT body_encrypted, body_sha256, case_task_id
+         FROM authority_portal_inquiries WHERE id = :id LIMIT 1'
+    );
+    $portalInquiryStorage->execute(['id' => $portalInquiry['id']]);
+    $portalInquiryRow = $portalInquiryStorage->fetch();
+    $assert(
+        is_array($portalInquiryRow)
+        && !str_contains(
+            (string) $portalInquiryRow['body_encrypted'],
+            'zusätzlichen anonymisierten Fotobeleg'
+        )
+        && !empty($portalInquiryRow['case_task_id']),
+        'Authority inquiry is encrypted and creates linked citizen task'
+    );
+
+    $portalTaskStmt = $pdo->prepare(
+        'SELECT source, task_type, status
+         FROM case_tasks WHERE id = :id LIMIT 1'
+    );
+    $portalTaskStmt->execute(['id' => $portalInquiry['case_task_id']]);
+    $portalTask = $portalTaskStmt->fetch();
+    $assert(
+        is_array($portalTask)
+        && $portalTask['source'] === 'AUTHORITY_PORTAL'
+        && $portalTask['task_type'] === 'AUTHORITY_PHOTO'
+        && $portalTask['status'] === 'OPEN',
+        'Authority inquiry is visible in existing citizen task workflow'
+    );
+
+    $holderRecord = $authorityHolders->save(
+        (string) $authorityOperator['id'],
+        $caseId,
+        'Max Mustermann',
+        'Beispielweg 10, 35390 Gießen',
+        '1980-01-02',
+        ['source' => 'integration-test']
+    );
+    $assert(
+        ($holderRecord['holder_name'] ?? null) === 'Max Mustermann'
+        && ($holderRecord['date_of_birth'] ?? null) === '1980-01-02',
+        'Authority admin can read own authority encrypted holder record'
+    );
+
+    $holderStorageStmt = $pdo->prepare(
+        'SELECT holder_name_encrypted, holder_address_encrypted, payload_sha256
+         FROM authority_holder_records
+         WHERE authority_id = :authority_id AND case_id = :case_id LIMIT 1'
+    );
+    $holderStorageStmt->execute([
+        'authority_id' => $authorityId,
+        'case_id' => $caseId,
+    ]);
+    $holderStorage = $holderStorageStmt->fetch();
+    $assert(
+        is_array($holderStorage)
+        && !str_contains((string) $holderStorage['holder_name_encrypted'], 'Max Mustermann')
+        && !str_contains((string) $holderStorage['holder_address_encrypted'], 'Beispielweg 10')
+        && strlen((string) $holderStorage['payload_sha256']) === 64,
+        'Holder data is encrypted at rest and integrity hashed'
+    );
+
+    $holderScopeBlocked = false;
+    try {
+        $authorityAccess->assertAuthority(
+            (string) $authorityOperator['id'],
+            $broadAuthorityId,
+            'authority.holder.read'
+        );
+    } catch (AuthorizationException $e) {
+        $holderScopeBlocked = true;
+    }
+    $assert(
+        $holderScopeBlocked,
+        'AUTHORITY_USER scope cannot access protected holder data'
+    );
+
+    $authorityExport = $authorityExports->export(
+        (string) $authorityOperator['id'],
+        $authorityId,
+        'json'
+    );
+    $assert(
+        str_contains((string) $authorityExport['body'], (string) $afterDispatch['case']['public_number'])
+        && !str_contains((string) $authorityExport['body'], 'Max Mustermann')
+        && !str_contains((string) $authorityExport['body'], 'Beispielweg 10'),
+        'Authority export includes scoped case but never isolated holder data'
+    );
+    $authorityXmlExport = $authorityExports->export(
+        (string) $authorityOperator['id'],
+        $authorityId,
+        'xml'
+    );
+    $assert(
+        str_contains((string) $authorityXmlExport['body'], '<meldeverkehr-export')
+        && !str_contains((string) $authorityXmlExport['body'], 'Max Mustermann'),
+        'Authority XML export is available without holder data'
+    );
+
+    $apiToken = $authorityTokens->create(
+        (string) $authorityOperator['id'],
+        $authorityId,
+        'Integration API',
+        ['cases:read','inquiries:write','exports:read'],
+        new DateTimeImmutable('+7 days', new DateTimeZone('UTC'))
+    );
+    $assert(
+        str_starts_with((string) $apiToken['token'], 'mvapi_'),
+        'Authority API token plaintext is returned only at creation'
+    );
+
+    $apiTokenStorageStmt = $pdo->prepare(
+        'SELECT token_hash, token_prefix, scopes_json
+         FROM authority_api_tokens WHERE id = :id LIMIT 1'
+    );
+    $apiTokenStorageStmt->execute(['id' => $apiToken['id']]);
+    $apiTokenStorage = $apiTokenStorageStmt->fetch();
+    $assert(
+        is_array($apiTokenStorage)
+        && !str_contains((string) $apiTokenStorage['token_hash'], (string) $apiToken['token'])
+        && hash_equals(
+            (string) $apiTokenStorage['token_hash'],
+            hash('sha256', (string) $apiToken['token'])
+        ),
+        'Authority API token is stored only as SHA-256 hash'
+    );
+
+    $apiContext = $authorityTokens->authenticate(
+        'Bearer ' . $apiToken['token'],
+        'cases:read'
+    );
+    $assert(
+        ($apiContext['authority_id'] ?? null) === $authorityId
+        && ($apiContext['user_id'] ?? null) === $authorityOperator['id'],
+        'Authority API token authenticates exact authority and user scope'
+    );
+
+    $apiScopeBlocked = false;
+    try {
+        $authorityTokens->authenticate(
+            'Bearer ' . $apiToken['token'],
+            'holder:read'
+        );
+    } catch (AuthorizationException $e) {
+        $apiScopeBlocked = true;
+    }
+    $assert(
+        $apiScopeBlocked,
+        'Authority API token cannot use scopes not granted at creation'
+    );
+
+    $broadApiToken = $authorityTokens->create(
+        (string) $authoritySuper['id'],
+        $broadAuthorityId,
+        'Broad Authority API',
+        ['cases:read'],
+        new DateTimeImmutable('+7 days', new DateTimeZone('UTC'))
+    );
+    $broadApiContext = $authorityTokens->authenticate(
+        'Bearer ' . $broadApiToken['token'],
+        'cases:read'
+    );
+
+    $apiCrossAuthorityBlocked = false;
+    try {
+        $authorityPortal->caseDetail(
+            (string) $broadApiContext['user_id'],
+            $caseId,
+            (string) $broadApiContext['authority_id']
+        );
+    } catch (AuthorizationException $e) {
+        $apiCrossAuthorityBlocked = true;
+    }
+    $assert(
+        $apiCrossAuthorityBlocked,
+        'API token for another authority cannot read sent case'
+    );
+
+    $authorityTokens->revoke(
+        (string) $authorityOperator['id'],
+        $authorityId,
+        (string) $apiToken['id']
+    );
+    $revokedTokenBlocked = false;
+    try {
+        $authorityTokens->authenticate(
+            'Bearer ' . $apiToken['token'],
+            'cases:read'
+        );
+    } catch (AuthorizationException $e) {
+        $revokedTokenBlocked = true;
+    }
+    $assert(
+        $revokedTokenBlocked,
+        'Revoked authority API token is immediately rejected'
     );
 
     $warningCase = $caseService->createDraft((string) $user['id']);

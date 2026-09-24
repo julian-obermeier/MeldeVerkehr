@@ -5,6 +5,8 @@ declare(strict_types=1);
 use MeldeVerkehr\Admin\AdminController;
 use MeldeVerkehr\Analytics\MapAnalyticsController;
 use MeldeVerkehr\Assist\AssistController;
+use MeldeVerkehr\AuthorityPortal\AuthorityApiController;
+use MeldeVerkehr\AuthorityPortal\AuthorityPortalController;
 use MeldeVerkehr\Auth\AuthController;
 use MeldeVerkehr\Auth\DashboardController;
 use MeldeVerkehr\Auth\PasskeyLoginController;
@@ -56,6 +58,8 @@ if ($installerService->isInstalled()) {
     $analytics = new MapAnalyticsController($app);
     $community = new CommunityController($app);
     $operations = new OperationsController($app);
+    $authorityPortal = new AuthorityPortalController($app);
+    $authorityApi = new AuthorityApiController($app);
 
     $app->router()->get('/register', [$auth, 'registerForm']);
     $app->router()->post('/register', [$auth, 'register']);
@@ -183,6 +187,21 @@ if ($installerService->isInstalled()) {
     $app->router()->post('/exports/cases', [$operations, 'createExport']);
     $app->router()->get('/exports/{id}', [$operations, 'exportBinary']);
     $app->router()->get('/settings/retention', [$operations, 'retention']);
+
+    $app->router()->get('/authority', [$authorityPortal, 'index']);
+    $app->router()->get('/authority/cases/{id}', [$authorityPortal, 'case']);
+    $app->router()->post('/authority/cases/{id}/inquiries', [$authorityPortal, 'createInquiry']);
+    $app->router()->get('/authority/cases/{id}/holder', [$authorityPortal, 'holder']);
+    $app->router()->post('/authority/cases/{id}/holder', [$authorityPortal, 'saveHolder']);
+    $app->router()->get('/authority/admin', [$authorityPortal, 'admin']);
+    $app->router()->post('/authority/{id}/users', [$authorityPortal, 'assignUser']);
+    $app->router()->post('/authority/{id}/tokens', [$authorityPortal, 'createToken']);
+    $app->router()->post('/authority/tokens/{id}/revoke', [$authorityPortal, 'revokeToken']);
+    $app->router()->get('/authority/{id}/export/{format}', [$authorityPortal, 'export']);
+
+    $app->router()->get('/api/v1/authority/cases', [$authorityApi, 'cases']);
+    $app->router()->get('/api/v1/authority/cases/{id}', [$authorityApi, 'case']);
+    $app->router()->post('/api/v1/authority/cases/{id}/inquiries', [$authorityApi, 'inquiry']);
 
     $app->router()->get('/settings/security', [$security, 'index']);
     $app->router()->post('/settings/security/totp/start', [$security, 'startTotp']);
