@@ -29,7 +29,7 @@ final class DiagnosticsService
                     'SELECT task, status, started_at, finished_at, processed_count, error_count
                      FROM cron_runs ORDER BY id DESC LIMIT 20'
                 )->fetchAll(),
-                'last_heartbeat' => $this->latestCronHeartbeat(),
+                'latest_run' => $this->latestCronRun(),
             ],
             'mail' => [
                 'quarantine_open' => (int) $this->pdo->query(
@@ -85,12 +85,12 @@ final class DiagnosticsService
         return $result;
     }
 
-    private function latestCronHeartbeat(): ?array
+    private function latestCronRun(): ?array
     {
         $stmt = $this->pdo->query(
-            'SELECT task, last_started_at, last_finished_at, last_status, updated_at
-             FROM cron_heartbeats
-             ORDER BY updated_at DESC LIMIT 1'
+            'SELECT task, status, started_at, finished_at, processed_count, error_count
+             FROM cron_runs
+             ORDER BY id DESC LIMIT 1'
         );
         $row = $stmt->fetch();
 
