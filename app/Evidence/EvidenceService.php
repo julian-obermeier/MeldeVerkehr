@@ -71,12 +71,18 @@ final class EvidenceService
         $quality = $this->qualityState($width, $height, $size);
         $evidenceId = Uuid::v4();
         $stored = $this->storage->storeOriginal($caseId, $evidenceId, $sourcePath, $mime);
-        $working = $this->processor?->createWorkingCopy(
-            $caseId,
-            $evidenceId,
-            (string) $stored['relative_path'],
-            $mime
-        );
+
+        try {
+            $working = $this->processor?->createWorkingCopy(
+                $caseId,
+                $evidenceId,
+                (string) $stored['relative_path'],
+                $mime
+            );
+        } catch (Throwable $e) {
+            $this->storage->deletePhysical((string) $stored['relative_path']);
+            throw $e;
+        }
 
         try {
             $this->pdo->beginTransaction();
