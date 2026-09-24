@@ -130,6 +130,19 @@ final class CaseController
         );
     }
 
+    public function saveObservation(Request $request): Response
+    {
+        return $this->mutate($request, fn (string $userId, string $caseId) =>
+            $this->service()->saveObservation($userId, $caseId, [
+                'observed_from' => $request->input('observed_from'),
+                'observed_until' => $request->input('observed_until'),
+                'obstruction' => $request->input('obstruction'),
+                'endangerment' => $request->input('endangerment'),
+                'damage' => $request->input('damage'),
+            ])
+        );
+    }
+
     public function saveOffense(Request $request): Response
     {
         return $this->mutate($request, fn (string $userId, string $caseId) =>
@@ -139,6 +152,59 @@ final class CaseController
                 trim((string) $request->input('offense_version_id', ''))
             )
         );
+    }
+
+    public function review(Request $request): Response
+    {
+        $userId = $this->requireUser();
+        if ($userId instanceof Response) {
+            return $userId;
+        }
+
+        $caseId = (string) $request->route('id', '');
+
+        try {
+            $summary = $this->service()->reviewSummary($userId, $caseId);
+        } catch (AuthorizationException $e) {
+            return Response::html('<h1>403</h1><p>Kein Zugriff auf diesen Vorgang.</p>', 403);
+        } catch (\DomainException $e) {
+            return Response::html('<h1>404</h1><p>Vorgang nicht gefunden.</p>', 404);
+        }
+
+        return Response::html($this->view->render('cases/review', [
+            'summary' => $summary,
+            'csrf' => Csrf::token(),
+            'message' => $this->pullFlash('case_message'),
+            'error' => $this->pullFlash('case_error'),
+        ]));
+    }
+
+    public function confirmReview(Request $request): Response
+    {
+        $userId = $this->requireUser();
+        if ($userId instanceof Response) {
+            return $userId;
+        }
+
+        $caseId = (string) $request->route('id', '');
+
+        if (!Csrf::validate((string) $request->input('_csrf', ''))) {
+            $_SESSION['case_error'] = 'Sitzung abgelaufen. Bitte erneut versuchen.';
+            return Response::redirect('/cases/' . rawurlencode($caseId) . '/review');
+        }
+
+        try {
+            $this->service()->confirmCoreReview(
+                $userId,
+                $caseId,
+                $request->input('acknowledge_warnings') === '1'
+            );
+            $_SESSION['case_message'] = 'Grunddaten wurden bestätigt. Der Vorgang ist bereit für die Beweiserfassung.';
+            return Response::redirect('/cases/' . rawurlencode($caseId));
+        } catch (\InvalidArgumentException|\DomainException|AuthorizationException $e) {
+            $_SESSION['case_error'] = $e->getMessage();
+            return Response::redirect('/cases/' . rawurlencode($caseId) . '/review');
+        }
     }
 
     private function mutate(Request $request, callable $operation): Response
@@ -209,7 +275,8 @@ final class CaseController
             new AuditLogger(
                 $this->app->database(),
                 (string) $this->app->config()->get('app.key', '')
-            )
+            ),
+            (string) $this->app->config()->get('app.timezone', 'Europe/Berlin')
         );
     }
 }
