@@ -29,10 +29,11 @@ final class CaseVersionRecorder
         );
         $hash = hash('sha256', $json);
 
-        for ($attempt = 0; $attempt < 2; $attempt++) {
+        $ownsTransaction = !$this->pdo->inTransaction();
+
+        for ($attempt = 0; $attempt < ($ownsTransaction ? 2 : 1); $attempt++) {
             try {
-                $started = !$this->pdo->inTransaction();
-                if ($started) {
+                if ($ownsTransaction) {
                     $this->pdo->beginTransaction();
                 }
 
@@ -62,7 +63,7 @@ final class CaseVersionRecorder
                     'created_by' => $actorId,
                 ]);
 
-                if ($started) {
+                if ($ownsTransaction) {
                     $this->pdo->commit();
                 }
 
@@ -74,11 +75,11 @@ final class CaseVersionRecorder
                     'snapshot_sha256' => $hash,
                 ];
             } catch (PDOException $e) {
-                if ($this->pdo->inTransaction()) {
+                if ($ownsTransaction && $this->pdo->inTransaction()) {
                     $this->pdo->rollBack();
                 }
 
-                if ($attempt === 0 && $e->getCode() === '23000') {
+                if ($ownsTransaction && $attempt === 0 && $e->getCode() === '23000') {
                     continue;
                 }
 
