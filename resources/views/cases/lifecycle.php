@@ -147,6 +147,7 @@ textarea{min-height:105px}button,.button{display:inline-block;margin-top:10px;pa
 <p class="<?= $row['integrity_valid']?'ok':'bad' ?>"><?= $row['integrity_valid']?'Integrität geprüft ✓':'Integritätsprüfung fehlgeschlagen' ?></p>
 <?php if($row['closure_note']):?><p><?= nl2br($e($row['closure_note'])) ?></p><?php endif;?>
 <p class="hash">SHA-256: <?= $e($row['dossier_sha256']) ?></p>
+<p><a class="button secondary" href="/cases/<?= rawurlencode($c['id']) ?>/lifecycle/closures/<?= rawurlencode($row['id']) ?>/export">Abschlussakte herunterladen</a></p>
 <p class="muted">Abgeschlossen: <?= $e($row['closed_at']) ?><?php if($row['archived_at']):?> · Archiviert: <?= $e($row['archived_at']) ?><?php endif;?></p>
 </div><?php endforeach;?>
 <?php endif;?></section>
