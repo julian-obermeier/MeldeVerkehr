@@ -64,7 +64,10 @@ if ($installerService->isInstalled()) {
     $app->router()->get('/cases/{id}', [$cases, 'show']);
     $app->router()->post('/cases/{id}/vehicle', [$cases, 'saveVehicle']);
     $app->router()->post('/cases/{id}/location', [$cases, 'saveLocation']);
+    $app->router()->post('/cases/{id}/observation', [$cases, 'saveObservation']);
     $app->router()->post('/cases/{id}/offense', [$cases, 'saveOffense']);
+    $app->router()->get('/cases/{id}/review', [$cases, 'review']);
+    $app->router()->post('/cases/{id}/review', [$cases, 'confirmReview']);
 
     $app->router()->get('/settings/security', [$security, 'index']);
     $app->router()->post('/settings/security/totp/start', [$security, 'startTotp']);
