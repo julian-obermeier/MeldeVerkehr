@@ -6,11 +6,15 @@ namespace MeldeVerkehr\Assist;
 
 final class HttpJsonVisionProvider implements VisionProviderInterface
 {
+    private readonly string $resolvedIp;
+    private readonly string $resolvedHost;
+    private readonly int $resolvedPort;
+
     public function __construct(
         private readonly string $endpoint,
         private readonly string $apiKey
     ) {
-        $this->assertEndpoint();
+        [$this->resolvedHost, $this->resolvedIp, $this->resolvedPort] = $this->assertEndpoint();
     }
 
     public function name(): string
@@ -86,6 +90,9 @@ final class HttpJsonVisionProvider implements VisionProviderInterface
             CURLOPT_PROTOCOLS => CURLPROTO_HTTPS,
             CURLOPT_REDIR_PROTOCOLS => CURLPROTO_HTTPS,
             CURLOPT_USERAGENT => 'MeldeVerkehr-Assist/1.0',
+            CURLOPT_RESOLVE => [
+                $this->resolvedHost . ':' . $this->resolvedPort . ':' . $this->resolvedIp,
+            ],
             CURLOPT_WRITEFUNCTION => static function ($handle, string $chunk) use (&$response, &$tooLarge): int {
                 if (strlen($response) + strlen($chunk) > 2 * 1024 * 1024) {
                     $tooLarge = true;
@@ -129,7 +136,7 @@ final class HttpJsonVisionProvider implements VisionProviderInterface
         }
     }
 
-    private function assertEndpoint(): void
+    private function assertEndpoint(): array
     {
         $parts = parse_url($this->endpoint);
 
@@ -154,6 +161,7 @@ final class HttpJsonVisionProvider implements VisionProviderInterface
             throw new \InvalidArgumentException('ASSIST_ENDPOINT konnte nicht aufgelöst werden.');
         }
 
+        $validated = [];
         foreach ($addresses as $address) {
             if (
                 filter_var(
@@ -164,6 +172,16 @@ final class HttpJsonVisionProvider implements VisionProviderInterface
             ) {
                 throw new \InvalidArgumentException('ASSIST_ENDPOINT löst auf eine private/reservierte Adresse auf.');
             }
+            $validated[] = $address;
         }
+
+        sort($validated, SORT_STRING);
+        $port = isset($parts['port']) ? (int) $parts['port'] : 443;
+
+        if ($port < 1 || $port > 65535) {
+            throw new \InvalidArgumentException('ASSIST_ENDPOINT verwendet einen ungültigen Port.');
+        }
+
+        return [$host, $validated[0], $port];
     }
 }
