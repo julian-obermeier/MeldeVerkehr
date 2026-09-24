@@ -14,6 +14,15 @@ final class AuthorityMessageClassifier
     {
         $text = mb_strtolower(trim($subject . "\n" . $body), 'UTF-8');
         $scores = [
+            'DELIVERY_FAILURE' => $this->score($text, [
+                'delivery status notification (failure)' => 8,
+                'mail delivery failed' => 8,
+                'undeliverable' => 7,
+                'zustellung fehlgeschlagen' => 8,
+                'unzustellbar' => 7,
+                'returned mail' => 6,
+                'recipient address rejected' => 8,
+            ]),
             'RECEIPT' => $this->score($text, [
                 'eingang bestätigt' => 5,
                 'eingangsbestätigung' => 5,
