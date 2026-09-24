@@ -693,6 +693,7 @@ final class CommunityController
                 'appeals' => $service->appealsQueue($userId),
                 'abuseFlags' => $service->abuseFlags($userId),
                 'escalations' => $service->escalations($userId),
+                'canResolveEscalations' => $service->canResolveEscalations($userId),
                 'csrf' => Csrf::token(),
                 'message' => $this->pullFlash('community_message'),
                 'error' => $this->pullFlash('community_error'),
