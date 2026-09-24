@@ -122,7 +122,7 @@ final class AuthorityExportService
             $xml .= "  <case>\n";
             foreach ($row as $key => $value) {
                 $tag = preg_replace('/[^a-z0-9_-]/i', '', (string) $key) ?: 'field';
-                $xml .= '    <' . $tag . '>' . $escape($value) . '</' . $tag . ">'\n";
+                $xml .= '    <' . $tag . '>' . $escape($value) . '</' . $tag . ">\n";
             }
             $xml .= "  </case>\n";
         }
