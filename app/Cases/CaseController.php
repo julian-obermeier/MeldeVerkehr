@@ -37,11 +37,17 @@ final class CaseController
         }
 
         $status = trim((string) $request->query('status', ''));
-        $cases = $this->service()->listOwned($userId, $status !== '' ? $status : null);
+        $search = trim((string) $request->query('q', ''));
+        $cases = $this->service()->listOwned(
+            $userId,
+            $status !== '' ? $status : null,
+            $search !== '' ? $search : null
+        );
 
         return Response::html($this->view->render('cases/index', [
             'cases' => $cases,
             'status' => $status,
+            'search' => $search,
             'statuses' => CaseStatus::all(),
             'csrf' => Csrf::token(),
         ]));
