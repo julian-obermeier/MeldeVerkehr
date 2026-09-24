@@ -10,4 +10,4 @@ $e=static fn(mixed $v):string=>htmlspecialchars((string)$v,ENT_QUOTES|ENT_SUBSTI
 <label>E-Mail</label><input type="email" name="email" value="<?= $e($email) ?>" autocomplete="email" required>
 <label>Passwort</label><input type="password" name="password" autocomplete="current-password" required>
 <button type="submit">Anmelden</button></form>
-<div class="links"><a href="/register">Registrieren</a><a href="/forgot-password">Passwort vergessen?</a></div></div></main><script src="/assets/app.js" defer></script></body></html>
+<div class="links"><a href="/register">Registrieren</a><a href="/passkey">Mit Passkey anmelden</a><a href="/forgot-password">Passwort vergessen?</a></div></div></main><script src="/assets/app.js" defer></script></body></html>
