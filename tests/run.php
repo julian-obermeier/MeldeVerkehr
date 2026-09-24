@@ -999,13 +999,24 @@ try {
         'Initial dry-run transport records Reply-To and Message-ID'
     );
 
+    $classifier = new AuthorityMessageClassifier('Europe/Berlin');
+    $bounceClassification = $classifier->classify(
+        'Mail delivery failed',
+        'Delivery Status Notification (Failure): recipient address rejected.',
+        '2026-09-24 08:20:00'
+    );
+    $assert(
+        ($bounceClassification['classification'] ?? null) === 'DELIVERY_FAILURE',
+        'Deterministic classifier recognizes delivery failure notices'
+    );
+
     $communicationStorage = new CommunicationStorage($basePath . '/storage/app');
     $communicationService = new CommunicationService(
         $pdo,
         $dispatchAuthorization,
         $caseService,
         $replyAddressService,
-        new AuthorityMessageClassifier('Europe/Berlin'),
+        $classifier,
         $witnessCipher,
         $communicationStorage,
         new AuditLogger($pdo, 'test-audit-key')
