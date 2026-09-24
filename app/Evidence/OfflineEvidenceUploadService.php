@@ -113,24 +113,53 @@ final class OfflineEvidenceUploadService
             )->execute(['id' => $clientUploadId]);
             $reservedEvidenceId = (string) $existing['reserved_evidence_id'];
         } else {
-            $reservedEvidenceId = Uuid::v4();
+            $candidateEvidenceId = Uuid::v4();
 
-            $this->pdo->prepare(
-                'INSERT INTO offline_evidence_uploads
+            $insert = $this->pdo->prepare(
+                'INSERT IGNORE INTO offline_evidence_uploads
                  (client_upload_id, user_id, case_id, reserved_evidence_id, client_sha256,
                   status, original_filename, category, created_at, updated_at)
                  VALUES
                  (:client_upload_id, :user_id, :case_id, :evidence_id, :sha256,
                   "PROCESSING", :filename, :category, UTC_TIMESTAMP(), UTC_TIMESTAMP())'
-            )->execute([
+            );
+            $insert->execute([
                 'client_upload_id' => $clientUploadId,
                 'user_id' => $userId,
                 'case_id' => $caseId,
-                'evidence_id' => $reservedEvidenceId,
+                'evidence_id' => $candidateEvidenceId,
                 'sha256' => $clientSha256,
                 'filename' => mb_substr(basename($originalName), 0, 255),
                 'category' => mb_substr(strtoupper(trim($category)), 0, 40),
             ]);
+
+            $persisted = $this->receipt($clientUploadId);
+            if ($persisted === null) {
+                throw new \RuntimeException('Offline-Upload konnte nicht reserviert werden.');
+            }
+            if (
+                (string) $persisted['user_id'] !== $userId
+                || (string) $persisted['case_id'] !== $caseId
+                || !hash_equals((string) $persisted['client_sha256'], $clientSha256)
+            ) {
+                throw new \DomainException('Diese lokale Upload-ID ist bereits anderweitig vergeben.');
+            }
+
+            $reservedEvidenceId = (string) $persisted['reserved_evidence_id'];
+
+            if ($insert->rowCount() === 0) {
+                $recovered = $this->evidence->findOwned($userId, $reservedEvidenceId);
+                if (is_array($recovered)) {
+                    $this->markDone($clientUploadId);
+                    return [
+                        'duplicate' => true,
+                        'receipt_status' => 'DONE',
+                        'evidence' => $recovered,
+                    ];
+                }
+
+                throw new \DomainException('Dieser Offline-Upload wird bereits verarbeitet.');
+            }
         }
 
         try {
