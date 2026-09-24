@@ -197,7 +197,11 @@ final class EvidenceService
                     EXISTS(
                         SELECT 1 FROM evidence_versions w
                         WHERE w.evidence_id = e.id AND w.variant = "WORKING"
-                    ) AS has_working_copy
+                    ) AS has_working_copy,
+                    EXISTS(
+                        SELECT 1 FROM evidence_privacy_reviews pr
+                        WHERE pr.evidence_id = e.id
+                    ) AS privacy_reviewed
              FROM evidence_items e
              INNER JOIN evidence_versions v
                ON v.evidence_id = e.id AND v.variant = "ORIGINAL" AND v.version_no = 1
@@ -251,11 +255,7 @@ final class EvidenceService
 
         $this->authorization->authorize($userId, 'evidence.upload', (string) $row['user_id']);
 
-        if (!in_array($row['case_status'], [
-            CaseStatus::WAITING_FOR_EVIDENCE,
-            CaseStatus::READY_FOR_REVIEW,
-            CaseStatus::REVIEW_REQUIRED,
-        ], true)) {
+        if ($row['case_status'] !== CaseStatus::WAITING_FOR_EVIDENCE) {
             throw new \DomainException('Nachweis kann in diesem Vorgangsstatus nicht entfernt werden.');
         }
 
