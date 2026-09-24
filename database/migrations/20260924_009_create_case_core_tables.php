@@ -115,13 +115,24 @@ return new class implements MigrationInterface {
         );
 
         $pdo->exec(
+            'CREATE TABLE IF NOT EXISTS offense_categories (
+                category_key VARCHAR(80) NOT NULL PRIMARY KEY,
+                label VARCHAR(120) NOT NULL,
+                sort_order INT NOT NULL DEFAULT 0,
+                active TINYINT(1) NOT NULL DEFAULT 1
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+
+        $pdo->exec(
             'CREATE TABLE IF NOT EXISTS offenses (
                 id CHAR(36) NOT NULL PRIMARY KEY,
                 stable_key VARCHAR(120) NOT NULL UNIQUE,
-                category VARCHAR(120) NOT NULL,
+                category_key VARCHAR(80) NOT NULL,
                 active TINYINT(1) NOT NULL DEFAULT 1,
                 created_at DATETIME NOT NULL,
-                updated_at DATETIME NOT NULL
+                updated_at DATETIME NOT NULL,
+                INDEX idx_offenses_category (category_key),
+                CONSTRAINT fk_offenses_category FOREIGN KEY (category_key) REFERENCES offense_categories(category_key) ON DELETE RESTRICT
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
         );
 
@@ -173,6 +184,7 @@ return new class implements MigrationInterface {
         $pdo->exec('DROP TABLE IF EXISTS case_offenses');
         $pdo->exec('DROP TABLE IF EXISTS offense_versions');
         $pdo->exec('DROP TABLE IF EXISTS offenses');
+        $pdo->exec('DROP TABLE IF EXISTS offense_categories');
         $pdo->exec('DROP TABLE IF EXISTS locations');
         $pdo->exec('DROP TABLE IF EXISTS vehicles');
         $pdo->exec('DROP TABLE IF EXISTS case_timeline');
