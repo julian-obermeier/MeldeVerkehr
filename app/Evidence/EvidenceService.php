@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MeldeVerkehr\Evidence;
 
+use MeldeVerkehr\Assist\ImageQualityAnalyzer;
 use MeldeVerkehr\Audit\AuditLogger;
 use MeldeVerkehr\Auth\AuthorizationService;
 use MeldeVerkehr\Cases\CaseStatus;
@@ -21,7 +22,8 @@ final class EvidenceService
         private readonly AuthorizationService $authorization,
         private readonly EvidenceStorage $storage,
         private readonly AuditLogger $audit,
-        private readonly ?EvidenceImageProcessor $processor = null
+        private readonly ?EvidenceImageProcessor $processor = null,
+        private readonly ?ImageQualityAnalyzer $qualityAnalyzer = null
     ) {
     }
 
@@ -82,6 +84,25 @@ final class EvidenceService
         } catch (Throwable $e) {
             $this->storage->deletePhysical((string) $stored['relative_path']);
             throw $e;
+        }
+
+        $qualityMetrics = null;
+        $qualityVariant = is_array($working) ? 'WORKING' : 'ORIGINAL';
+        $qualityRelativePath = is_array($working)
+            ? (string) $working['relative_path']
+            : (string) $stored['relative_path'];
+
+        try {
+            $qualityMetrics = $this->qualityAnalyzer?->analyze(
+                $this->storage->absolute($qualityRelativePath),
+                $mime
+            );
+        } catch (Throwable) {
+            $qualityMetrics = null;
+        }
+
+        if (is_array($qualityMetrics)) {
+            $quality = (string) $qualityMetrics['overall_state'];
         }
 
         try {
@@ -153,6 +174,47 @@ final class EvidenceService
                     'sha256' => $working['sha256'],
                     'width' => $working['width'],
                     'height' => $working['height'],
+                ]);
+            }
+
+            if (is_array($qualityMetrics)) {
+                $qualityStmt = $this->pdo->prepare(
+                    'INSERT INTO evidence_quality_metrics
+                     (id, evidence_id, version_no, source_variant, width, height,
+                      brightness_mean, contrast_stddev, sharpness_score,
+                      resolution_state, brightness_state, contrast_state, sharpness_state,
+                      overall_state, metrics_json, created_at)
+                     VALUES
+                     (:id, :evidence_id, 1, :source_variant, :width, :height,
+                      :brightness_mean, :contrast_stddev, :sharpness_score,
+                      :resolution_state, :brightness_state, :contrast_state, :sharpness_state,
+                      :overall_state, :metrics_json, UTC_TIMESTAMP())'
+                );
+                $qualityStmt->execute([
+                    'id' => Uuid::v4(),
+                    'evidence_id' => $evidenceId,
+                    'source_variant' => $qualityVariant,
+                    'width' => $qualityMetrics['width'],
+                    'height' => $qualityMetrics['height'],
+                    'brightness_mean' => $qualityMetrics['brightness_mean'],
+                    'contrast_stddev' => $qualityMetrics['contrast_stddev'],
+                    'sharpness_score' => $qualityMetrics['sharpness_score'],
+                    'resolution_state' => $qualityMetrics['resolution_state'],
+                    'brightness_state' => $qualityMetrics['brightness_state'],
+                    'contrast_state' => $qualityMetrics['contrast_state'],
+                    'sharpness_state' => $qualityMetrics['sharpness_state'],
+                    'overall_state' => $qualityMetrics['overall_state'],
+                    'metrics_json' => json_encode(
+                        $qualityMetrics,
+                        JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+                    ),
+                ]);
+
+                $this->event($evidenceId, 'QUALITY_METRICS_ANALYZED', $userId, [
+                    'source_variant' => $qualityVariant,
+                    'overall_state' => $qualityMetrics['overall_state'],
+                    'algorithm' => $qualityMetrics['algorithm'],
+                    'warnings' => $qualityMetrics['warnings'],
                 ]);
             }
 
