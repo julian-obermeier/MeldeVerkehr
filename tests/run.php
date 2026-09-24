@@ -122,12 +122,11 @@ try {
     $offenseId = Uuid::v4();
     $offenseVersionId = Uuid::v4();
     $pdo->prepare(
-        'INSERT INTO offenses (id, stable_key, category, active, created_at, updated_at)
-         VALUES (:id, :stable_key, :category, 1, UTC_TIMESTAMP(), UTC_TIMESTAMP())'
+        'INSERT INTO offenses (id, stable_key, category_key, active, created_at, updated_at)
+         VALUES (:id, :stable_key, "OTHER", 1, UTC_TIMESTAMP(), UTC_TIMESTAMP())'
     )->execute([
         'id' => $offenseId,
         'stable_key' => 'TEST_CONCRETE_OFFENSE_' . bin2hex(random_bytes(4)),
-        'category' => 'Test',
     ]);
     $pdo->prepare(
         'INSERT INTO offense_versions
