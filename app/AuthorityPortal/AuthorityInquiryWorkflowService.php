@@ -218,14 +218,14 @@ final class AuthorityInquiryWorkflowService
             ]);
 
             $this->pdo->prepare(
-                'UPDATE authority_portal_inquiries
-                 SET status = :status,
-                     answered_at = CASE WHEN :status = "CLOSED" THEN UTC_TIMESTAMP() ELSE NULL END
-                 WHERE id = :id'
-            )->execute([
-                'status' => $inquiryStatus,
-                'id' => $inquiryId,
-            ]);
+                $decision === 'ACCEPT'
+                    ? 'UPDATE authority_portal_inquiries
+                       SET status = "CLOSED", answered_at = UTC_TIMESTAMP()
+                       WHERE id = :id'
+                    : 'UPDATE authority_portal_inquiries
+                       SET status = "REVISION_REQUIRED", answered_at = NULL
+                       WHERE id = :id'
+            )->execute(['id' => $inquiryId]);
 
             if (!empty($inquiry['case_task_id']) && $decision === 'REVISION_REQUIRED') {
                 $this->pdo->prepare(
