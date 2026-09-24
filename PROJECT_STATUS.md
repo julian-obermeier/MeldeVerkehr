@@ -1,10 +1,10 @@
 # Projektstatus
 
 ## Aktuelle Version
-0.16.0-dev
+0.17.0-dev
 
 ## Phase
-M16 – Authority Inquiry Workflow
+M17 – Community Social
 
 ## Integrierter Stand bis M13
 Fundament, Vorgangskern, Beweissystem, Zeugenbericht/Final Review, Behördenrouting/Dispatch, Behördenkommunikation, intelligente Assistenz, private Karten/Analytics, Community, Suche/Dokumentcenter/Notifications/Exporte/Retention, Behördenportal/API Produktionshärtung/Release-Operations sowie M13-Vorgangsversionierung und Lifecycle sind auf `develop` integriert.
@@ -31,7 +31,7 @@ Fundament, Vorgangskern, Beweissystem, Zeugenbericht/Final Review, Behördenrout
 - Integrationstests für Versionierung, Nachträge, Korrekturen, Rücknahmen, Abschluss, Export, Ownership und Archivierung
 
 ## Synchronisationshinweis Zielserver
-Der Entwicklungsstand auf `develop` enthält bereits die Migrationen `020`, `021` und `022`. Ein Server, der nur bis Migration `019` anzeigt, ist nicht auf dem aktuellen Repository-Stand. Vor Funktionstests muss deshalb zuerst der aktuelle Entwicklungsstand sauber deployed und anschließend der Migrationslauf ausgeführt werden. M13 ergänzt Migration `023`; M14 Migration `024`; M15 Migration `025`; M16 Migration `026`.
+Der Entwicklungsstand auf `develop` enthält bereits die Migrationen `020`, `021` und `022`. Ein Server, der nur bis Migration `019` anzeigt, ist nicht auf dem aktuellen Repository-Stand. Vor Funktionstests muss deshalb zuerst der aktuelle Entwicklungsstand sauber deployed und anschließend der Migrationslauf ausgeführt werden. M13 ergänzt Migration `023`; M14 Migration `024`; M15 Migration `025`; M16 Migration `026`; M17 Migration `027`.
 
 ## M14 – in `develop` integriert
 - Appeals/Einsprüche für HIDE, WARN und RESTRICT
@@ -65,8 +65,20 @@ Der Entwicklungsstand auf `develop` enthält bereits die Migrationen `020`, `021
 - Auditlogging für Einreichung und behördliche Prüfung
 - neue Migration `20260924_026_create_authority_inquiry_response_tables.php`
 
+## M17 – auf Feature-Branch umgesetzt
+- Follower-Beziehungen zwischen Community-Profilen inklusive Follow/Unfollow und Netzwerkansicht
+- Follower-/Following-Zähler auf Profilen
+- Blockierungen verhindern neue Follow-Beziehungen und filtern Netzwerklisten
+- Favoriten für Community-Beiträge inklusive eigener Favoritenansicht
+- Favoritenaktionen direkt im Feed und in der Beitragsdetailansicht
+- Gruppenchat ausschließlich für aktive Gruppenmitglieder
+- Gruppennachrichten verschlüsselt gespeichert und per SHA-256 auf Integrität geprüft
+- Gruppenchat nutzt bestehende Messaging-Berechtigung und Anti-Spam-/Bot-Signale
+- Auditlogging für Follow-, Favoriten- und Gruppenchat-Aktionen
+- Integrationstests für Follow, Favoriten und verschlüsselten Gruppenchat
+- neue Migration `20260924_027_create_community_social_tables.php`
+
 ## Noch offen vor 1.0.0
-- Community um Follower, Favoriten und Gruppenchat ergänzen
 - Notification-Präferenzen als vollständige UI bereitstellen und mit E-Mail/Push verbinden
 - kontrollierte IndexedDB-Queue für Offline-Evidence evaluieren/umsetzen
 - Inline-CSS/JS aus Legacy-Views entfernen und CSP anschließend ohne `unsafe-inline` betreiben
@@ -85,6 +97,6 @@ Der Entwicklungsstand auf `develop` enthält bereits die Migrationen `020`, `021
 - Production darf nicht mit `APP_DEBUG=true` als release-ready gelten.
 
 ## Release-Status
-`0.16.0-dev` ist noch kein Stable-Release. Nach Integration von M16 müssen die verbleibenden 1.0-Punkte umgesetzt, CI vollständig ausgeführt und das Release-/Restore-Runbook auf der Zielumgebung erfolgreich durchgespielt werden.
+`0.17.0-dev` ist noch kein Stable-Release. Nach Integration von M17 müssen die verbleibenden 1.0-Punkte umgesetzt, CI vollständig ausgeführt und das Release-/Restore-Runbook auf der Zielumgebung erfolgreich durchgespielt werden.
 
 Siehe `docs/RELEASE_RUNBOOK.md`.
