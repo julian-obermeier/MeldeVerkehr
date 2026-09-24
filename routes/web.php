@@ -5,6 +5,9 @@ declare(strict_types=1);
 use MeldeVerkehr\Admin\AdminController;
 use MeldeVerkehr\Auth\AuthController;
 use MeldeVerkehr\Auth\DashboardController;
+use MeldeVerkehr\Auth\PasskeyLoginController;
+use MeldeVerkehr\Auth\SecurityController;
+use MeldeVerkehr\Auth\TwoFactorController;
 use MeldeVerkehr\Core\Application;
 use MeldeVerkehr\Http\Request;
 use MeldeVerkehr\Http\Response;
@@ -26,12 +29,22 @@ if ($installerService->isInstalled()) {
     $auth = new AuthController($app);
     $dashboard = new DashboardController($app);
     $admin = new AdminController($app);
+    $twoFactor = new TwoFactorController($app);
+    $security = new SecurityController($app);
+    $passkeyLogin = new PasskeyLoginController($app);
 
     $app->router()->get('/register', [$auth, 'registerForm']);
     $app->router()->post('/register', [$auth, 'register']);
     $app->router()->get('/login', [$auth, 'loginForm']);
     $app->router()->post('/login', [$auth, 'login']);
     $app->router()->post('/logout', [$auth, 'logout']);
+
+    $app->router()->get('/passkey', [$passkeyLogin, 'page']);
+    $app->router()->get('/passkey/login/options', [$passkeyLogin, 'options']);
+    $app->router()->post('/passkey/login', [$passkeyLogin, 'login']);
+
+    $app->router()->get('/two-factor', [$twoFactor, 'form']);
+    $app->router()->post('/two-factor', [$twoFactor, 'verify']);
 
     $app->router()->get('/verify-email', [$auth, 'verify']);
     $app->router()->get('/verify-email/pending', [$auth, 'verificationPending']);
@@ -43,6 +56,15 @@ if ($installerService->isInstalled()) {
     $app->router()->post('/reset-password', [$auth, 'reset']);
 
     $app->router()->get('/dashboard', [$dashboard, 'index']);
+
+    $app->router()->get('/settings/security', [$security, 'index']);
+    $app->router()->post('/settings/security/totp/start', [$security, 'startTotp']);
+    $app->router()->post('/settings/security/totp/confirm', [$security, 'confirmTotp']);
+    $app->router()->post('/settings/security/totp/disable', [$security, 'disableTotp']);
+    $app->router()->get('/settings/security/passkeys/options', [$security, 'passkeyOptions']);
+    $app->router()->post('/settings/security/passkeys/register', [$security, 'registerPasskey']);
+    $app->router()->post('/settings/security/passkeys/delete', [$security, 'deletePasskey']);
+
     $app->router()->get('/admin', [$admin, 'index']);
 }
 

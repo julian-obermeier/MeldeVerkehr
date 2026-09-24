@@ -5,6 +5,15 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 ## [Unreleased]
 
 ### Added
+- resource-basierte AuthorizationService-Grundlage mit Ownership-Prüfung
+- TOTP-Zwei-Faktor-Authentifizierung nach RFC 6238
+- verschlüsselte TOTP-Secrets und gehashte Recovery-Codes
+- Passkeys/WebAuthn mit ES256/P-256
+- dedizierte Passkey-Anmeldung
+- Sicherheitsseite für TOTP- und Passkey-Verwaltung
+- frische Re-Authentication für sensible Sicherheitsänderungen
+- aktionsorientiertes Bürger-Dashboard mit Sicherheitsstatus
+- Tests für Ownership, Secret-Verschlüsselung, TOTP-RFC-Vektor und WebAuthn-Helfer
 - Admin-Systemdashboard mit Benutzer-, DB-, Queue-, Cron- und Audit-Status
 - PWA-Manifest, Service Worker, Offline-Fallback und SVG-App-Icon
 - sicherer Static-Cache ohne Speicherung privater Navigationsantworten
@@ -36,6 +45,8 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 - CSRF-Schutz für Installations- und Authentifizierungsformulare
 
 ### Changed
+- Passwort-Login fordert bei aktivem TOTP vor Sessionfreigabe den zweiten Faktor
+- Passkey-Login wird bei aktivem TOTP ebenfalls um den zweiten Faktor ergänzt
 - Dashboard zeigt Administration nur bei serverseitig bestätigter `admin.system`-Permission
 - Bootstrap lädt zentrale Anwendungskonfiguration und sichere Sessionparameter
 - Application stellt Datenbankverbindung lazy bereit
@@ -49,6 +60,11 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 - native Mailheader werden gegen Zeilenumbrüche abgesichert und UTF-8-Betreffzeilen kodiert
 
 ### Security
+- TOTP-Secrets werden mit AES-256-GCM verschlüsselt gespeichert
+- Recovery-Codes werden ausschließlich gehasht gespeichert und nach Nutzung entfernt
+- WebAuthn prüft Challenge, Origin, RP-ID-Hash, User Presence, User Verification und Signatur
+- Passkey- und TOTP-Anmeldeversuche sind rate-limited
+- sensible Änderungen an TOTP/Passkeys verlangen eine frische Anmeldung
 - Audit-Einträge werden mit dem APP_KEY per HMAC signiert
 - Audit-Metadaten speichern IP- und User-Agent-Bezug nur gehasht
 - Installer wird nach erfolgreicher Installation dauerhaft gesperrt

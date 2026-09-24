@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace MeldeVerkehr\Auth;
 
+use MeldeVerkehr\Auth\WebAuthn\WebAuthnService;
 use MeldeVerkehr\Core\Application;
 use MeldeVerkehr\Http\Request;
 use MeldeVerkehr\Http\Response;
 use MeldeVerkehr\Security\Csrf;
+use MeldeVerkehr\Security\SecretCipher;
 use MeldeVerkehr\Support\View;
 
 final class DashboardController
@@ -41,11 +43,22 @@ final class DashboardController
         }
 
         $permissions = new PermissionService($this->app->database());
+        $twoFactor = new TwoFactorService(
+            $this->app->database(),
+            new SecretCipher((string) $this->app->config()->get('app.key', ''))
+        );
+        $passkeys = (new WebAuthnService(
+            $this->app->database(),
+            (string) $this->app->config()->get('app.url', ''),
+            (string) $this->app->config()->get('app.name', 'MeldeVerkehr')
+        ))->listForUser($id);
 
         return Response::html($this->view->render('dashboard/index', [
             'user' => $user,
             'csrf' => Csrf::token(),
             'canAdmin' => $permissions->can($id, 'admin.system'),
+            'totpEnabled' => $twoFactor->enabled($id),
+            'passkeyCount' => count($passkeys),
         ]));
     }
 }
