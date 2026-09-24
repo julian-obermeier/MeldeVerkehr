@@ -119,14 +119,33 @@ try {
     $afterLocation = $caseService->findOwned((string) $user['id'], $caseId);
     $assert(($afterLocation['location']['city'] ?? null) === 'Gießen', 'Location saved');
 
+    $plateSearch = $caseService->listOwned((string) $user['id'], null, 'GI-AB 123');
+    $assert(
+        count(array_filter(
+            $plateSearch,
+            static fn(array $row): bool => ($row['id'] ?? null) === $caseId
+        )) === 1,
+        'Own case searchable by plate hash'
+    );
+
+    $locationSearch = $caseService->listOwned((string) $user['id'], null, 'Teststraße');
+    $assert(
+        count(array_filter(
+            $locationSearch,
+            static fn(array $row): bool => ($row['id'] ?? null) === $caseId
+        )) === 1,
+        'Own case searchable by location'
+    );
+
     $offenseId = Uuid::v4();
     $offenseVersionId = Uuid::v4();
+    $testStableKey = 'TEST_CONCRETE_OFFENSE_' . bin2hex(random_bytes(4));
     $pdo->prepare(
         'INSERT INTO offenses (id, stable_key, category_key, active, created_at, updated_at)
          VALUES (:id, :stable_key, "OTHER", 1, UTC_TIMESTAMP(), UTC_TIMESTAMP())'
     )->execute([
         'id' => $offenseId,
-        'stable_key' => 'TEST_CONCRETE_OFFENSE_' . bin2hex(random_bytes(4)),
+        'stable_key' => $testStableKey,
     ]);
     $pdo->prepare(
         'INSERT INTO offense_versions
@@ -141,7 +160,33 @@ try {
         'offense_id' => $offenseId,
     ]);
 
-    $caseService->setPrimaryOffense((string) $user['id'], $caseId, $offenseVersionId);
+    $newerVersionId = Uuid::v4();
+    $pdo->prepare(
+        'INSERT INTO offense_versions
+         (id, offense_id, version, code, title, description, legal_reference, fine_amount, points,
+          duration_requirement, requires_sign, requires_duration, supports_obstruction,
+          supports_endangerment, supports_damage, valid_from, valid_until, created_at)
+         VALUES
+         (:id, :offense_id, 2, NULL, "Testtatbestand Version 2", "Nur automatisierter Test.", NULL, NULL, NULL,
+          NULL, 0, 0, 0, 0, 0, NULL, NULL, UTC_TIMESTAMP())'
+    )->execute([
+        'id' => $newerVersionId,
+        'offense_id' => $offenseId,
+    ]);
+
+    $available = $caseService->availableOffenses();
+    $matchingVersions = array_values(array_filter(
+        $available,
+        static function (array $row) use ($testStableKey): bool {
+            return ($row['stable_key'] ?? null) === $testStableKey;
+        }
+    ));
+    $assert(
+        count($matchingVersions) === 1 && (int) $matchingVersions[0]['version'] === 2,
+        'Available offenses expose latest version only'
+    );
+
+    $caseService->setPrimaryOffense((string) $user['id'], $caseId, $newerVersionId);
     $afterOffense = $caseService->findOwned((string) $user['id'], $caseId);
     $assert(
         ($afterOffense['case']['status'] ?? null) === CaseStatus::WAITING_FOR_EVIDENCE,
