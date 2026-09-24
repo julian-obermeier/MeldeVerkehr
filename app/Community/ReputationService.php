@@ -371,10 +371,11 @@ final class ReputationService
                 'INSERT INTO reputation_event_details
                  (event_id, requested_points, effective_points, multiplier,
                   daily_points_before, daily_points_after, created_at)
-                 VALUES (:event_id, :points, :points, 1.00, 0, 0, UTC_TIMESTAMP())'
+                 VALUES (:event_id, :requested_points, :effective_points, 1.00, 0, 0, UTC_TIMESTAMP())'
             )->execute([
                 'event_id' => $eventId,
-                'points' => $points,
+                'requested_points' => $points,
+                'effective_points' => $points,
             ]);
 
             $this->pdo->prepare(
