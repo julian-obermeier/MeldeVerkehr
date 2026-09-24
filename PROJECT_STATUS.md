@@ -22,31 +22,30 @@ M1 – Fundament
 - zweistufiger Webinstaller unter /install
 - Registrierung, Login/Logout, E-Mail-Verifikation und Passwort-Reset
 - DB-basiertes Login-Rate-Limiting
-- Rollen/Permissions-Grundlage und PermissionService
+- Rollen/Permissions inklusive resource-basierter Ownership-Autorisierung
 - HMAC-signiertes, verkettetes Audit-System
 - DB-basierte Jobqueue mit Locking, Retry und Backoff
 - Cron-Registry mit Heartbeat-/Run-Historie
 - Admin-Systemdashboard mit DB-, Queue-, Cron- und Audit-Status
+- aktionsorientiertes Bürger-Dashboard-Grundgerüst
 - PWA-Manifest, Service Worker, Offline-Fallback und App-Icon
 - datenschutzfreundliche Cache-Strategie ohne Caching privater Navigationsantworten
-- MySQL-Integrationstests für Migrationen, Auth, Permissions, Rate-Limit, Audit und Queue
+- TOTP-Zwei-Faktor-Authentifizierung mit verschlüsseltem Secret und Einmal-Recovery-Codes
+- Passkeys/WebAuthn mit ES256/P-256, RP-ID-/Origin-/Challenge-/Signaturprüfung
+- frische Re-Authentication für sensible Sicherheitseinstellungen
+- Rate-Limits für Passwort-, TOTP- und Passkey-Anmeldung
+- MySQL-Integrationstests plus zusätzliche Tests für Ownership, TOTP, Secret-Verschlüsselung und WebAuthn-Helfer
 
-## In Arbeit
-- Ausbau des Rollen-/Permission-Systems für resource-basierte Policies/Ownership
-- vollständiges Bürger-Dashboard
-- Passkeys/TOTP
-
-## Offen in M1
-- vollständige resource-basierte Policies/Ownership-Prüfungen
-- vollständiges aktionsorientiertes Bürger-Dashboard
-- Passkeys und TOTP
+## M1-Status
+M1 – Fundament ist technisch abgeschlossen. Die fachlichen Vorgangsdaten beginnen in M2.
 
 ## Bekannte Einschränkungen
-- Der Router unterstützt aktuell nur exakt registrierte Pfade.
+- Der Router unterstützt aktuell nur exakt registrierte Pfade; dynamische Parameter folgen mit M2.
 - Der aktuelle E-Mail-Transport verwendet PHP mail(); konfigurierbares SMTP folgt mit dem Kommunikations-/Mail-Ausbau.
-- Das Bürger-Dashboard enthält noch keine echten Vorgänge; diese beginnen in M2.
+- Das Bürger-Dashboard zeigt noch keine Vorgangszahlen, da die Case-Tabellen erst in M2 entstehen.
 - Die Queue besitzt Infrastruktur, fachliche Job-Handler folgen mit den jeweiligen Modulen.
 - PWA-Offlinedaten/IndexedDB für Meldungsentwürfe folgen mit dem Meldeworkflow.
+- WebAuthn unterstützt in M1 gezielt ES256/P-256; weitere Algorithmen können später ergänzt werden.
 
 ## Nächster Schritt
-M1 abschließen: resource-basierte Authorization-Grundlage, Dashboard-Struktur und optionale Passkeys/TOTP vorbereiten; anschließend M2 – Bürgerportal/Vorgänge starten.
+M2 – Bürgerportal/Vorgänge: Case-Modell, Statusmaschine, Fahrzeug, Standort, Tatbestände und adaptiver Melde-Wizard.
