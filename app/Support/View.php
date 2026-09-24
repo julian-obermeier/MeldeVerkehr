@@ -6,8 +6,11 @@ namespace MeldeVerkehr\Support;
 
 final class View
 {
+    private readonly ViewStyleCompiler $styles;
+
     public function __construct(private readonly string $basePath)
     {
+        $this->styles = new ViewStyleCompiler($basePath);
     }
 
     public function render(string $template, array $viewData = []): string
@@ -22,7 +25,8 @@ final class View
 
         ob_start();
         require $path;
+        $html = (string) ob_get_clean();
 
-        return (string) ob_get_clean();
+        return $this->styles->externalize($html, $template);
     }
 }
