@@ -54,9 +54,12 @@ final class SecurityController
 
         $user = $this->currentUser();
 
-        if ($user === null || !$this->reauthenticate($user, (string) $request->input('password', ''))) {
-            $_SESSION['security_error'] = 'Aktuelles Passwort ist nicht korrekt.';
-            return Response::redirect('/settings/security');
+        if ($user === null) {
+            return Response::redirect('/login');
+        }
+
+        if (!$this->auth->recentlyAuthenticated()) {
+            return $this->requireFreshLogin();
         }
 
         $setup = $this->totp()->beginSetup(
@@ -106,9 +109,12 @@ final class SecurityController
 
         $user = $this->currentUser();
 
-        if ($user === null || !$this->reauthenticate($user, (string) $request->input('password', ''))) {
-            $_SESSION['security_error'] = 'Aktuelles Passwort ist nicht korrekt.';
-            return Response::redirect('/settings/security');
+        if ($user === null) {
+            return Response::redirect('/login');
+        }
+
+        if (!$this->auth->recentlyAuthenticated()) {
+            return $this->requireFreshLogin();
         }
 
         $this->totp()->disable((string) $user['id']);
@@ -146,8 +152,11 @@ final class SecurityController
             return Response::json(['success' => false, 'errors' => ['Nicht angemeldet.']], 401);
         }
 
-        if (!$this->reauthenticate($user, (string) $request->input('password', ''))) {
-            return Response::json(['success' => false, 'errors' => ['Aktuelles Passwort ist nicht korrekt.']], 422);
+        if (!$this->auth->recentlyAuthenticated()) {
+            return Response::json([
+                'success' => false,
+                'errors' => ['Bitte melde dich erneut an, bevor du einen Passkey hinzufügst.']
+            ], 401);
         }
 
         try {
@@ -184,9 +193,12 @@ final class SecurityController
 
         $user = $this->currentUser();
 
-        if ($user === null || !$this->reauthenticate($user, (string) $request->input('password', ''))) {
-            $_SESSION['security_error'] = 'Aktuelles Passwort ist nicht korrekt.';
-            return Response::redirect('/settings/security');
+        if ($user === null) {
+            return Response::redirect('/login');
+        }
+
+        if (!$this->auth->recentlyAuthenticated()) {
+            return $this->requireFreshLogin();
         }
 
         $id = trim((string) $request->input('passkey_id', ''));
@@ -209,10 +221,12 @@ final class SecurityController
         return $id === null ? null : (new AuthService($this->app->database()))->findById($id);
     }
 
-    private function reauthenticate(array $user, string $password): bool
+    private function requireFreshLogin(): Response
     {
-        return (new AuthService($this->app->database()))
-            ->authenticate((string) $user['email'], $password) !== null;
+        $_SESSION['flash_auth'] = 'Bitte melde dich erneut an, um die Sicherheitseinstellungen zu ändern.';
+        $this->auth->logout();
+
+        return Response::redirect('/login');
     }
 
     private function totp(): TwoFactorService
