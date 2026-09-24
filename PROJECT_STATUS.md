@@ -1,10 +1,10 @@
 # Projektstatus
 
 ## Aktuelle Version
-0.15.0-dev
+0.16.0-dev
 
 ## Phase
-M15 – Reputation & Governance
+M16 – Authority Inquiry Workflow
 
 ## Integrierter Stand bis M13
 Fundament, Vorgangskern, Beweissystem, Zeugenbericht/Final Review, Behördenrouting/Dispatch, Behördenkommunikation, intelligente Assistenz, private Karten/Analytics, Community, Suche/Dokumentcenter/Notifications/Exporte/Retention, Behördenportal/API Produktionshärtung/Release-Operations sowie M13-Vorgangsversionierung und Lifecycle sind auf `develop` integriert.
@@ -31,7 +31,7 @@ Fundament, Vorgangskern, Beweissystem, Zeugenbericht/Final Review, Behördenrout
 - Integrationstests für Versionierung, Nachträge, Korrekturen, Rücknahmen, Abschluss, Export, Ownership und Archivierung
 
 ## Synchronisationshinweis Zielserver
-Der Entwicklungsstand auf `develop` enthält bereits die Migrationen `020`, `021` und `022`. Ein Server, der nur bis Migration `019` anzeigt, ist nicht auf dem aktuellen Repository-Stand. Vor Funktionstests muss deshalb zuerst der aktuelle Entwicklungsstand sauber deployed und anschließend der Migrationslauf ausgeführt werden. M13 ergänzt Migration `023`; M14 Migration `024`; M15 Migration `025`.
+Der Entwicklungsstand auf `develop` enthält bereits die Migrationen `020`, `021` und `022`. Ein Server, der nur bis Migration `019` anzeigt, ist nicht auf dem aktuellen Repository-Stand. Vor Funktionstests muss deshalb zuerst der aktuelle Entwicklungsstand sauber deployed und anschließend der Migrationslauf ausgeführt werden. M13 ergänzt Migration `023`; M14 Migration `024`; M15 Migration `025`; M16 Migration `026`.
 
 ## M14 – in `develop` integriert
 - Appeals/Einsprüche für HIDE, WARN und RESTRICT
@@ -55,8 +55,17 @@ Der Entwicklungsstand auf `develop` enthält bereits die Migrationen `020`, `021
 - Admin-Oberfläche für Regeln, Anomalien und Korrekturen
 - Integrationstests für Governance-Regeln
 
+## M16 – auf Feature-Branch umgesetzt
+- strukturierte Behördenanfragen werden Bürgern im jeweiligen Vorgang angezeigt
+- Bürgerantworten werden verschlüsselt, SHA-256-geprüft und versioniert gespeichert
+- Statusfluss OPEN/REVISION_REQUIRED → AWAITING_REVIEW → CLOSED
+- Behörde kann Antworten annehmen oder mit Prüfvermerk zur Überarbeitung zurückgeben
+- zugehörige Aufgaben werden bei Einreichung erledigt und bei Überarbeitungsbedarf wieder geöffnet
+- getrennte Bürger- und Behördenoberflächen
+- Auditlogging für Einreichung und behördliche Prüfung
+- neue Migration `20260924_026_create_authority_inquiry_response_tables.php`
+
 ## Noch offen vor 1.0.0
-- Authority-Inquiry-End-to-End-Workflow bis Bürgerantwort und behördlicher Prüfung abschließen
 - Community um Follower, Favoriten und Gruppenchat ergänzen
 - Notification-Präferenzen als vollständige UI bereitstellen und mit E-Mail/Push verbinden
 - kontrollierte IndexedDB-Queue für Offline-Evidence evaluieren/umsetzen
@@ -76,6 +85,6 @@ Der Entwicklungsstand auf `develop` enthält bereits die Migrationen `020`, `021
 - Production darf nicht mit `APP_DEBUG=true` als release-ready gelten.
 
 ## Release-Status
-`0.15.0-dev` ist noch kein Stable-Release. Nach Integration von M15 müssen die verbleibenden 1.0-Punkte umgesetzt, CI vollständig ausgeführt und das Release-/Restore-Runbook auf der Zielumgebung erfolgreich durchgespielt werden.
+`0.16.0-dev` ist noch kein Stable-Release. Nach Integration von M16 müssen die verbleibenden 1.0-Punkte umgesetzt, CI vollständig ausgeführt und das Release-/Restore-Runbook auf der Zielumgebung erfolgreich durchgespielt werden.
 
 Siehe `docs/RELEASE_RUNBOOK.md`.
