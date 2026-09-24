@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MeldeVerkehr\Operations;
 
 use MeldeVerkehr\Mail\MailTransportInterface;
+use MeldeVerkehr\Security\SecretCipher;
 use MeldeVerkehr\Support\Uuid;
 use PDO;
 
@@ -12,6 +13,7 @@ final class NotificationDeliveryService
 {
     public function __construct(
         private readonly PDO $pdo,
+        private readonly SecretCipher $cipher,
         private readonly ?MailTransportInterface $mail,
         private readonly ?WebPushService $push,
         private readonly string $appUrl
@@ -47,7 +49,14 @@ final class NotificationDeliveryService
         }
 
         if ($pushEnabled && $this->push !== null && $this->push->configured() && $this->push->activeCount($userId) > 0) {
-            $delivered += $this->deliverPush($userId, $eventKey, $key) ? 1 : 0;
+            $delivered += $this->deliverPush(
+                $userId,
+                $eventKey,
+                $key,
+                $title,
+                $body,
+                $actionUrl
+            ) ? 1 : 0;
         }
 
         return $delivered;
@@ -62,7 +71,15 @@ final class NotificationDeliveryService
         ?string $body,
         ?string $actionUrl
     ): bool {
-        $row = $this->reserve($userId, $eventKey, $uniqueKey, 'EMAIL');
+        $row = $this->reserve(
+            $userId,
+            $eventKey,
+            $uniqueKey,
+            'EMAIL',
+            $title,
+            $body,
+            $actionUrl
+        );
         if ($row === null) {
             return false;
         }
@@ -103,9 +120,20 @@ final class NotificationDeliveryService
     private function deliverPush(
         string $userId,
         string $eventKey,
-        string $uniqueKey
+        string $uniqueKey,
+        string $title = 'MeldeVerkehr',
+        ?string $body = null,
+        ?string $actionUrl = null
     ): bool {
-        $row = $this->reserve($userId, $eventKey, $uniqueKey, 'PUSH');
+        $row = $this->reserve(
+            $userId,
+            $eventKey,
+            $uniqueKey,
+            'PUSH',
+            $title ?? 'MeldeVerkehr',
+            $body ?? null,
+            $actionUrl ?? null
+        );
         if ($row === null) {
             return false;
         }
@@ -120,19 +148,29 @@ final class NotificationDeliveryService
         string $userId,
         string $eventKey,
         string $uniqueKey,
-        string $channel
+        string $channel,
+        string $title,
+        ?string $body,
+        ?string $actionUrl
     ): ?array {
         $this->pdo->prepare(
             'INSERT IGNORE INTO notification_channel_deliveries
-             (id, user_id, event_key, unique_key, channel, status, attempts, created_at, updated_at)
+             (id, user_id, event_key, unique_key, channel, title, body_encrypted, action_url,
+              status, attempts, created_at, updated_at)
              VALUES
-             (:id, :user_id, :event_key, :unique_key, :channel, "PENDING", 0, UTC_TIMESTAMP(), UTC_TIMESTAMP())'
+             (:id, :user_id, :event_key, :unique_key, :channel, :title, :body, :action_url,
+              "PENDING", 0, UTC_TIMESTAMP(), UTC_TIMESTAMP())'
         )->execute([
             'id' => Uuid::v4(),
             'user_id' => $userId,
             'event_key' => mb_substr($eventKey, 0, 100),
             'unique_key' => $uniqueKey,
             'channel' => $channel,
+            'title' => mb_substr(trim($title), 0, 255),
+            'body' => $body === null || trim($body) === ''
+                ? null
+                : $this->cipher->encrypt(trim($body)),
+            'action_url' => $actionUrl,
         ]);
 
         $stmt = $this->pdo->prepare(
