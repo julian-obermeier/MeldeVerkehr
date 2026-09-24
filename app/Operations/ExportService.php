@@ -39,13 +39,18 @@ final class ExportService
             unset($row);
         }
 
+        $exportFilters = $this->sanitizeExportFilters(
+            $result['filters'],
+            $includeSensitive
+        );
+
         if ($format === 'json') {
             $content = json_encode(
                 [
                     'schema_version' => 1,
                     'generated_at' => gmdate('c'),
                     'includes_sensitive' => $includeSensitive,
-                    'filters' => $result['filters'],
+                    'filters' => $exportFilters,
                     'count' => count($rows),
                     'cases' => $rows,
                 ],
@@ -152,6 +157,35 @@ final class ExportService
         }
 
         return $count;
+    }
+
+    private function sanitizeExportFilters(array $filters, bool $includeSensitive): array
+    {
+        if ($includeSensitive) {
+            return $filters;
+        }
+
+        $q = trim((string) ($filters['q'] ?? ''));
+        if ($q === '') {
+            return $filters;
+        }
+
+        $normalized = preg_replace(
+            '/[^A-Z0-9]/',
+            '',
+            mb_strtoupper($q, 'UTF-8')
+        ) ?? '';
+
+        if (
+            preg_match(
+                '/^[A-ZÄÖÜ]{1,3}[A-ZÄÖÜ]{1,2}[0-9]{1,4}$/u',
+                $normalized
+            ) === 1
+        ) {
+            $filters['q'] = '[REDACTED]';
+        }
+
+        return $filters;
     }
 
     private function csv(array $rows, bool $includeSensitive): string
