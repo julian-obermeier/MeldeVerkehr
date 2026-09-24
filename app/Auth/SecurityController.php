@@ -86,6 +86,10 @@ final class SecurityController
             return Response::redirect('/login');
         }
 
+        if (!$this->auth->recentlyAuthenticated()) {
+            return $this->requireFreshLogin();
+        }
+
         $codes = $this->totp()->confirm((string) $user['id'], trim((string) $request->input('code', '')));
 
         if ($codes === null) {
@@ -130,6 +134,13 @@ final class SecurityController
 
         if ($user === null || $user['email_verified_at'] === null) {
             return Response::json(['success' => false, 'errors' => ['Nicht angemeldet.']], 401);
+        }
+
+        if (!$this->auth->recentlyAuthenticated()) {
+            return Response::json([
+                'success' => false,
+                'errors' => ['Bitte melde dich erneut an, bevor du einen Passkey hinzufügst.']
+            ], 401);
         }
 
         return Response::json([
