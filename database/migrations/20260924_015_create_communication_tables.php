@@ -51,6 +51,7 @@ return new class implements MigrationInterface {
                 classification_confidence DECIMAL(5,4) NULL,
                 received_at DATETIME NULL,
                 sent_at DATETIME NULL,
+                last_error VARCHAR(2000) NULL,
                 created_at DATETIME NOT NULL,
                 INDEX idx_authority_message_case (case_id, created_at),
                 INDEX idx_authority_message_class (case_id, classification, created_at),
@@ -163,7 +164,8 @@ return new class implements MigrationInterface {
         $pdo->exec(
             'ALTER TABLE dispatch_dry_run_outbox
              ADD COLUMN reply_to VARCHAR(320) NULL AFTER recipient,
-             ADD COLUMN message_id VARCHAR(500) NULL AFTER subject'
+             ADD COLUMN message_id VARCHAR(500) NULL AFTER subject,
+             ADD COLUMN in_reply_to VARCHAR(500) NULL AFTER message_id'
         );
     }
 
@@ -172,7 +174,7 @@ return new class implements MigrationInterface {
         $pdo->exec('ALTER TABLE dispatches DROP FOREIGN KEY fk_dispatch_reply_address');
         $pdo->exec('ALTER TABLE dispatches DROP INDEX idx_dispatch_reply_address');
         $pdo->exec('ALTER TABLE dispatches DROP COLUMN outbound_message_id, DROP COLUMN reply_address_id');
-        $pdo->exec('ALTER TABLE dispatch_dry_run_outbox DROP COLUMN message_id, DROP COLUMN reply_to');
+        $pdo->exec('ALTER TABLE dispatch_dry_run_outbox DROP COLUMN in_reply_to, DROP COLUMN message_id, DROP COLUMN reply_to');
         $pdo->exec('DROP TABLE IF EXISTS authority_reply_drafts');
         $pdo->exec('DROP TABLE IF EXISTS inbound_mail_quarantine');
         $pdo->exec('DROP TABLE IF EXISTS case_deadlines');
