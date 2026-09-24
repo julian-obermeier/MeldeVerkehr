@@ -1043,9 +1043,9 @@ try {
     $ingested = $communicationService->ingest($inboundMail);
     $assert(
         ($ingested['status'] ?? null) === 'INGESTED'
-        && ($ingested['classification'] ?? null) === 'DEADLINE'
+        && ($ingested['classification'] ?? null) === 'INQUIRY'
         && ($ingested['deadline_at'] ?? null) === '2026-09-30 21:59:59',
-        'Inbound authority mail is routed classified and deadline-extracted'
+        'Inbound authority inquiry is routed while its deadline is extracted separately'
     );
 
     $afterInbound = $caseService->findOwned((string) $user['id'], $caseId);
@@ -1076,13 +1076,13 @@ try {
     $assert(
         count(array_filter(
             $communication['tasks'],
-            static fn(array $task): bool => $task['status'] === 'OPEN' && $task['task_type'] === 'DEADLINE'
+            static fn(array $task): bool => $task['status'] === 'OPEN' && $task['task_type'] === 'INQUIRY'
         )) === 1
         && count(array_filter(
             $communication['deadlines'],
             static fn(array $deadline): bool => $deadline['status'] === 'OPEN'
         )) === 1,
-        'Inbound deadline creates one open task and one open deadline'
+        'Inbound inquiry with deadline creates one inquiry task and one deadline'
     );
 
     $attachmentId = (string) $inboundMessages[0]['attachments'][0]['id'];
