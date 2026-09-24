@@ -11,7 +11,7 @@ use PDO;
 final class ModerationService
 {
     private const TARGETS = ['POST','COMMENT','PROBLEM_AREA','PROFILE','MESSAGE'];
-    private const ACTIONS = ['DISMISS','HIDE','WARN','RESTRICT'];
+    private const ACTIONS = ['DISMISS','HIDE','WARN','RESTRICT','APPROVE'];
 
     public function __construct(
         private readonly PDO $pdo,
@@ -118,10 +118,6 @@ final class ModerationService
             throw new \MeldeVerkehr\Auth\AuthorizationException('Access denied.');
         }
 
-        if ($action === 'HIDE') {
-            $this->hideTarget((string) $report['target_type'], (string) $report['target_id']);
-        }
-
         $reason = trim((string) $reason);
         if (mb_strlen($reason) > 1000) {
             throw new \InvalidArgumentException('Moderationsbegründung ist zu lang.');
@@ -129,6 +125,12 @@ final class ModerationService
 
         $this->pdo->beginTransaction();
         try {
+            if ($action === 'HIDE') {
+                $this->hideTarget((string) $report['target_type'], (string) $report['target_id']);
+            } elseif ($action === 'APPROVE' && (string) $report['target_type'] === 'PROBLEM_AREA') {
+                $this->approveProblemTarget((string) $report['target_id']);
+            }
+
             $this->pdo->prepare(
                 'UPDATE community_reports
                  SET status = "RESOLVED", assigned_user_id = :moderator,
@@ -162,6 +164,51 @@ final class ModerationService
             }
             throw $e;
         }
+    }
+
+    public function pendingProblemAreas(string $moderatorUserId): array
+    {
+        $this->assertModerator($moderatorUserId);
+
+        $stmt = $this->pdo->query(
+            'SELECT ppa.*, cp.username
+             FROM public_problem_areas ppa
+             LEFT JOIN community_profiles cp ON cp.user_id = ppa.created_by_user_id
+             WHERE ppa.moderation_status = "PENDING"
+             ORDER BY ppa.created_at'
+        );
+
+        return array_values(array_filter(
+            $stmt->fetchAll(),
+            fn(array $area): bool => $this->inModeratorScope(
+                $moderatorUserId,
+                'PROBLEM_AREA',
+                (string) $area['id']
+            )
+        ));
+    }
+
+    public function approveProblemArea(string $moderatorUserId, string $areaId): void
+    {
+        $this->assertModerator($moderatorUserId);
+
+        if (!$this->inModeratorScope($moderatorUserId, 'PROBLEM_AREA', $areaId)) {
+            throw new \MeldeVerkehr\Auth\AuthorizationException('Access denied.');
+        }
+
+        $this->approveProblemTarget($areaId);
+
+        $this->pdo->prepare(
+            'INSERT INTO community_moderation_actions
+             (id, report_id, moderator_user_id, action_type, target_type, target_id, reason, created_at)
+             VALUES
+             (:id, NULL, :moderator, "APPROVE", "PROBLEM_AREA", :target_id,
+              "Initial public problem area approval", UTC_TIMESTAMP())'
+        )->execute([
+            'id' => Uuid::v4(),
+            'moderator' => $moderatorUserId,
+            'target_id' => $areaId,
+        ]);
     }
 
     private function assertModerator(string $userId): void
@@ -263,6 +310,20 @@ final class ModerationService
         $row = $stmt->fetch();
 
         return is_array($row) ? $row : null;
+    }
+
+    private function approveProblemTarget(string $id): void
+    {
+        $stmt = $this->pdo->prepare(
+            'UPDATE public_problem_areas
+             SET moderation_status = "APPROVED", updated_at = UTC_TIMESTAMP()
+             WHERE id = :id AND moderation_status IN ("PENDING","HIDDEN")'
+        );
+        $stmt->execute(['id' => $id]);
+
+        if ($stmt->rowCount() !== 1) {
+            throw new \DomainException('Öffentliche Problemstelle wurde nicht gefunden oder ist bereits freigegeben.');
+        }
     }
 
     private function hideTarget(string $type, string $id): void
