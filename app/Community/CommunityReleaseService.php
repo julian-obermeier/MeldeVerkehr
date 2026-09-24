@@ -220,6 +220,30 @@ final class CommunityReleaseService
         );
     }
 
+    public function availableEvidence(string $userId, string $caseId): array
+    {
+        $case = $this->cases->findOwned($userId, $caseId);
+        if ($case === null) {
+            throw new \DomainException('Vorgang nicht gefunden.');
+        }
+
+        $stmt = $this->pdo->prepare(
+            'SELECT e.id, e.category, e.original_filename,
+                    pr.public_version_no, ev.mime_type, ev.file_size, ev.sha256
+             FROM evidence_items e
+             INNER JOIN evidence_privacy_reviews pr ON pr.evidence_id = e.id
+             INNER JOIN evidence_versions ev
+               ON ev.evidence_id = e.id
+              AND ev.variant = "PUBLIC"
+              AND ev.version_no = pr.public_version_no
+             WHERE e.case_id = :case_id AND e.status = "ACTIVE"
+             ORDER BY e.created_at, e.id'
+        );
+        $stmt->execute(['case_id' => $caseId]);
+
+        return $stmt->fetchAll();
+    }
+
     public function ownedReleases(string $userId, string $caseId): array
     {
         $case = $this->cases->findOwned($userId, $caseId);
