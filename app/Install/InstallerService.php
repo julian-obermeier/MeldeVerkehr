@@ -98,6 +98,8 @@ final class InstallerService
             'ASSIST_PROVIDER' => 'disabled',
             'ASSIST_ENDPOINT' => '',
             'ASSIST_API_KEY' => '',
+            'RETENTION_CLOSED_CASE_DAYS' => '',
+            'RETENTION_EXPORT_DAYS' => '7',
         ]);
 
         $directory = dirname($this->lockPath());
