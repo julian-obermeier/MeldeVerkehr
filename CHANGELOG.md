@@ -5,6 +5,10 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 ## [Unreleased]
 
 ### Added
+- HTTP-Liveness- und Readiness-Probes für Produktionsbetrieb
+- reproduzierbares Shared-Hosting-Release-ZIP mit SHA-256-Artefakt
+- kompakte RC-Release-Checkliste
+- Batch-Grenzregressionen für Notifications, Suche und Authority-Inbox
 - M12-Release-Operations-Datenmodell für verschlüsselte Backups, Update-Historie und generisches Request-Rate-Limiting
 - verschlüsselte Datenbank- und Runtime-Backups mit SHA-256-Manifestprüfung
 - Backup-Verifikation und CLI-only Restore mit expliziter Bestätigung
