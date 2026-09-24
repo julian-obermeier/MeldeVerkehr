@@ -23,6 +23,8 @@ final class View
         ob_start();
         require $path;
 
-        return (string) ob_get_clean();
+        $html = (string) ob_get_clean();
+
+        return (new AccessibilityHtmlEnhancer())->enhance($html);
     }
 }

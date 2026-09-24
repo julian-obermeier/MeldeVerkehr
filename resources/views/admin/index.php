@@ -3,7 +3,7 @@ $e=static fn(mixed $v):string=>htmlspecialchars((string)$v,ENT_QUOTES|ENT_SUBSTI
 ?>
 <!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#172033"><link rel="manifest" href="/manifest.webmanifest"><title>Administration – MeldeVerkehr</title>
 <style>body{font-family:system-ui,sans-serif;background:#f4f6f9;color:#172033;margin:0}main{max-width:1100px;margin:32px auto;padding:20px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px}.card{background:white;border:1px solid #dce3eb;border-radius:14px;padding:20px;margin-bottom:16px}.kpi{font-size:1.7rem;font-weight:800}.muted{color:#657389}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:9px;border-bottom:1px solid #edf0f4}a{color:inherit}</style></head>
-<body><main><p><a href="/dashboard">← Dashboard</a> · <a href="/admin/system/update">Releasecenter</a></p><h1>Systemadministration</h1>
+<body><main><p><a href="/dashboard">← Dashboard</a></p><h1>Systemadministration</h1>
 <div class="grid">
 <div class="card"><div class="muted">Version</div><div class="kpi"><?= $e($version) ?></div></div>
 <div class="card"><div class="muted">PHP</div><div class="kpi"><?= $e($phpVersion) ?></div></div>

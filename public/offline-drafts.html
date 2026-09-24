@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#172033">
+  <title>Offline-Entwürfe – MeldeVerkehr</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <style>
+    body{font-family:system-ui,sans-serif;background:#f5f7fa;color:#172033;margin:0}
+    main{max-width:950px;margin:24px auto;padding:20px}
+    .card{background:#fff;border:1px solid #dfe5ec;border-radius:15px;padding:20px;margin-bottom:14px}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}
+    label{display:block;font-weight:650;margin:8px 0 4px}
+    input,select,textarea{width:100%;box-sizing:border-box;padding:10px;border:1px solid #bac5d1;border-radius:8px;font:inherit}
+    button,.button{display:inline-block;padding:9px 13px;border:0;border-radius:9px;background:#172033;color:#fff;text-decoration:none;font-weight:700;margin:4px}
+    .secondary{background:#fff;color:#172033;border:1px solid #9aa8b7}
+    .danger{background:#8e1f1f}
+    .warn{padding:12px;border:1px solid #d6b36b;background:#fffaf0;border-radius:8px}
+    .ok{padding:12px;border:1px solid #8fb799;background:#f7fff8;border-radius:8px}
+    .error{padding:12px;border:1px solid #c99;background:#fff7f7;border-radius:8px}
+    .muted{color:#66758a}
+    .draft{border-top:1px solid #e5e9ee;padding:10px 0}
+    .photo{border:1px solid #e1e7ed;border-radius:10px;padding:10px;margin:8px 0}
+    .actions{display:flex;gap:6px;flex-wrap:wrap}
+    .skip-link{position:absolute;left:-9999px;top:auto}.skip-link:focus{left:10px;top:10px;background:#fff;padding:8px;z-index:1000}
+    :focus-visible{outline:3px solid currentColor;outline-offset:3px}
+  </style>
+</head>
+<body>
+<a class="skip-link" href="#main-content">Zum Inhalt springen</a>
+<main id="main-content" tabindex="-1">
+  <p><a href="/dashboard">Dashboard</a> · <a href="/cases">Vorgänge</a></p>
+  <h1>Offline-Entwürfe</h1>
+  <div class="warn">
+    Entwürfe und Fotos werden ausschließlich lokal in diesem Browser gespeichert, bis du ausdrücklich synchronisierst.
+    Eine Synchronisierung überschreibt niemals still einen zwischenzeitlich geänderten Server-Entwurf.
+  </div>
+  <p id="networkState" aria-live="polite"></p>
+  <div id="message" aria-live="polite"></div>
+
+  <section class="card">
+    <div class="actions">
+      <button id="newDraft" type="button">Neuer Offline-Entwurf</button>
+      <button id="saveDraft" type="button" class="secondary">Lokal speichern</button>
+      <button id="syncDraft" type="button">Mit Server synchronisieren</button>
+      <button id="uploadPhotos" type="button" class="secondary">Lokale Fotos hochladen</button>
+    </div>
+    <p class="muted">Tatbestand und finaler Review werden nach dem Sync bewusst im normalen MeldeVerkehr-Workflow bestätigt.</p>
+  </section>
+
+  <section class="card">
+    <h2>Grunddaten</h2>
+    <form id="draftForm" autocomplete="off">
+      <div class="grid">
+        <div><label for="licensePlate">Kennzeichen</label><input id="licensePlate" name="license_plate" maxlength="40"></div>
+        <div><label for="vehicleType">Fahrzeugart</label><select id="vehicleType" name="vehicle_type"><option value="">–</option><option>PKW</option><option>MOTORRAD</option><option>TRANSPORTER</option><option>LKW</option><option>BUS</option><option>ANHÄNGER</option><option>WOHNMOBIL</option><option>SONSTIGES</option></select></div>
+        <div><label for="street">Straße</label><input id="street" name="street"></div>
+        <div><label for="houseNumber">Hausnummer</label><input id="houseNumber" name="house_number"></div>
+        <div><label for="postalCode">PLZ</label><input id="postalCode" name="postal_code"></div>
+        <div><label for="city">Ort</label><input id="city" name="city"></div>
+        <div><label for="latitude">Breitengrad</label><input id="latitude" name="latitude" inputmode="decimal"></div>
+        <div><label for="longitude">Längengrad</label><input id="longitude" name="longitude" inputmode="decimal"></div>
+        <div><label for="trafficSpace">Verkehrsraum</label><select id="trafficSpace"><option value="UNKNOWN">Unklar</option><option value="ROADWAY">Fahrbahn</option><option value="SIDEWALK">Gehweg</option><option value="BIKE_LANE">Radfahrstreifen</option><option value="BIKE_PATH">Radweg</option><option value="SHOULDER">Seitenstreifen</option><option value="PARKING_AREA">Parkfläche</option><option value="PEDESTRIAN_ZONE">Fußgängerzone</option><option value="PRIVATE_PROPERTY">Privatfläche</option></select></div>
+        <div><label for="accessType">Einordnung</label><select id="accessType"><option value="UNCLEAR">Unklar</option><option value="PUBLIC">Öffentlich</option><option value="PRIVATE">Privat</option></select></div>
+        <div><label for="observedFrom">Beobachtungsbeginn</label><input id="observedFrom" type="datetime-local"></div>
+        <div><label for="observedUntil">Beobachtungsende optional</label><input id="observedUntil" type="datetime-local"></div>
+      </div>
+      <p><label><input id="obstruction" type="checkbox" style="width:auto"> Behinderung beobachtet</label> <label><input id="endangerment" type="checkbox" style="width:auto"> Gefährdung beobachtet</label> <label><input id="damage" type="checkbox" style="width:auto"> Schaden beobachtet</label></p>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>Lokale Fotos</h2>
+    <label for="photoInput">Fotos aufnehmen oder auswählen</label>
+    <input id="photoInput" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" multiple>
+    <div id="photos"></div>
+  </section>
+
+  <section id="conflictCard" class="card" hidden>
+    <h2>Versionskonflikt</h2>
+    <div class="warn">Der Server-Entwurf wurde seit deiner letzten Synchronisierung verändert. Wähle ausdrücklich, welche Fassung gelten soll.</div>
+    <div class="actions">
+      <button id="useServer" class="secondary" type="button">Server-Fassung behalten</button>
+      <button id="useLocal" type="button">Lokalen Entwurf anwenden</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Lokale Entwürfe auf diesem Gerät</h2>
+    <div id="draftList"></div>
+  </section>
+</main>
+<script src="/assets/offline-drafts.js"></script>
+</body>
+</html>

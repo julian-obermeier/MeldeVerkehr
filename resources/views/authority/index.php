@@ -16,4 +16,4 @@ $e=static fn(mixed $v):string=>htmlspecialchars((string)$v,ENT_QUOTES|ENT_SUBSTI
 <section class="card"><h2>Übermittelte Vorgänge</h2><table><thead><tr><th>Vorgang</th><th>Status</th><th>Ort</th><th>Übermittelt</th><th>Anfragen</th></tr></thead><tbody>
 <?php foreach($cases as $row):?><tr><td><a href="/authority/cases/<?= rawurlencode($row['id']) ?>"><strong><?= $e($row['public_number']) ?></strong></a></td><td><?= $e($row['status']) ?></td><td><?= $e(trim(($row['street']??'').' '.($row['house_number']??'').', '.($row['postal_code']??'').' '.($row['city']??''),', ')) ?></td><td><?= $e($row['sent_at']) ?></td><td><?= $e($row['open_inquiries']) ?></td></tr><?php endforeach;?>
 </tbody></table><?php if(!$cases):?><p class="muted">Keine übermittelten Vorgänge für diesen Scope gefunden.</p><?php endif;?></section>
-</main><script src="/assets/app.js" defer></script></body></html>
+</main></body></html>

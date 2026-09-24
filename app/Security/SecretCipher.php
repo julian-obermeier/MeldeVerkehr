@@ -43,7 +43,7 @@ final class SecretCipher
     {
         $payload = base64_decode($encoded, true);
 
-        if ($payload === false || strlen($payload) < 28) {
+        if ($payload === false || strlen($payload) < 29) {
             throw new \RuntimeException('Encrypted secret is invalid.');
         }
 

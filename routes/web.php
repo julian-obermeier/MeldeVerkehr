@@ -24,9 +24,9 @@ use MeldeVerkehr\Http\Request;
 use MeldeVerkehr\Http\Response;
 use MeldeVerkehr\Install\InstallerController;
 use MeldeVerkehr\Install\InstallerService;
+use MeldeVerkehr\Offline\OfflineDraftController;
 use MeldeVerkehr\Operations\OperationsController;
-use MeldeVerkehr\Release\ReleaseAdminController;
-use MeldeVerkehr\Release\ReleaseServiceFactory;
+use MeldeVerkehr\Update\ProductionHealthController;
 use MeldeVerkehr\Witness\FinalReviewController;
 use MeldeVerkehr\Witness\WitnessController;
 
@@ -34,6 +34,7 @@ use MeldeVerkehr\Witness\WitnessController;
 
 $installer = new InstallerController($app->basePath());
 $installerService = new InstallerService($app->basePath());
+$productionHealth = new ProductionHealthController($app);
 
 $app->router()->get('/install', [$installer, 'index']);
 $app->router()->post('/install/database', [$installer, 'database']);
@@ -60,7 +61,7 @@ if ($installerService->isInstalled()) {
     $analytics = new MapAnalyticsController($app);
     $community = new CommunityController($app);
     $operations = new OperationsController($app);
-    $releaseAdmin = new ReleaseAdminController($app);
+    $offlineDrafts = new OfflineDraftController($app);
     $authorityPortal = new AuthorityPortalController($app);
     $authorityApi = new AuthorityApiController($app);
 
@@ -180,6 +181,11 @@ if ($installerService->isInstalled()) {
     $app->router()->post('/community/moderation/problems/{id}/approve', [$community, 'approveProblem']);
     $app->router()->post('/community/moderation/reports/{id}/resolve', [$community, 'resolveModeration']);
 
+    $app->router()->get('/offline-drafts', static fn(Request $request): Response => Response::redirect('/offline-drafts.html'));
+    $app->router()->get('/offline/csrf', [$offlineDrafts, 'csrf']);
+    $app->router()->post('/offline/sync', [$offlineDrafts, 'sync']);
+    $app->router()->post('/offline/cases/{id}/evidence', [$offlineDrafts, 'uploadEvidence']);
+
     $app->router()->get('/search', [$operations, 'search']);
     $app->router()->post('/search/filters', [$operations, 'saveFilter']);
     $app->router()->post('/search/filters/{id}/delete', [$operations, 'deleteFilter']);
@@ -215,11 +221,6 @@ if ($installerService->isInstalled()) {
     $app->router()->post('/settings/security/passkeys/delete', [$security, 'deletePasskey']);
 
     $app->router()->get('/admin', [$admin, 'index']);
-    $app->router()->get('/admin/system/update', [$releaseAdmin, 'index']);
-    $app->router()->post('/admin/system/update/backup', [$releaseAdmin, 'backup']);
-    $app->router()->post('/admin/system/update/backups/{id}/verify', [$releaseAdmin, 'verify']);
-    $app->router()->post('/admin/system/update/run', [$releaseAdmin, 'update']);
-    $app->router()->post('/admin/system/update/maintenance-off', [$releaseAdmin, 'maintenanceOff']);
 }
 
 $app->router()->get('/', static function (Request $request) use ($installerService): Response {
@@ -230,7 +231,10 @@ $app->router()->get('/', static function (Request $request) use ($installerServi
     return Response::redirect('/dashboard');
 });
 
-$app->router()->get('/health', static function (Request $request) use ($installerService, $app): Response {
+$app->router()->get('/health/live', [$productionHealth, 'live']);
+$app->router()->get('/health/ready', [$productionHealth, 'ready']);
+
+$app->router()->get('/health', static function (Request $request) use ($installerService): Response {
     return Response::json([
         'success' => true,
         'data' => [
@@ -238,7 +242,6 @@ $app->router()->get('/health', static function (Request $request) use ($installe
             'status' => 'ok',
             'installed' => $installerService->isInstalled(),
             'version' => trim((string) @file_get_contents(dirname(__DIR__) . '/VERSION')),
-            'maintenance' => ReleaseServiceFactory::maintenance($app)->active(),
         ],
         'errors' => [],
         'meta' => [],

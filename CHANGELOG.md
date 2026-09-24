@@ -5,21 +5,16 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 ## [Unreleased]
 
 ### Added
-- M12-Release-Operations-Datenmodell für verschlüsselte Backups, Update-Historie und generisches Request-Rate-Limiting
-- verschlüsselte Datenbank- und Runtime-Backups mit SHA-256-Manifestprüfung
-- Backup-Verifikation und CLI-only Restore mit expliziter Bestätigung
-- Maintenance-Modus mit HTTP 503
-- sicherer Update-Workflow mit Preflight, Backup, Verify, Migrationen und Update-Historie
-- Shared-Hosting-CLI maintenance.php für Readiness, Backup, Verify, Restore, Update und Maintenance
-- Admin-Releasecenter unter /admin/system/update
-- Release-Readiness-Prüfungen
-- zentrale Production-Security-Header
-- generisches Request-Rate-Limiting und Authority-API-Burstschutz
-- IndexedDB-Offline-Entwürfe mit expliziter Konfliktauflösung
-- PWA-Shortcuts und aktualisierte Service-Worker-Cache-Strategie
-- Accessibility-Basis mit Skip-Link, sichtbarem Tastaturfokus und Live-Regions
-- M12-Regressionsprüfungen für Release-, Backup-, PWA- und Security-Invarianten
-- Produktions-/Restore-Runbook
+- M12 Backup-/Restore-Service mit SHA-256-Manifest und restriktiven Dateirechten
+- Maintenance-Mode und sichere Update-Transaktion
+- Produktions-Readiness- und Liveness-Probes
+- Offline-Entwürfe mit IndexedDB, Fotos und expliziter Konfliktauflösung
+- Offline-Sync-API und Evidence-Upload
+- PWA-Shortcuts und Offline-Draft-Cache
+- zentrale Accessibility-Härtung mit Skip-Link, Focus-Visible und Reduced Motion
+- reproduzierbare Release-ZIP-Paketierung mit SHA-256
+- Produktions-Deployment- und Release-Checklisten
+- RC-Regressionstests für Backup, Maintenance, Accessibility, PWA und Batchgrenzen
 - M11-Datenmodell für Authority-Nutzerscopes, API-Tokens, strukturierte Portal-Inquiries und isolierte Halterdaten
 - Authority-Scope-Service mit per-Behörde-Rollen
 - Behördenportal mit Inbox und frozen Dispatch-Fallansicht
@@ -196,11 +191,11 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 - CSRF-Schutz für Installations- und Authentifizierungsformulare
 
 ### Changed
-- Version auf 0.12.0-rc1 angehoben
-- Dashboard rendert die Version dynamisch aus VERSION
-- private Navigationen verwenden im Service Worker network-first ohne persistentes Caching
-- Kern-Wizard markiert Offline-Drafts mit Serverversion und wendet lokale Stände niemals still an
-- Health-Endpunkt meldet den Maintenance-Status
+- Version auf 1.0.0-rc.1 gesetzt
+- Updates verlangen standardmäßig ein verifiziertes lokales Datenbankbackup
+- externes Datenbankbackup muss für automatische Updates explizit bestätigt werden
+- Maintenance lässt Health-Probes weiterhin zu
+- Service-Worker-Cache auf v2 aktualisiert
 - Bürgerdashboard zeigt den Behördenportal-Link nur bei aktivem Authority-Scope
 - HTTP Request unterstützt jetzt testbaren Raw-/JSON-Body
 - Bürgerportal-Version auf 0.11.0-dev aktualisiert
@@ -250,13 +245,12 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 - native Mailheader werden gegen Zeilenumbrüche abgesichert und UTF-8-Betreffzeilen kodiert
 
 ### Security
-- Backuppayloads liegen verschlüsselt außerhalb des Webroots
-- jedes Backup wird vor Restore vollständig gegen SHA-256 geprüft
-- fehlgeschlagene Updates lassen Maintenance aktiv
-- maintenance.php ist über Apache explizit gesperrt
-- CSP, HSTS, X-Frame-Options, MIME-, Referrer- und Permissions-Policy werden zentral gesetzt
-- Authority API liefert bei Burst-Überschreitung HTTP 429 mit Retry-After
-- Offline-Entwürfe überschreiben keine neueren Serverstände ohne ausdrückliche Nutzeraktion
+- Release-Pakete schließen .env und sensible Runtime-Daten aus
+- Backup-Manifeste erkennen manipulierte Payloads per SHA-256
+- fehlgeschlagene Updates deaktivieren Maintenance nicht automatisch
+- Offline-Sync erfordert aktive verifizierte Session und CSRF
+- Offline-Konflikte erfordern eine explizite Entscheidung statt Silent Overwrite
+- Readiness meldet Maintenance als nicht bereit
 - Authority-Fallzugriff benötigt neben Rollen immer einen aktiven Scope zur konkreten Behörde
 - Scope-Rollen begrenzen Rechte zusätzlich zu globalen Permissions
 - API-Token ist fest an eine Authority-ID gebunden

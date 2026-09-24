@@ -1,0 +1,78 @@
+name: Release Package
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_mysql, mbstring, fileinfo, openssl, gd
+
+      - name: Lint release PHP
+        run: |
+          set -euo pipefail
+          while IFS= read -r file; do
+            php -l "$file" >/dev/null
+          done < <(find app bootstrap config database install public resources routes -type f -name '*.php' | sort)
+
+      - name: Build shared-hosting package
+        run: |
+          set -euo pipefail
+          VERSION=$(tr -d '\r\n' < VERSION)
+          OUT="MeldeVerkehr-${VERSION}"
+          mkdir -p "dist/${OUT}"
+
+          rsync -a ./ "dist/${OUT}/" \
+            --exclude='.git/' \
+            --exclude='.github/' \
+            --exclude='dist/' \
+            --exclude='.env' \
+            --exclude='storage/app/evidence/' \
+            --exclude='storage/app/mail/' \
+            --exclude='storage/backups/' \
+            --exclude='storage/logs/' \
+            --exclude='tests/' \
+            --exclude='docs/internal/'
+
+          mkdir -p "dist/${OUT}/storage/app" "dist/${OUT}/storage/logs" "dist/${OUT}/storage/backups"
+          touch "dist/${OUT}/storage/app/.gitkeep" "dist/${OUT}/storage/logs/.gitkeep" "dist/${OUT}/storage/backups/.gitkeep"
+
+          (
+            cd dist
+            zip -qr "${OUT}.zip" "${OUT}"
+            sha256sum "${OUT}.zip" > "${OUT}.zip.sha256"
+          )
+
+      - name: Verify package excludes secrets
+        run: |
+          set -euo pipefail
+          ZIP=$(find dist -maxdepth 1 -name '*.zip' -print -quit)
+          unzip -l "$ZIP" > /tmp/package-list.txt
+          if grep -E '(^|[[:space:]])[^[:space:]]*/\.env$' /tmp/package-list.txt; then
+            echo "Release package contains .env"
+            exit 1
+          fi
+          if grep -E '/storage/(app/evidence|app/mail|backups)/[^/[:space:]]+' /tmp/package-list.txt | grep -v '\.gitkeep$'; then
+            echo "Release package contains runtime-sensitive data"
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: meldeverkehr-release-package
+          path: |
+            dist/*.zip
+            dist/*.sha256
+          if-no-files-found: error

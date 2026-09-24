@@ -9,7 +9,7 @@ Die Plattform verbindet vier Bereiche:
 1. Bürgerportal für Erfassung, Beweissicherung und Vorgangsverwaltung
 2. automatisierte Behördenkommunikation und Routing
 3. Community mit Problemstellen, Reputation und Leaderboards
-4. Behördenportal mit Authority-RBAC, strukturierten Schnittstellen und API v1
+4. späteres Behördenportal mit strukturierten Schnittstellen
 
 ## Technische Leitplanken
 
@@ -34,8 +34,7 @@ Die Plattform verbindet vier Bereiche:
 - `storage/` – private Dateien, Beweise, Dokumente, Logs
 - `cron/` – Shared-Hosting-Cronjobs
 - `install/` – Webinstaller
-- `app/Release/` – Backup-, Update-, Readiness- und Maintenance-Logik
-- `maintenance.php` – Shared-Hosting-CLI für Releasebetrieb
+- `update/` – Update-/Migrationslogik
 - `tests/` – Tests
 - `docs/` – Architektur und Spezifikation
 
@@ -55,15 +54,14 @@ Die Plattform verbindet vier Bereiche:
 - [Entwicklungsauftrag](docs/MASTER_PROMPT.md)
 - [Projektstatus](PROJECT_STATUS.md)
 - [Security Policy](SECURITY.md)
-- [Release-/Deploy-/Restore-Runbook](docs/RELEASE_RUNBOOK.md)
 
 ## Entwicklungsreihenfolge
 
-M1 Fundament → M2 Vorgangskern → M3 Beweissystem → M4 Sachverhalt/Final Review → M5 Behördenrouting/Versand → M6 Kommunikation → M7 KI/OCR → M8 Analyse/Problemstellen → M9 Community → M10 Suche/Dokumente/Notifications → M11 Behördenportal/API → M12 Produktionshärtung/Release Candidate
+M1 Fundament → M2 Bürgerportal → M3 Beweissystem → M4 Sachverhalt/Final Review → M5 Behördenrouting/Versand → M6 Kommunikation → M7 KI/OCR → M8 Analyse/Problemstellen → M9 Community → M10 Reputation → M11 Moderation → M12 Behördenportal
 
 ## Status
 
-Der aktuelle Entwicklungsstand ist `0.12.0-rc1` – Produktionshärtung und Release Candidate. Siehe `PROJECT_STATUS.md`.
+Der Entwicklungsstand reicht aktuell bis M6 – Behördenkommunikation. Siehe `PROJECT_STATUS.md`.
 
 
 ## Installation (Entwicklungsstand)
@@ -97,8 +95,7 @@ php cron.php inbound-mail
 
 `health` schreibt einen erfolgreichen Heartbeat in `cron_runs`.  
 `queue` verarbeitet verfügbare Jobs über die DB-basierte Queue, einschließlich Behördenversand und bestätigter Nutzerantworten.  
-`inbound-mail` pollt das konfigurierte IMAP-Postfach; der Lauf bleibt wirkungslos, solange `COMM_INBOUND_ENABLED=false` gesetzt ist.  
-Zusätzlich stehen `notifications`, `export-cleanup` und `retention-plan` zur Verfügung.
+`inbound-mail` pollt das konfigurierte IMAP-Postfach; der Lauf bleibt wirkungslos, solange `COMM_INBOUND_ENABLED=false` gesetzt ist.
 
 Auf Shared Hosting können diese Befehle über reguläre Cronjobs aufgerufen werden. Jeder Lauf wird mit Status, Start-/Endzeit sowie Fehler- und Verarbeitungszähler protokolliert.
 
@@ -123,7 +120,7 @@ php tests/run.php
 
 ## PWA
 
-Die Anwendung enthält Manifest, Service Worker, Offline-Fallback und IndexedDB-Entwürfe für den Kern-Wizard. Private Navigationsantworten werden nicht persistiert. Lokale Entwürfe tragen `serverVersion`/`localVersion`; bei Konflikten gibt es keine stille Überschreibung, sondern nur explizites Übernehmen oder Verwerfen.
+Die Anwendung enthält eine PWA-Grundlage mit Manifest, Service Worker und Offline-Fallback. Private Navigationsantworten werden bewusst nicht im Cache persistiert. Offline-Entwürfe mit IndexedDB folgen zusammen mit dem Meldungsworkflow.
 
 
 ## M2 – Vorgänge
@@ -141,18 +138,3 @@ Der aktuelle Entwicklungsstand enthält den ersten echten Bürger-Vorgangsworkfl
 - serverseitige Ownership-Prüfung
 
 Die produktive Tatbestandsdatenbank enthält zunächst bewusst nur neutrale Kategorien und einen internen Entwurfs-Platzhalter. Konkrete rechtliche Angaben werden erst nach fachlicher Verifikation ergänzt.
-
-
-## Releasebetrieb
-
-Ab 0.12.0-rc1 steht eine Shared-Hosting-kompatible Release-CLI bereit:
-
-~~~bash
-php maintenance.php readiness
-php maintenance.php backup
-php maintenance.php backup:verify <BACKUP-ID>
-php maintenance.php update --from=<ALT> --to=<NEU>
-php maintenance.php restore <BACKUP-ID> --confirm
-~~~
-
-Das Admin-Releasecenter ist unter `/admin/system/update` verfügbar. Restore bleibt absichtlich CLI-only. Details stehen in [docs/RELEASE_RUNBOOK.md](docs/RELEASE_RUNBOOK.md).

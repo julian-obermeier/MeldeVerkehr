@@ -10,6 +10,6 @@ Options -Indexes
     RewriteRule ^(.*)$ public/$1 [L]
 </IfModule>
 
-<FilesMatch "^(?:\.env|maintenance\.php|composer\.(?:json|lock)|PROJECT_STATUS\.md|CHANGELOG\.md|SECURITY\.md|CONTRIBUTING\.md|AGENTS\.md)$">
+<FilesMatch "^(?:\.env|composer\.(?:json|lock)|PROJECT_STATUS\.md|CHANGELOG\.md|SECURITY\.md|CONTRIBUTING\.md|AGENTS\.md)$">
     Require all denied
 </FilesMatch>

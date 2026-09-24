@@ -18,15 +18,12 @@ final class Response
         return new self($body, $status, ['Content-Type' => 'text/html; charset=UTF-8']);
     }
 
-    public static function json(array $data, int $status = 200, array $headers = []): self
+    public static function json(array $data, int $status = 200): self
     {
         return new self(
             (string) json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
             $status,
-            array_merge(
-                ['Content-Type' => 'application/json; charset=UTF-8'],
-                $headers
-            )
+            ['Content-Type' => 'application/json; charset=UTF-8']
         );
     }
 
@@ -61,10 +58,38 @@ final class Response
     {
         http_response_code($this->status);
 
-        foreach ($this->headers as $name => $value) {
+        $headers = array_merge(
+            $this->securityHeaders(),
+            $this->headers
+        );
+
+        foreach ($headers as $name => $value) {
             header($name . ': ' . $value);
         }
 
         echo $this->body;
+    }
+
+    private function securityHeaders(): array
+    {
+        $headers = [
+            'X-Content-Type-Options' => 'nosniff',
+            'X-Frame-Options' => 'DENY',
+            'Referrer-Policy' => 'no-referrer',
+            'Permissions-Policy' => 'geolocation=(self), camera=(self), microphone=()',
+            'Cross-Origin-Opener-Policy' => 'same-origin',
+            'Cross-Origin-Resource-Policy' => 'same-origin',
+            'Content-Security-Policy' => "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self'; worker-src 'self' blob:",
+            'Cache-Control' => 'no-store, max-age=0',
+        ];
+
+        $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+            || strtolower((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')) === 'https';
+
+        if ($https) {
+            $headers['Strict-Transport-Security'] = 'max-age=31536000';
+        }
+
+        return $headers;
     }
 }

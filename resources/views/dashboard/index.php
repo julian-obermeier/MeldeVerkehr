@@ -25,4 +25,4 @@ $statusLabels=['DRAFT'=>'Entwurf','CAPTURE_IN_PROGRESS'=>'Erfassung läuft','WAI
 </div>
 <div class="grid"><section class="card"><div class="muted">E-Mail</div><div class="kpi ok">Bestätigt</div></section><section class="card"><div class="muted">TOTP-2FA</div><div class="kpi <?= $totpEnabled?'ok':'warn' ?>"><?= $totpEnabled?'Aktiv':'Aus' ?></div></section><section class="card"><div class="muted">Passkeys</div><div class="kpi"><?= $e($passkeyCount) ?></div></section></div>
 <form method="post" action="/logout" class="footer"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><button type="submit">Abmelden</button></form>
-<p class="muted">MeldeVerkehr <?= $e($version) ?> · Bürgerportal</p></main><script src="/assets/app.js" defer></script></body></html>
+<p class="muted">MeldeVerkehr 0.10.0-dev · Bürgerportal</p></main><script src="/assets/app.js" defer></script></body></html>

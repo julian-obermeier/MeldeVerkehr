@@ -18,8 +18,8 @@
   ],
   "shortcuts": [
     {
-      "name": "Meine Vorgänge",
-      "short_name": "Vorgänge",
+      "name": "Neue Meldung",
+      "short_name": "Neu",
       "url": "/cases",
       "icons": [
         {
@@ -30,9 +30,9 @@
       ]
     },
     {
-      "name": "Karte",
-      "short_name": "Karte",
-      "url": "/map",
+      "name": "Offline-Entwurf",
+      "short_name": "Offline",
+      "url": "/offline-drafts",
       "icons": [
         {
           "src": "/assets/icon.svg",
@@ -42,9 +42,9 @@
       ]
     },
     {
-      "name": "Benachrichtigungen",
-      "short_name": "Hinweise",
-      "url": "/notifications",
+      "name": "Offene Vorgänge",
+      "short_name": "Vorgänge",
+      "url": "/cases",
       "icons": [
         {
           "src": "/assets/icon.svg",
@@ -53,5 +53,6 @@
         }
       ]
     }
-  ]
+  ],
+  "id": "/"
 }
