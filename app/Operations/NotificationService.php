@@ -198,6 +198,35 @@ final class NotificationService
         return $rows;
     }
 
+    public function latestPushPayload(string $userId): ?array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT id, title, body_encrypted, action_url, sent_at
+             FROM notification_channel_deliveries
+             WHERE user_id = :user_id
+               AND channel = "PUSH"
+               AND status = "SENT"
+             ORDER BY sent_at DESC, updated_at DESC
+             LIMIT 1'
+        );
+        $stmt->execute(['user_id' => $userId]);
+        $row = $stmt->fetch();
+
+        if (!is_array($row)) {
+            return null;
+        }
+
+        return [
+            'id' => (string) $row['id'],
+            'title' => (string) $row['title'],
+            'body' => $row['body_encrypted'] === null
+                ? null
+                : $this->cipher->decrypt((string) $row['body_encrypted']),
+            'action_url' => $row['action_url'],
+            'sent_at' => $row['sent_at'],
+        ];
+    }
+
     public function unreadCount(string $userId): int
     {
         $stmt = $this->pdo->prepare(
