@@ -39,6 +39,7 @@ if ($installerService->isInstalled()) {
     $app->router()->post('/login', [$auth, 'login']);
     $app->router()->post('/logout', [$auth, 'logout']);
 
+    $app->router()->get('/passkey', [$passkeyLogin, 'page']);
     $app->router()->get('/passkey/login/options', [$passkeyLogin, 'options']);
     $app->router()->post('/passkey/login', [$passkeyLogin, 'login']);
 
