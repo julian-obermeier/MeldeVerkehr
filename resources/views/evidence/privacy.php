@@ -15,7 +15,7 @@ body{font-family:system-ui,sans-serif;background:#f5f7fa;color:#172033;margin:0}
 <section class="card"><h2>Arbeitskopie prüfen</h2><p class="muted">Ziehe auf dem Bild ein Rechteck über Gesichter, fremde Kennzeichen oder andere sensible Bereiche. Die Originaldatei wird dabei niemals verändert.</p>
 <div class="stage" id="privacyStage">
 <img id="privacyImage" draggable="false" src="/evidence/<?= rawurlencode($item['id']) ?>/preview?variant=WORKING" alt="Geschützte Arbeitskopie">
-<?php foreach($regions as $region):?><span class="region" style="left:<?= $e(((float)$region['x'])*100) ?>%;top:<?= $e(((float)$region['y'])*100) ?>%;width:<?= $e(((float)$region['width'])*100) ?>%;height:<?= $e(((float)$region['height'])*100) ?>%"></span><?php endforeach;?>
+<?php foreach($regions as $region):?><span class="region" data-privacy-region="1" data-x="<?= $e(((float)$region['x'])*100) ?>" data-y="<?= $e(((float)$region['y'])*100) ?>" data-width="<?= $e(((float)$region['width'])*100) ?>" data-height="<?= $e(((float)$region['height'])*100) ?>"></span><?php endforeach;?>
 <span class="selection" id="selection" hidden></span>
 </div>
 <?php if($editable):?><form method="post" action="/evidence/<?= rawurlencode($item['id']) ?>/privacy/regions" id="regionForm"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>">
@@ -35,16 +35,4 @@ body{font-family:system-ui,sans-serif;background:#f5f7fa;color:#172033;margin:0}
 <?php if($review):?><p><strong>Bestätigt.</strong> PUBLIC-Version <?= $e($review['public_version_no']) ?> · geprüft <?= $e($review['reviewed_at']) ?></p><p><a class="button" href="/evidence/<?= rawurlencode($item['id']) ?>/preview?variant=PUBLIC" target="_blank" rel="noopener">Redigierte Kopie ansehen</a></p><?php else:?><p>Prüfe das vollständige Bild und bestätige anschließend die Privacy-Freigabe. Auch bei null markierten Bereichen wird eine getrennte PUBLIC-Kopie erzeugt.</p><?php endif;?>
 <?php if($editable):?><form method="post" action="/evidence/<?= rawurlencode($item['id']) ?>/privacy/confirm"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><label style="font-weight:500"><input type="checkbox" name="privacy_confirm" value="1" required style="width:auto"> Ich habe die Arbeitskopie vollständig auf Gesichter, fremde Kennzeichen, Personen und sensible Details geprüft.</label><br><button type="submit">Privacy-Prüfung bestätigen und PUBLIC-Kopie erzeugen</button></form><?php endif;?></section>
 </main>
-<script>
-(() => {
- const stage=document.getElementById('privacyStage'), img=document.getElementById('privacyImage'), selection=document.getElementById('selection');
- if(!stage||!img||!selection) return;
- let start=null;
- const values={x:document.getElementById('xPct'),y:document.getElementById('yPct'),w:document.getElementById('wPct'),h:document.getElementById('hPct')};
- if(!values.x||!values.y||!values.w||!values.h) return;
- const point=e=>{const r=img.getBoundingClientRect();return{x:Math.max(0,Math.min(r.width,e.clientX-r.left)),y:Math.max(0,Math.min(r.height,e.clientY-r.top)),r};};
- stage.addEventListener('pointerdown',e=>{if(e.button!==0)return;start=point(e);stage.setPointerCapture(e.pointerId);selection.hidden=false;});
- stage.addEventListener('pointermove',e=>{if(!start)return;const p=point(e),x=Math.min(start.x,p.x),y=Math.min(start.y,p.y),w=Math.abs(p.x-start.x),h=Math.abs(p.y-start.y);selection.style.left=(x/p.r.width*100)+'%';selection.style.top=(y/p.r.height*100)+'%';selection.style.width=(w/p.r.width*100)+'%';selection.style.height=(h/p.r.height*100)+'%';});
- stage.addEventListener('pointerup',e=>{if(!start)return;const p=point(e),x=Math.min(start.x,p.x),y=Math.min(start.y,p.y),w=Math.abs(p.x-start.x),h=Math.abs(p.y-start.y);values.x.value=(x/p.r.width*100).toFixed(2);values.y.value=(y/p.r.height*100).toFixed(2);values.w.value=(w/p.r.width*100).toFixed(2);values.h.value=(h/p.r.height*100).toFixed(2);start=null;});
-})();
-</script></body></html>
+<script src="/assets/app.js" defer></script></body></html>
