@@ -267,8 +267,15 @@ final class BackupService
 
             $tables = $this->pdo->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN);
 
+            $excludedTables = ['system_backups', 'system_update_runs', 'request_rate_limits'];
+
             foreach ($tables as $tableName) {
                 $table = (string) $tableName;
+
+                if (in_array($table, $excludedTables, true)) {
+                    continue;
+                }
+
                 $quoted = $this->quoteIdentifier($table);
                 $create = $this->pdo->query('SHOW CREATE TABLE ' . $quoted)->fetch(PDO::FETCH_NUM);
 
