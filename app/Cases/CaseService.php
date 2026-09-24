@@ -68,7 +68,7 @@ final class CaseService
         }
     }
 
-    public function listOwned(string $userId, ?string $status = null): array
+    public function listOwned(string $userId, ?string $status = null, ?string $search = null): array
     {
         $sql = 'SELECT c.id, c.public_number, c.status, c.created_at, c.updated_at,
                        v.vehicle_type, v.license_plate_encrypted,
@@ -83,6 +83,19 @@ final class CaseService
         if ($status !== null && in_array($status, CaseStatus::all(), true)) {
             $sql .= ' AND c.status = :status';
             $params['status'] = $status;
+        }
+
+        $search = trim((string) ($search ?? ''));
+        if ($search !== '') {
+            $normalizedPlate = preg_replace('/[^A-Z0-9]/', '', mb_strtoupper($search, 'UTF-8')) ?? '';
+            $sql .= ' AND (
+                c.public_number LIKE :search_text
+                OR l.street LIKE :search_text
+                OR l.city LIKE :search_text
+                OR v.license_plate_hash = :plate_hash
+            )';
+            $params['search_text'] = '%' . $search . '%';
+            $params['plate_hash'] = hash_hmac('sha256', $normalizedPlate, $this->searchKey);
         }
 
         $sql .= ' ORDER BY c.updated_at DESC LIMIT 100';
