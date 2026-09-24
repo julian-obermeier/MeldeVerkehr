@@ -56,6 +56,40 @@ final class AssistController
         ]));
     }
 
+    public function quality(Request $request): Response
+    {
+        $userId = $this->requireUser();
+        if ($userId instanceof Response) {
+            return $userId;
+        }
+
+        $caseId = trim((string) $request->input('case_id', ''));
+        $evidenceId = (string) $request->route('id', '');
+
+        if (!Csrf::validate((string) $request->input('_csrf', ''))) {
+            $_SESSION['assist_error'] = 'Sitzung abgelaufen. Bitte erneut versuchen.';
+            return Response::redirect('/cases/' . rawurlencode($caseId) . '/assist');
+        }
+
+        try {
+            $result = AssistServiceFactory::make($this->app)->analyzeQuality(
+                $userId,
+                $evidenceId
+            );
+
+            $_SESSION['assist_message'] = 'Lokale Qualitätsanalyse Version '
+                . (int) $result['version_no']
+                . ' abgeschlossen: '
+                . (string) $result['metrics']['overall_state'] . '.';
+        } catch (\InvalidArgumentException|\DomainException|\MeldeVerkehr\Auth\AuthorizationException $e) {
+            $_SESSION['assist_error'] = $e->getMessage();
+        } catch (Throwable $e) {
+            $_SESSION['assist_error'] = 'Lokale Qualitätsanalyse ist technisch fehlgeschlagen.';
+        }
+
+        return Response::redirect('/cases/' . rawurlencode($caseId) . '/assist');
+    }
+
     public function analyze(Request $request): Response
     {
         $userId = $this->requireUser();
