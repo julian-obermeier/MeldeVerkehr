@@ -17,6 +17,7 @@ use MeldeVerkehr\Evidence\EvidencePrivacyController;
 use MeldeVerkehr\Evidence\EvidenceReviewController;
 use MeldeVerkehr\Dispatch\DispatchController;
 use MeldeVerkehr\Communication\CommunicationController;
+use MeldeVerkehr\Community\CommunityController;
 use MeldeVerkehr\Http\Request;
 use MeldeVerkehr\Http\Response;
 use MeldeVerkehr\Install\InstallerController;
@@ -52,6 +53,7 @@ if ($installerService->isInstalled()) {
     $communication = new CommunicationController($app);
     $assist = new AssistController($app);
     $analytics = new MapAnalyticsController($app);
+    $community = new CommunityController($app);
 
     $app->router()->get('/register', [$auth, 'registerForm']);
     $app->router()->post('/register', [$auth, 'register']);
@@ -137,6 +139,37 @@ if ($installerService->isInstalled()) {
     $app->router()->post('/problem-areas/{id}/sync', [$analytics, 'syncArea']);
     $app->router()->post('/problem-areas/{id}/reports', [$analytics, 'createReport']);
     $app->router()->get('/municipal-reports/{id}', [$analytics, 'report']);
+
+    $app->router()->get('/community', [$community, 'feed']);
+    $app->router()->get('/community/profile', [$community, 'profile']);
+    $app->router()->post('/community/profile', [$community, 'saveProfile']);
+    $app->router()->get('/community/u/{username}', [$community, 'userProfile']);
+    $app->router()->get('/community/groups', [$community, 'groups']);
+    $app->router()->post('/community/groups', [$community, 'createGroup']);
+    $app->router()->post('/community/groups/{id}/join', [$community, 'joinGroup']);
+    $app->router()->post('/community/posts', [$community, 'createPost']);
+    $app->router()->get('/community/posts/{id}', [$community, 'post']);
+    $app->router()->post('/community/posts/{id}/comments', [$community, 'comment']);
+    $app->router()->post('/community/posts/{id}/helpful', [$community, 'react']);
+    $app->router()->get('/community/problems', [$community, 'problems']);
+    $app->router()->post('/community/problems', [$community, 'createProblem']);
+    $app->router()->get('/community/problems/{id}', [$community, 'problem']);
+    $app->router()->post('/community/problems/{id}/observations', [$community, 'observeProblem']);
+    $app->router()->get('/community/messages', [$community, 'messages']);
+    $app->router()->post('/community/messages', [$community, 'sendMessage']);
+    $app->router()->post('/community/messages/{id}/accept', [$community, 'acceptMessage']);
+    $app->router()->post('/community/blocks', [$community, 'blockUser']);
+    $app->router()->get('/community/leaderboard', [$community, 'leaderboard']);
+    $app->router()->get('/cases/{id}/community-release', [$community, 'releases']);
+    $app->router()->post('/cases/{id}/community-release', [$community, 'createRelease']);
+    $app->router()->post('/community/releases/{id}/publish', [$community, 'publishRelease']);
+    $app->router()->post('/community/releases/{id}/withdraw', [$community, 'withdrawRelease']);
+    $app->router()->get('/community/releases/{token}', [$community, 'publicRelease']);
+    $app->router()->get('/community/releases/{token}/evidence/{order}', [$community, 'publicReleaseEvidence']);
+    $app->router()->post('/community/reports', [$community, 'reportContent']);
+    $app->router()->get('/community/moderation', [$community, 'moderation']);
+    $app->router()->post('/community/moderation/problems/{id}/approve', [$community, 'approveProblem']);
+    $app->router()->post('/community/moderation/reports/{id}/resolve', [$community, 'resolveModeration']);
 
     $app->router()->get('/settings/security', [$security, 'index']);
     $app->router()->post('/settings/security/totp/start', [$security, 'startTotp']);
