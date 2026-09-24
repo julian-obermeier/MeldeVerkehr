@@ -4,7 +4,7 @@ $c=$data['case_data']['case'];
 $labels=[
  'RECEIPT'=>'Eingangsbestätigung','INQUIRY'=>'Rückfrage','DEADLINE'=>'Frist',
  'DEMAND'=>'Nachforderung','REJECTION'=>'Ablehnung/Einstellung','CLOSURE'=>'Abschluss',
- 'OTHER'=>'Sonstiges','OUTBOUND_REPLY'=>'Antwort'
+ 'OTHER'=>'Sonstiges','OUTBOUND_REPLY'=>'Antwort','DELIVERY_FAILURE'=>'Unzustellbarkeit'
 ];
 ?>
 <!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#172033"><title>Kommunikation – MeldeVerkehr</title>
