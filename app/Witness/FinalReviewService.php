@@ -41,10 +41,15 @@ final class FinalReviewService
         $yellow = [];
         $green = [];
 
-        if ((string) $caseData['case']['status'] !== CaseStatus::READY_FOR_REVIEW) {
-            $red[] = 'Der Vorgang befindet sich nicht im finalen Review-Status.';
-        } else {
+        $caseStatus = (string) $caseData['case']['status'];
+        $completed = $caseStatus === CaseStatus::READY_FOR_SUBMISSION;
+
+        if ($caseStatus === CaseStatus::READY_FOR_REVIEW) {
             $green[] = 'Vorgang befindet sich im finalen Review.';
+        } elseif ($completed) {
+            $green[] = 'Finaler Qualitätsreview wurde bereits bestätigt; der Vorgang ist versandbereit.';
+        } else {
+            $red[] = 'Der Vorgang befindet sich nicht im finalen Review-Status.';
         }
 
         $package = $this->latestPackage($caseId);
@@ -150,13 +155,19 @@ final class FinalReviewService
             'red' => array_values(array_unique($red)),
             'yellow' => array_values(array_unique($yellow)),
             'green' => array_values(array_unique($green)),
-            'ready' => $red === [],
+            'ready' => $red === [] && !$completed,
+            'completed' => $completed,
+            'latest_quality_review' => $this->latestQualityReview($caseId),
         ];
     }
 
     public function confirm(string $userId, string $caseId, bool $yellowAcknowledged): array
     {
         $summary = $this->summary($userId, $caseId);
+
+        if ($summary['completed']) {
+            throw new \DomainException('Der finale Qualitätsreview wurde bereits bestätigt.');
+        }
 
         if ($summary['red'] !== []) {
             throw new \DomainException('Der finale Review enthält noch blockierende Punkte.');
@@ -235,6 +246,20 @@ final class FinalReviewService
              FROM case_evidence_reviews
              WHERE case_id = :case_id AND confirmed_at IS NOT NULL
              ORDER BY review_version DESC LIMIT 1'
+        );
+        $stmt->execute(['case_id' => $caseId]);
+        $row = $stmt->fetch();
+
+        return is_array($row) ? $row : null;
+    }
+
+    private function latestQualityReview(string $caseId): ?array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT id, version_no, acknowledged_yellow, created_at, confirmed_at
+             FROM case_quality_reviews
+             WHERE case_id = :case_id AND confirmed_at IS NOT NULL
+             ORDER BY version_no DESC LIMIT 1'
         );
         $stmt->execute(['case_id' => $caseId]);
         $row = $stmt->fetch();
