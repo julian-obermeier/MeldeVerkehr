@@ -230,14 +230,25 @@ try {
         throw new RuntimeException('Could not create evidence test file.');
     }
 
-    $png = base64_decode(
-        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6KJ8AAAAASUVORK5CYII=',
-        true
-    );
-    if ($png === false) {
-        throw new RuntimeException('Could not decode evidence test image.');
+    if (!extension_loaded('gd')) {
+        throw new RuntimeException('GD extension is required for evidence derivative integration tests.');
     }
-    file_put_contents($evidenceSource, $png);
+
+    $testImage = imagecreatetruecolor(320, 240);
+    if (!$testImage instanceof GdImage) {
+        throw new RuntimeException('Could not create evidence test image.');
+    }
+
+    $background = imagecolorallocate($testImage, 230, 230, 230);
+    $foreground = imagecolorallocate($testImage, 25, 25, 25);
+    imagefilledrectangle($testImage, 0, 0, 319, 239, $background);
+    imagerectangle($testImage, 20, 20, 300, 220, $foreground);
+
+    if (!imagepng($testImage, $evidenceSource, 6)) {
+        imagedestroy($testImage);
+        throw new RuntimeException('Could not write evidence test image.');
+    }
+    imagedestroy($testImage);
 
     $evidenceStorage = new EvidenceStorage($basePath . '/storage/app');
     $evidenceService = new EvidenceService(
