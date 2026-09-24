@@ -28,7 +28,8 @@ return new class implements MigrationInterface {
             'CREATE TABLE IF NOT EXISTS passkey_credentials (
                 id CHAR(36) NOT NULL PRIMARY KEY,
                 user_id CHAR(36) NOT NULL,
-                credential_id VARCHAR(1024) NOT NULL UNIQUE,
+                credential_id TEXT NOT NULL,
+                credential_id_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL UNIQUE,
                 public_key_pem TEXT NOT NULL,
                 algorithm INT NOT NULL,
                 sign_count BIGINT UNSIGNED NOT NULL DEFAULT 0,
