@@ -1,15 +1,15 @@
 # Projektstatus
 
 ## Aktuelle Version
-0.13.0-dev
+0.14.0-dev
 
 ## Phase
-M13 – Vorgangsversionierung & Lifecycle
+M14 – Moderation & Safety
 
-## Integrierter Stand bis M12
-Fundament, Vorgangskern, Beweissystem, Zeugenbericht/Final Review, Behördenrouting/Dispatch, Behördenkommunikation, intelligente Assistenz, private Karten/Analytics, Community, Suche/Dokumentcenter/Notifications/Exporte/Retention, Behördenportal/API sowie Produktionshärtung und Release-Operations sind auf `develop` integriert.
+## Integrierter Stand bis M13
+Fundament, Vorgangskern, Beweissystem, Zeugenbericht/Final Review, Behördenrouting/Dispatch, Behördenkommunikation, intelligente Assistenz, private Karten/Analytics, Community, Suche/Dokumentcenter/Notifications/Exporte/Retention, Behördenportal/API Produktionshärtung/Release-Operations sowie M13-Vorgangsversionierung und Lifecycle sind auf `develop` integriert.
 
-## M13 – auf Feature-Branch umgesetzt
+## M13 – in `develop` integriert
 - neue Migration `20260924_023_create_case_lifecycle_tables.php`
 - `case_versions` als unveränderliche, fortlaufende Vorgangsversionen
 - kanonische JSON-Snapshots mit SHA-256-Integritätswert
@@ -31,10 +31,21 @@ Fundament, Vorgangskern, Beweissystem, Zeugenbericht/Final Review, Behördenrout
 - Integrationstests für Versionierung, Nachträge, Korrekturen, Rücknahmen, Abschluss, Export, Ownership und Archivierung
 
 ## Synchronisationshinweis Zielserver
-Der Entwicklungsstand auf `develop` enthält bereits die Migrationen `020`, `021` und `022`. Ein Server, der nur bis Migration `019` anzeigt, ist nicht auf dem aktuellen Repository-Stand. Vor Funktionstests muss deshalb zuerst der aktuelle Entwicklungsstand sauber deployed und anschließend der Migrationslauf ausgeführt werden. M13 ergänzt danach Migration `023`.
+Der Entwicklungsstand auf `develop` enthält bereits die Migrationen `020`, `021` und `022`. Ein Server, der nur bis Migration `019` anzeigt, ist nicht auf dem aktuellen Repository-Stand. Vor Funktionstests muss deshalb zuerst der aktuelle Entwicklungsstand sauber deployed und anschließend der Migrationslauf ausgeführt werden. M13 ergänzt Migration `023`; M14 ergänzt Migration `024`.
+
+## M14 – auf Feature-Branch umgesetzt
+- Appeals/Einsprüche für HIDE, WARN und RESTRICT
+- gespeicherte Vorher-/Nachher-Snapshots für reversible Moderationsmaßnahmen
+- Abuse Flags und transparente Risikosignale
+- Reporter-Risikoscore in der Moderationsqueue
+- Eskalationsworkflow mit Prioritäten und Senior-Abschluss
+- zeitlich begrenzte Posting-, Messaging- und Reporting-Restriktionen
+- Duplicate-Report-Schutz
+- Duplicate-Content-, Velocity-, Bot-Burst- und Mass-Report-Erkennung
+- automatische Signale dienen ausschließlich als Prüfhinweise; endgültige Maßnahmen bleiben moderationsgesteuert
+- End-to-End-Tests für Einspruch, Wiederherstellung, Eskalation, Spam und Restriktion
 
 ## Noch offen vor 1.0.0
-- Moderation vollständig ausbauen: Appeals, Abuse Flags, Eskalationsworkflow sowie Anti-Spam-/Bot-/Mass-Report-Erkennung
 - Reputation erweitern: Achievements, Daily Limits, Diminishing Returns, Anomalieerkennung und Admin-Korrekturen
 - Authority-Inquiry-End-to-End-Workflow bis Bürgerantwort und behördlicher Prüfung abschließen
 - Community um Follower, Favoriten und Gruppenchat ergänzen
@@ -56,6 +67,6 @@ Der Entwicklungsstand auf `develop` enthält bereits die Migrationen `020`, `021
 - Production darf nicht mit `APP_DEBUG=true` als release-ready gelten.
 
 ## Release-Status
-`0.13.0-dev` ist noch kein Stable-Release. Nach Integration von M13 müssen die verbleibenden 1.0-Punkte umgesetzt, CI vollständig ausgeführt und das Release-/Restore-Runbook auf der Zielumgebung erfolgreich durchgespielt werden.
+`0.14.0-dev` ist noch kein Stable-Release. Nach Integration von M14 müssen die verbleibenden 1.0-Punkte umgesetzt, CI vollständig ausgeführt und das Release-/Restore-Runbook auf der Zielumgebung erfolgreich durchgespielt werden.
 
 Siehe `docs/RELEASE_RUNBOOK.md`.

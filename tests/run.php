@@ -32,6 +32,7 @@ use MeldeVerkehr\Communication\CommunicationStorage;
 use MeldeVerkehr\Communication\ReplyAddressService;
 use MeldeVerkehr\Community\CommunityReleaseService;
 use MeldeVerkehr\Community\CommunityService;
+use MeldeVerkehr\Community\CommunityAbuseService;
 use MeldeVerkehr\Community\ModerationService;
 use MeldeVerkehr\Community\ReputationService;
 use MeldeVerkehr\Config\Config;
@@ -2108,6 +2109,29 @@ try {
         'Regional moderator receives reports for targets in own region'
     );
 
+    $duplicateReportBlocked = false;
+    try {
+        $moderationService->report(
+            (string) $other['id'],
+            'POST',
+            (string) $communityPost['id'],
+            'PRIVACY',
+            'Doppelte Meldung darf nicht erneut angelegt werden.'
+        );
+    } catch (DomainException $e) {
+        $duplicateReportBlocked = true;
+    }
+    $assert($duplicateReportBlocked, 'Duplicate reports from same user and target are blocked');
+
+    $queuedReport = array_values(array_filter(
+        $moderationQueue,
+        static fn(array $row): bool => ($row['id'] ?? null) === $reportId
+    ))[0] ?? null;
+    $assert(
+        is_array($queuedReport) && (int) ($queuedReport['reporter_risk_score'] ?? 0) > 0,
+        'Moderation queue exposes transparent reporter risk score'
+    );
+
     $moderationService->resolve(
         (string) $moderator['id'],
         $reportId,
@@ -2118,6 +2142,147 @@ try {
         $communityService->post((string) $moderator['id'], (string) $communityPost['id']) === null,
         'Moderation HIDE removes reported post from public feed'
     );
+
+    $appealable = $moderationService->appealableForUser((string) $user['id']);
+    $assert(
+        count(array_filter(
+            $appealable,
+            static fn(array $row): bool => ($row['id'] ?? null) === $reportId
+        )) === 1,
+        'Target owner can see appealable moderation decision'
+    );
+
+    $appealId = $moderationService->submitAppeal(
+        (string) $user['id'],
+        $reportId,
+        'Der Beitrag enthält keine personenbezogenen Angaben und soll erneut geprüft werden.'
+    );
+    $appealQueue = $moderationService->appealsQueue((string) $moderator['id']);
+    $assert(
+        count(array_filter(
+            $appealQueue,
+            static fn(array $row): bool => ($row['id'] ?? null) === $appealId
+        )) === 1,
+        'Appeal enters scoped moderation queue'
+    );
+
+    $escalationId = $moderationService->escalate(
+        (string) $moderator['id'],
+        'APPEAL',
+        $appealId,
+        'HIGH',
+        'Einspruch soll zusätzlich durch übergeordnete Moderation geprüft werden.'
+    );
+
+    $moderationAdmin = $auth->register([
+        'first_name' => 'Moderation',
+        'last_name' => 'Admin',
+        'email' => 'moderation-admin-' . bin2hex(random_bytes(5)) . '@example.test',
+        'password' => 'VeryStrongModerationAdmin-123!',
+    ]);
+    $pdo->prepare(
+        'INSERT IGNORE INTO user_roles (user_id, role_id, created_at)
+         SELECT :user_id, id, UTC_TIMESTAMP()
+         FROM roles WHERE name = "SUPER_ADMIN"'
+    )->execute(['user_id' => $moderationAdmin['id']]);
+
+    $adminModeration = new ModerationService(
+        $pdo,
+        $permissions,
+        new CommunityAbuseService($pdo),
+        new AuditLogger($pdo, 'test-audit-key')
+    );
+    $openEscalations = $adminModeration->escalations((string) $moderationAdmin['id']);
+    $assert(
+        count(array_filter(
+            $openEscalations,
+            static fn(array $row): bool => ($row['id'] ?? null) === $escalationId
+        )) === 1,
+        'Senior moderation sees escalated appeal'
+    );
+    $adminModeration->resolveEscalation(
+        (string) $moderationAdmin['id'],
+        $escalationId,
+        'Zusatzprüfung durchgeführt; Einspruch kann in der Fachmoderation entschieden werden.'
+    );
+
+    $moderationService->resolveAppeal(
+        (string) $moderator['id'],
+        $appealId,
+        'OVERTURN',
+        'Nach erneuter Prüfung wird die Ausblendung aufgehoben.'
+    );
+    $assert(
+        $communityService->post((string) $moderator['id'], (string) $communityPost['id']) !== null,
+        'Successful appeal restores target from captured pre-moderation state'
+    );
+
+    $abuseUser = $auth->register([
+        'first_name' => 'Abuse',
+        'last_name' => 'Test',
+        'email' => 'abuse-' . bin2hex(random_bytes(5)) . '@example.test',
+        'password' => 'VeryStrongAbuseTest-123!',
+    ]);
+    $abuseService = new CommunityAbuseService($pdo);
+    $guardedCommunity = new CommunityService(
+        $pdo,
+        new AuthorizationService($permissions),
+        $communityCipher,
+        new AuditLogger($pdo, 'test-audit-key'),
+        $abuseService
+    );
+    $guardedCommunity->saveProfile((string) $abuseUser['id'], [
+        'username' => 'abusetest',
+        'region_state' => 'Hessen',
+        'region_district' => 'Gießen',
+        'region_city' => 'Gießen',
+        'visibility_state' => 'PUBLIC',
+        'visibility_district' => 'LOGGED_IN',
+        'visibility_city' => 'PRIVATE',
+        'leaderboard_opt_in' => false,
+    ]);
+    $guardedCommunity->createPost((string) $abuseUser['id'], ['body' => 'Identischer automatisierter Testinhalt.']);
+    $guardedCommunity->createPost((string) $abuseUser['id'], ['body' => 'Identischer automatisierter Testinhalt.']);
+
+    $duplicateSpamBlocked = false;
+    try {
+        $guardedCommunity->createPost((string) $abuseUser['id'], ['body' => 'Identischer automatisierter Testinhalt.']);
+    } catch (DomainException $e) {
+        $duplicateSpamBlocked = true;
+    }
+    $assert($duplicateSpamBlocked, 'Duplicate-content anti-spam blocks repeated identical posts');
+
+    for ($i = 0; $i < 5; $i++) {
+        $abuseService->record(
+            (string) $abuseUser['id'],
+            'REPORT',
+            'POST',
+            Uuid::v4(),
+            'Mass report ' . $i
+        );
+    }
+    $abuseFlags = $moderationService->abuseFlags((string) $moderator['id']);
+    $massFlag = array_values(array_filter(
+        $abuseFlags,
+        static fn(array $row): bool =>
+            ($row['user_id'] ?? null) === $abuseUser['id']
+            && ($row['signal_type'] ?? null) === 'MASS_REPORT_PATTERN'
+    ))[0] ?? null;
+    $assert(is_array($massFlag), 'Mass-report pattern creates moderator-reviewable abuse flag');
+
+    $moderationService->resolveAbuseFlag(
+        (string) $moderator['id'],
+        (string) $massFlag['id'],
+        'RESTRICT_REPORTING',
+        'Automatisierter Test einer zeitlich begrenzten Reporting-Einschränkung.'
+    );
+    $reportingRestrictionWorks = false;
+    try {
+        $abuseService->assertAllowed((string) $abuseUser['id'], 'REPORT', 'Weitere Meldung');
+    } catch (DomainException $e) {
+        $reportingRestrictionWorks = true;
+    }
+    $assert($reportingRestrictionWorks, 'Resolved abuse flag can enforce temporary reporting restriction');
 
     $caseSearch = new CaseSearchService(
         $pdo,

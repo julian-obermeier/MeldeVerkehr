@@ -23,7 +23,8 @@ final class CommunityServiceFactory
             $pdo,
             new AuthorizationService(new PermissionService($pdo)),
             new SecretCipher($key),
-            new AuditLogger($pdo, $key)
+            new AuditLogger($pdo, $key),
+            new CommunityAbuseService($pdo)
         );
     }
 
@@ -62,7 +63,9 @@ final class CommunityServiceFactory
 
         return new ModerationService(
             $pdo,
-            new PermissionService($pdo)
+            new PermissionService($pdo),
+            new CommunityAbuseService($pdo),
+            new AuditLogger($pdo, (string) $app->config()->get('app.key', ''))
         );
     }
 }

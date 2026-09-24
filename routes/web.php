@@ -189,9 +189,15 @@ if ($installerService->isInstalled()) {
     $app->router()->get('/community/releases/{token}', [$community, 'publicRelease']);
     $app->router()->get('/community/releases/{token}/evidence/{order}', [$community, 'publicReleaseEvidence']);
     $app->router()->post('/community/reports', [$community, 'reportContent']);
+    $app->router()->get('/community/appeals', [$community, 'appeals']);
+    $app->router()->post('/community/appeals/{id}', [$community, 'submitAppeal']);
     $app->router()->get('/community/moderation', [$community, 'moderation']);
     $app->router()->post('/community/moderation/problems/{id}/approve', [$community, 'approveProblem']);
     $app->router()->post('/community/moderation/reports/{id}/resolve', [$community, 'resolveModeration']);
+    $app->router()->post('/community/moderation/appeals/{id}/resolve', [$community, 'resolveAppeal']);
+    $app->router()->post('/community/moderation/abuse/{id}/resolve', [$community, 'resolveAbuseFlag']);
+    $app->router()->post('/community/moderation/escalations', [$community, 'escalateModeration']);
+    $app->router()->post('/community/moderation/escalations/{id}/resolve', [$community, 'resolveEscalation']);
 
     $app->router()->get('/search', [$operations, 'search']);
     $app->router()->post('/search/filters', [$operations, 'saveFilter']);

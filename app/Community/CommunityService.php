@@ -16,7 +16,8 @@ final class CommunityService
         private readonly PDO $pdo,
         private readonly AuthorizationService $authorization,
         private readonly SecretCipher $cipher,
-        private readonly AuditLogger $audit
+        private readonly AuditLogger $audit,
+        private readonly ?CommunityAbuseService $abuse = null
     ) {
     }
 
@@ -199,6 +200,8 @@ final class CommunityService
             throw new \InvalidArgumentException('Beitrag muss zwischen 2 und 10.000 Zeichen lang sein.');
         }
 
+        $this->abuse?->assertAllowed($userId, 'POST', $body);
+
         $groupId = $this->nullable($input['group_id'] ?? null);
         if ($groupId !== null && !$this->isActiveMember($userId, $groupId)) {
             throw new \DomainException('Beiträge in einer Gruppe erfordern eine aktive Mitgliedschaft.');
@@ -234,6 +237,7 @@ final class CommunityService
         ]);
 
         $this->audit->log('COMMUNITY_POST_CREATED', 'community_post', $id, 'USER', $userId);
+        $this->abuse?->record($userId, 'POST', 'POST', $id, $body);
 
         return $this->post($userId, $id)
             ?? throw new \RuntimeException('Beitrag konnte nicht geladen werden.');
@@ -336,6 +340,8 @@ final class CommunityService
         if (mb_strlen($body) < 1 || mb_strlen($body) > 4000) {
             throw new \InvalidArgumentException('Kommentar ist ungültig.');
         }
+
+        $this->abuse?->assertAllowed($userId, 'COMMENT', $body);
 
         if ($parentId !== null) {
             $parentStmt = $this->pdo->prepare(
@@ -556,6 +562,8 @@ final class CommunityService
         if (mb_strlen($body) < 1 || mb_strlen($body) > 10000) {
             throw new \InvalidArgumentException('Nachricht ist ungültig.');
         }
+
+        $this->abuse?->assertAllowed($userId, 'MESSAGE', $body);
 
         $acceptedBefore = $this->pdo->prepare(
             'SELECT COUNT(*) FROM community_messages

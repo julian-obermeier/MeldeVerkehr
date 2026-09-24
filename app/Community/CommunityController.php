@@ -638,6 +638,46 @@ final class CommunityController
         return Response::redirect((string) $request->input('return_to', '/community'));
     }
 
+    public function appeals(Request $request): Response
+    {
+        $userId = $this->requireUser();
+        if ($userId instanceof Response) {
+            return $userId;
+        }
+
+        return Response::html($this->view->render('community/appeals', [
+            'items' => CommunityServiceFactory::moderation($this->app)->appealableForUser($userId),
+            'csrf' => Csrf::token(),
+            'message' => $this->pullFlash('community_message'),
+            'error' => $this->pullFlash('community_error'),
+        ]));
+    }
+
+    public function submitAppeal(Request $request): Response
+    {
+        $userId = $this->requireUser();
+        if ($userId instanceof Response) {
+            return $userId;
+        }
+
+        if (!$this->csrf($request, '/community/appeals')) {
+            return Response::redirect('/community/appeals');
+        }
+
+        try {
+            CommunityServiceFactory::moderation($this->app)->submitAppeal(
+                $userId,
+                (string) $request->route('id', ''),
+                (string) $request->input('reason', '')
+            );
+            $_SESSION['community_message'] = 'Einspruch wurde eingereicht.';
+        } catch (\InvalidArgumentException|\DomainException|\MeldeVerkehr\Auth\AuthorizationException $e) {
+            $_SESSION['community_error'] = $e->getMessage();
+        }
+
+        return Response::redirect('/community/appeals');
+    }
+
     public function moderation(Request $request): Response
     {
         $userId = $this->requireUser();
@@ -650,6 +690,10 @@ final class CommunityController
             return Response::html($this->view->render('community/moderation', [
                 'reports' => $service->queue($userId),
                 'pendingProblems' => $service->pendingProblemAreas($userId),
+                'appeals' => $service->appealsQueue($userId),
+                'abuseFlags' => $service->abuseFlags($userId),
+                'escalations' => $service->escalations($userId),
+                'canResolveEscalations' => $service->canResolveEscalations($userId),
                 'csrf' => Csrf::token(),
                 'message' => $this->pullFlash('community_message'),
                 'error' => $this->pullFlash('community_error'),
@@ -714,6 +758,110 @@ final class CommunityController
                 $this->nullable($request->input('reason'))
             );
             $_SESSION['community_message'] = 'Moderationsfall abgeschlossen.';
+        } catch (\InvalidArgumentException|\DomainException|\MeldeVerkehr\Auth\AuthorizationException $e) {
+            $_SESSION['community_error'] = $e->getMessage();
+        }
+
+        return Response::redirect('/community/moderation');
+    }
+
+    public function resolveAppeal(Request $request): Response
+    {
+        $userId = $this->requireUser();
+        if ($userId instanceof Response) {
+            return $userId;
+        }
+
+        if (!$this->csrf($request, '/community/moderation')) {
+            return Response::redirect('/community/moderation');
+        }
+
+        try {
+            CommunityServiceFactory::moderation($this->app)->resolveAppeal(
+                $userId,
+                (string) $request->route('id', ''),
+                (string) $request->input('outcome', ''),
+                (string) $request->input('reason', '')
+            );
+            $_SESSION['community_message'] = 'Einspruch wurde entschieden.';
+        } catch (\InvalidArgumentException|\DomainException|\MeldeVerkehr\Auth\AuthorizationException $e) {
+            $_SESSION['community_error'] = $e->getMessage();
+        }
+
+        return Response::redirect('/community/moderation');
+    }
+
+    public function resolveAbuseFlag(Request $request): Response
+    {
+        $userId = $this->requireUser();
+        if ($userId instanceof Response) {
+            return $userId;
+        }
+
+        if (!$this->csrf($request, '/community/moderation')) {
+            return Response::redirect('/community/moderation');
+        }
+
+        try {
+            CommunityServiceFactory::moderation($this->app)->resolveAbuseFlag(
+                $userId,
+                (string) $request->route('id', ''),
+                (string) $request->input('action', ''),
+                (string) $request->input('reason', '')
+            );
+            $_SESSION['community_message'] = 'Abuse-Flag wurde bearbeitet.';
+        } catch (\InvalidArgumentException|\DomainException|\MeldeVerkehr\Auth\AuthorizationException $e) {
+            $_SESSION['community_error'] = $e->getMessage();
+        }
+
+        return Response::redirect('/community/moderation');
+    }
+
+    public function escalateModeration(Request $request): Response
+    {
+        $userId = $this->requireUser();
+        if ($userId instanceof Response) {
+            return $userId;
+        }
+
+        if (!$this->csrf($request, '/community/moderation')) {
+            return Response::redirect('/community/moderation');
+        }
+
+        try {
+            CommunityServiceFactory::moderation($this->app)->escalate(
+                $userId,
+                (string) $request->input('source_type', ''),
+                (string) $request->input('source_id', ''),
+                (string) $request->input('priority', 'NORMAL'),
+                (string) $request->input('reason', '')
+            );
+            $_SESSION['community_message'] = 'Fall wurde eskaliert.';
+        } catch (\InvalidArgumentException|\DomainException|\MeldeVerkehr\Auth\AuthorizationException $e) {
+            $_SESSION['community_error'] = $e->getMessage();
+        }
+
+        return Response::redirect('/community/moderation');
+    }
+
+    public function resolveEscalation(Request $request): Response
+    {
+        $userId = $this->requireUser();
+        if ($userId instanceof Response) {
+            return $userId;
+        }
+
+        if (!$this->csrf($request, '/community/moderation')) {
+            return Response::redirect('/community/moderation');
+        }
+
+        try {
+            CommunityServiceFactory::moderation($this->app)->resolveEscalation(
+                $userId,
+                (string) $request->route('id', ''),
+                (string) $request->input('resolution', '')
+            );
+            $_SESSION['community_message'] = 'Eskalation wurde abgeschlossen.';
         } catch (\InvalidArgumentException|\DomainException|\MeldeVerkehr\Auth\AuthorizationException $e) {
             $_SESSION['community_error'] = $e->getMessage();
         }
