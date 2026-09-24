@@ -13,7 +13,8 @@ final class Request
         private readonly string $path,
         private readonly array $query,
         private readonly array $post,
-        private readonly array $server
+        private readonly array $server,
+        private readonly array $files = []
     ) {
     }
 
@@ -27,7 +28,8 @@ final class Request
             '/' . ltrim($path, '/'),
             $_GET,
             $_POST,
-            $_SERVER
+            $_SERVER,
+            $_FILES
         );
     }
 
@@ -49,6 +51,11 @@ final class Request
     public function input(string $key, mixed $default = null): mixed
     {
         return $this->post[$key] ?? $default;
+    }
+
+    public function file(string $key, mixed $default = null): mixed
+    {
+        return $this->files[$key] ?? $default;
     }
 
     public function server(string $key, mixed $default = null): mixed
