@@ -51,6 +51,7 @@ if ($installerService->isInstalled()) {
     $security = new SecurityController($app);
     $passkeyLogin = new PasskeyLoginController($app);
     $cases = new CaseController($app);
+    $caseLifecycle = new CaseLifecycleController($app);
     $evidence = new EvidenceController($app);
     $privacy = new EvidencePrivacyController($app);
     $evidenceReview = new EvidenceReviewController($app);
@@ -99,6 +100,15 @@ if ($installerService->isInstalled()) {
     $app->router()->post('/cases/{id}/offense', [$cases, 'saveOffense']);
     $app->router()->get('/cases/{id}/review', [$cases, 'review']);
     $app->router()->post('/cases/{id}/review', [$cases, 'confirmReview']);
+
+    $app->router()->get('/cases/{id}/lifecycle', [$caseLifecycle, 'index']);
+    $app->router()->post('/cases/{id}/lifecycle/amendments', [$caseLifecycle, 'addAmendment']);
+    $app->router()->post('/cases/{id}/lifecycle/corrections', [$caseLifecycle, 'requestCorrection']);
+    $app->router()->post('/cases/{id}/lifecycle/corrections/{correction}/complete', [$caseLifecycle, 'completeCorrection']);
+    $app->router()->post('/cases/{id}/lifecycle/withdrawals', [$caseLifecycle, 'requestWithdrawal']);
+    $app->router()->post('/cases/{id}/lifecycle/withdrawals/{withdrawal}/complete', [$caseLifecycle, 'completeWithdrawal']);
+    $app->router()->post('/cases/{id}/lifecycle/close', [$caseLifecycle, 'close']);
+    $app->router()->post('/cases/{id}/lifecycle/archive', [$caseLifecycle, 'archive']);
 
     $app->router()->get('/cases/{id}/evidence', [$evidence, 'index']);
     $app->router()->post('/cases/{id}/evidence', [$evidence, 'upload']);
