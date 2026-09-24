@@ -5,6 +5,17 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 ## [Unreleased]
 
 ### Added
+- M4-Datenmodell für eigene Beobachtungen, Narrative, Zeugenberichte, Erklärungen und Qualitätsreviews
+- versionierte eigene Beobachtung mit verschlüsselter Freitextspeicherung
+- deterministischer neutraler Sachverhaltgenerator
+- versionierte bearbeitbare Sachverhaltstexte
+- verschlüsselte Zeugenbericht-Snapshots mit SHA-256-Integrität
+- elektronische Erklärung mit minimierten gehashten Audit-Metadaten
+- serverseitige Prüfung, ob ein bestätigter Zeugenbericht noch zum aktuellen Aktenstand gehört
+- finaler Rot/Gelb/Grün-Qualitätsreview
+- versionierter Qualitätsreview-Snapshot
+- Bürgeroberflächen für Zeugenbericht und finalen Review
+- End-to-End-Tests bis READY_FOR_SUBMISSION
 - manuelle Evidence-Privacy-Bereiche mit normalisierten Bildkoordinaten
 - interaktive Privacy-Rechteckauswahl auf geschützten Vorschauen
 - versionierte Privacy-Review-Snapshots
@@ -91,6 +102,8 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 - CSRF-Schutz für Installations- und Authentifizierungsformulare
 
 ### Changed
+- nach bestätigtem M4-Review sind Beobachtung, Sachverhalt und Zeugenbericht nur noch lesbar
+- READY_FOR_SUBMISSION markiert den abgeschlossenen Bürger-Vorbereitungsprozess vor dem Behördenversand
 - Evidence-Änderungen werden nach eingefrorener Beweismappe serverseitig gesperrt
 - READY_FOR_REVIEW wird in der Vorgangsansicht anhand des Evidence-Pakets eindeutig dem richtigen Review-Schritt zugeordnet
 - vollständige M2-Grunddaten wechseln jetzt zuerst zu READY_FOR_REVIEW
@@ -115,6 +128,10 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 - native Mailheader werden gegen Zeilenumbrüche abgesichert und UTF-8-Betreffzeilen kodiert
 
 ### Security
+- Beobachtungs- und Sachverhaltstexte werden feldseitig verschlüsselt gespeichert
+- Zeugenbericht-Snapshots werden verschlüsselt gespeichert und zusätzlich per SHA-256 verifiziert
+- elektronische Erklärungen speichern IP-, User-Agent- und Sessionbezug nur als Hash/HMAC
+- der finale Qualitätsreview prüft Evidence-Manifest- und Zeugenbericht-Integrität
 - Privacy-Redaktionen verändern ausschließlich PUBLIC-Kopien, niemals Originale
 - Evidence-Packages prüfen die Integrität von Original und PUBLIC-Kopie vor dem Einfrieren
 - interne Storage-Pfade werden nicht an Review-Views ausgegeben
