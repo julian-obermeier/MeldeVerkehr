@@ -39,10 +39,12 @@ final class SmtpDispatchTransport implements DispatchTransportInterface
 
         $messageId = $headers['Message-ID'] ?? ('<mv-' . bin2hex(random_bytes(16)) . '@' . $this->messageDomain() . '>');
         $replyTo = $headers['Reply-To'] ?? null;
+        $inReplyTo = $headers['In-Reply-To'] ?? null;
 
         if (
             !$this->validHeaderValue($messageId)
             || ($replyTo !== null && (!filter_var($replyTo, FILTER_VALIDATE_EMAIL) || !$this->validHeaderValue($replyTo)))
+            || ($inReplyTo !== null && !$this->validHeaderValue($inReplyTo))
         ) {
             return $this->failure('invalid_reply_or_message_header');
         }
@@ -95,7 +97,8 @@ final class SmtpDispatchTransport implements DispatchTransportInterface
                 $text,
                 $attachments,
                 $messageId,
-                $replyTo
+                $replyTo,
+                $inReplyTo
             );
             $raw = preg_replace('/(?m)^\./', '..', $raw) ?? $raw;
             fwrite($socket, $raw . "\r\n.\r\n");
@@ -109,6 +112,7 @@ final class SmtpDispatchTransport implements DispatchTransportInterface
                 'response' => [
                     'mode' => 'smtp',
                     'reply_to' => $replyTo,
+                    'in_reply_to' => $inReplyTo,
                     'server_response' => mb_substr($response, 0, 500),
                 ],
                 'message_id' => $messageId,
@@ -129,7 +133,8 @@ final class SmtpDispatchTransport implements DispatchTransportInterface
         string $text,
         array $attachments,
         string $messageId,
-        ?string $replyTo
+        ?string $replyTo,
+        ?string $inReplyTo
     ): string {
         $boundary = 'mv_smtp_' . bin2hex(random_bytes(16));
         $encodedSubject = function_exists('mb_encode_mimeheader')
@@ -152,6 +157,10 @@ final class SmtpDispatchTransport implements DispatchTransportInterface
 
         if ($replyTo !== null) {
             $headers[] = 'Reply-To: ' . $replyTo;
+        }
+        if ($inReplyTo !== null) {
+            $headers[] = 'In-Reply-To: ' . $inReplyTo;
+            $headers[] = 'References: ' . $inReplyTo;
         }
 
         $body = '--' . $boundary . "\r\n"
