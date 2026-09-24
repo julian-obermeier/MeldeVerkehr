@@ -109,6 +109,131 @@ final class EvidenceController
         return Response::redirect('/cases/' . rawurlencode($caseId) . '/evidence');
     }
 
+    public function offlineToken(Request $request): Response
+    {
+        $userId = $this->requireUser();
+        if ($userId instanceof Response) {
+            return $userId;
+        }
+
+        $caseId = (string) $request->route('id', '');
+
+        try {
+            $context = $this->offlineService()->context($userId, $caseId);
+        } catch (\MeldeVerkehr\Auth\AuthorizationException $e) {
+            return Response::json([
+                'success' => false,
+                'data' => null,
+                'errors' => [['code' => 'FORBIDDEN', 'message' => 'Kein Zugriff auf diesen Vorgang.']],
+                'meta' => [],
+            ], 403);
+        } catch (\DomainException $e) {
+            return Response::json([
+                'success' => false,
+                'data' => null,
+                'errors' => [['code' => 'CASE_NOT_FOUND', 'message' => $e->getMessage()]],
+                'meta' => [],
+            ], 404);
+        }
+
+        return Response::json([
+            'success' => true,
+            'data' => $context + [
+                'csrf' => Csrf::token(),
+                'queue_max_items' => 10,
+                'queue_max_bytes' => 100 * 1024 * 1024,
+                'queue_ttl_seconds' => 86400,
+            ],
+            'errors' => [],
+            'meta' => [],
+        ], 200, ['Cache-Control' => 'private, no-store, max-age=0']);
+    }
+
+    public function offlineUpload(Request $request): Response
+    {
+        $userId = $this->requireUser();
+        if ($userId instanceof Response) {
+            return $userId;
+        }
+
+        $caseId = (string) $request->route('id', '');
+
+        if (!Csrf::validate((string) $request->input('_csrf', ''))) {
+            return Response::json([
+                'success' => false,
+                'data' => null,
+                'errors' => [['code' => 'CSRF', 'message' => 'Sitzung abgelaufen.']],
+                'meta' => [],
+            ], 419);
+        }
+
+        $file = $request->file('evidence');
+        if (!is_array($file) || (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+            return Response::json([
+                'success' => false,
+                'data' => null,
+                'errors' => [['code' => 'FILE_REQUIRED', 'message' => 'Bilddatei fehlt.']],
+                'meta' => [],
+            ], 422);
+        }
+
+        $tmp = (string) ($file['tmp_name'] ?? '');
+        if ($tmp === '' || !is_uploaded_file($tmp)) {
+            return Response::json([
+                'success' => false,
+                'data' => null,
+                'errors' => [['code' => 'UPLOAD_INVALID', 'message' => 'Upload konnte nicht verifiziert werden.']],
+                'meta' => [],
+            ], 422);
+        }
+
+        try {
+            $result = $this->offlineService()->process(
+                $userId,
+                $caseId,
+                (string) $request->input('client_upload_id', ''),
+                (string) $request->input('client_sha256', ''),
+                $tmp,
+                (string) ($file['name'] ?? 'offline-bild'),
+                (string) $request->input('category', '')
+            );
+
+            return Response::json([
+                'success' => true,
+                'data' => [
+                    'client_upload_id' => (string) $request->input('client_upload_id', ''),
+                    'duplicate' => (bool) $result['duplicate'],
+                    'receipt_status' => (string) $result['receipt_status'],
+                    'evidence_id' => (string) $result['evidence']['id'],
+                    'sha256' => (string) $result['evidence']['sha256'],
+                ],
+                'errors' => [],
+                'meta' => [],
+            ], !empty($result['duplicate']) ? 200 : 201);
+        } catch (\MeldeVerkehr\Auth\AuthorizationException $e) {
+            return Response::json([
+                'success' => false,
+                'data' => null,
+                'errors' => [['code' => 'FORBIDDEN', 'message' => 'Kein Zugriff auf diesen Vorgang.']],
+                'meta' => [],
+            ], 403);
+        } catch (\InvalidArgumentException $e) {
+            return Response::json([
+                'success' => false,
+                'data' => null,
+                'errors' => [['code' => 'VALIDATION', 'message' => $e->getMessage()]],
+                'meta' => [],
+            ], 422);
+        } catch (\DomainException $e) {
+            return Response::json([
+                'success' => false,
+                'data' => null,
+                'errors' => [['code' => 'CONFLICT', 'message' => $e->getMessage()]],
+                'meta' => [],
+            ], 409);
+        }
+    }
+
     public function remove(Request $request): Response
     {
         $userId = $this->requireUser();
@@ -171,6 +296,14 @@ final class EvidenceController
             ),
             new EvidenceImageProcessor($storage),
             new ImageQualityAnalyzer()
+        );
+    }
+
+    private function offlineService(): OfflineEvidenceUploadService
+    {
+        return new OfflineEvidenceUploadService(
+            $this->app->database(),
+            $this->service()
         );
     }
 
