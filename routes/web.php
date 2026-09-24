@@ -8,6 +8,7 @@ use MeldeVerkehr\Auth\DashboardController;
 use MeldeVerkehr\Auth\PasskeyLoginController;
 use MeldeVerkehr\Auth\SecurityController;
 use MeldeVerkehr\Auth\TwoFactorController;
+use MeldeVerkehr\Cases\CaseController;
 use MeldeVerkehr\Core\Application;
 use MeldeVerkehr\Http\Request;
 use MeldeVerkehr\Http\Response;
@@ -32,6 +33,7 @@ if ($installerService->isInstalled()) {
     $twoFactor = new TwoFactorController($app);
     $security = new SecurityController($app);
     $passkeyLogin = new PasskeyLoginController($app);
+    $cases = new CaseController($app);
 
     $app->router()->get('/register', [$auth, 'registerForm']);
     $app->router()->post('/register', [$auth, 'register']);
@@ -56,6 +58,13 @@ if ($installerService->isInstalled()) {
     $app->router()->post('/reset-password', [$auth, 'reset']);
 
     $app->router()->get('/dashboard', [$dashboard, 'index']);
+
+    $app->router()->get('/cases', [$cases, 'index']);
+    $app->router()->post('/cases', [$cases, 'create']);
+    $app->router()->get('/cases/{id}', [$cases, 'show']);
+    $app->router()->post('/cases/{id}/vehicle', [$cases, 'saveVehicle']);
+    $app->router()->post('/cases/{id}/location', [$cases, 'saveLocation']);
+    $app->router()->post('/cases/{id}/offense', [$cases, 'saveOffense']);
 
     $app->router()->get('/settings/security', [$security, 'index']);
     $app->router()->post('/settings/security/totp/start', [$security, 'startTotp']);
