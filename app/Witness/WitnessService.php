@@ -31,7 +31,7 @@ final class WitnessService
 
     public function detail(string $userId, string $caseId): array
     {
-        $caseData = $this->m4Case($userId, $caseId);
+        $caseData = $this->m4Case($userId, $caseId, true);
         $observation = $this->latestObservation($caseId);
         $narrative = $this->latestNarrative($caseId);
         $report = $this->latestReport($caseId);
@@ -114,7 +114,7 @@ final class WitnessService
 
     public function generateNarrative(string $userId, string $caseId): array
     {
-        $caseData = $this->m4Case($userId, $caseId);
+        $caseData = $this->m4Case($userId, $caseId, true);
         $observation = $this->latestObservation($caseId);
 
         if ($observation === null) {
@@ -135,7 +135,7 @@ final class WitnessService
 
     public function saveNarrative(string $userId, string $caseId, string $text): array
     {
-        $this->m4Case($userId, $caseId);
+        $this->m4Case($userId, $caseId, true);
         $observation = $this->latestObservation($caseId);
         $latest = $this->latestNarrative($caseId);
 
@@ -474,7 +474,7 @@ final class WitnessService
         ];
     }
 
-    private function m4Case(string $userId, string $caseId): array
+    private function m4Case(string $userId, string $caseId, bool $editable = false): array
     {
         $caseData = $this->cases->findOwned($userId, $caseId);
 
@@ -488,11 +488,17 @@ final class WitnessService
             (string) $caseData['case']['user_id']
         );
 
+        $status = (string) $caseData['case']['status'];
+
         if (
-            (string) $caseData['case']['status'] !== CaseStatus::READY_FOR_REVIEW
+            !in_array($status, [CaseStatus::READY_FOR_REVIEW, CaseStatus::READY_FOR_SUBMISSION], true)
             || !is_array($caseData['evidence_package'] ?? null)
         ) {
             throw new \DomainException('M4 ist erst nach eingefrorener Beweismappe verfügbar.');
+        }
+
+        if ($editable && $status !== CaseStatus::READY_FOR_REVIEW) {
+            throw new \DomainException('Der Zeugenbericht ist nach abgeschlossenem finalen Review nur noch lesbar.');
         }
 
         return $caseData;
