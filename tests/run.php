@@ -32,6 +32,7 @@ use MeldeVerkehr\Communication\CommunicationStorage;
 use MeldeVerkehr\Communication\ReplyAddressService;
 use MeldeVerkehr\Community\CommunityReleaseService;
 use MeldeVerkehr\Community\CommunityService;
+use MeldeVerkehr\Community\CommunitySocialService;
 use MeldeVerkehr\Community\CommunityAbuseService;
 use MeldeVerkehr\Community\ModerationService;
 use MeldeVerkehr\Community\ReputationService;
@@ -1772,6 +1773,13 @@ try {
         $communityCipher,
         new AuditLogger($pdo, 'test-audit-key')
     );
+    $communitySocial = new CommunitySocialService(
+        $pdo,
+        new AuthorizationService($permissions),
+        $communityCipher,
+        new AuditLogger($pdo, 'test-audit-key'),
+        new CommunityAbuseService($pdo)
+    );
     $reputationService = new ReputationService($pdo);
     $communityReleaseService = new CommunityReleaseService(
         $pdo,
@@ -1855,6 +1863,35 @@ try {
     $assert(
         isset($comment['id']),
         'Community comments can be added by accessible users'
+    );
+
+    $communitySocial->followUsername((string) $other['id'], 'testuser');
+    $followStats = $communitySocial->profileStats((string) $other['id'], (string) $user['id']);
+    $assert(
+        $followStats['is_following'] === true && $followStats['followers'] >= 1,
+        'Community followers are persisted and exposed through profile stats'
+    );
+
+    $communitySocial->favorite((string) $other['id'], (string) $communityPost['id']);
+    $assert(
+        $communitySocial->isFavorite((string) $other['id'], (string) $communityPost['id'])
+        && count($communitySocial->favorites((string) $other['id'])) >= 1,
+        'Community post favorites are persisted and listed'
+    );
+
+    $groupMessageId = $communitySocial->sendGroupMessage(
+        (string) $other['id'],
+        (string) $group['id'],
+        'Verschlüsselte Testnachricht im Gruppenchat.'
+    );
+    $groupChat = $communitySocial->groupChat((string) $user['id'], (string) $group['id']);
+    $assert(
+        $groupMessageId !== ''
+        && count(array_filter(
+            $groupChat['messages'],
+            static fn(array $row): bool => ($row['id'] ?? null) === $groupMessageId
+        )) === 1,
+        'Group chat stores encrypted messages for active members'
     );
 
     $helpfulInserted = $communityService->reactHelpful(
