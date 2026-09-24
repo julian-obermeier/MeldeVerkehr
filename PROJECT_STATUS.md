@@ -1,10 +1,10 @@
 # Projektstatus
 
 ## Aktuelle Version
-0.18.0-dev
+0.19.0-dev
 
 ## Phase
-M18 – Notification Preferences & Delivery
+M19 – Offline Evidence Queue
 
 ## Integrierter Stand bis M13
 Fundament, Vorgangskern, Beweissystem, Zeugenbericht/Final Review, Behördenrouting/Dispatch, Behördenkommunikation, intelligente Assistenz, private Karten/Analytics, Community, Suche/Dokumentcenter/Notifications/Exporte/Retention, Behördenportal/API Produktionshärtung/Release-Operations sowie M13-Vorgangsversionierung und Lifecycle sind auf `develop` integriert.
@@ -31,7 +31,7 @@ Fundament, Vorgangskern, Beweissystem, Zeugenbericht/Final Review, Behördenrout
 - Integrationstests für Versionierung, Nachträge, Korrekturen, Rücknahmen, Abschluss, Export, Ownership und Archivierung
 
 ## Synchronisationshinweis Zielserver
-Der Entwicklungsstand auf `develop` enthält bereits die Migrationen `020`, `021` und `022`. Ein Server, der nur bis Migration `019` anzeigt, ist nicht auf dem aktuellen Repository-Stand. Vor Funktionstests muss deshalb zuerst der aktuelle Entwicklungsstand sauber deployed und anschließend der Migrationslauf ausgeführt werden. M13 ergänzt Migration `023`; M14 Migration `024`; M15 Migration `025`; M16 Migration `026`; M17 Migration `027`; M18 Migration `028`.
+Der Entwicklungsstand auf `develop` enthält bereits die Migrationen `020`, `021` und `022`. Ein Server, der nur bis Migration `019` anzeigt, ist nicht auf dem aktuellen Repository-Stand. Vor Funktionstests muss deshalb zuerst der aktuelle Entwicklungsstand sauber deployed und anschließend der Migrationslauf ausgeführt werden. M13 ergänzt Migration `023`; M14 Migration `024`; M15 Migration `025`; M16 Migration `026`; M17 Migration `027`; M18 Migration `028`; M19 Migration `029`.
 
 ## M14 – in `develop` integriert
 - Appeals/Einsprüche für HIDE, WARN und RESTRICT
@@ -78,7 +78,7 @@ Der Entwicklungsstand auf `develop` enthält bereits die Migrationen `020`, `021
 - Integrationstests für Follow, Favoriten und verschlüsselten Gruppenchat
 - neue Migration `20260924_027_create_community_social_tables.php`
 
-## M18 – auf Feature-Branch umgesetzt
+## M18 – in `develop` integriert
 - vollständige Benachrichtigungspräferenzen als Benutzeroberfläche
 - In-App, E-Mail und Push je Ereignistyp getrennt aktivierbar
 - alle Kanäle standardmäßig aktiviert
@@ -92,8 +92,23 @@ Der Entwicklungsstand auf `develop` enthält bereits die Migrationen `020`, `021
 - Integrationstests für Default-Präferenzen, gespeicherte Kanalwahl und Push-Subscription-Lifecycle
 - neue Migration `20260924_028_create_notification_delivery_tables.php`
 
+## M19 – auf Feature-Branch umgesetzt
+- kontrollierte IndexedDB-Queue für Bildnachweise mit eigenem Evidence-Store
+- maximal 10 lokale Dateien, 100 MB Gesamtqueue und 20 MB je Bild
+- ausschließlich JPEG, PNG und WebP
+- 24-Stunden-Ablauf; abgelaufene Einträge werden beim nächsten Öffnen bereinigt
+- lokale SHA-256-Berechnung vor dem Upload und Serverabgleich nach Speicherung
+- keine lokalen Vorschaubilder und kein Background-Sync aus dem Service Worker
+- Queue synchronisiert nur bei geöffneter Anwendung bzw. Online-Wiederkehr
+- lokale Blobs werden erst nach bestätigtem Serverreceipt mit identischem SHA-256 gelöscht
+- idempotente `client_upload_id` mit vorreservierter Evidence-ID verhindert Doppeluploads bei Verbindungsabbrüchen
+- parallele Wiederholungen derselben Upload-ID werden geblockt
+- Ownership, Berechtigung und bearbeitbarer Vorgangsstatus werden vor Receipt-Reservierung geprüft
+- No-JavaScript-Fallback über den bestehenden normalen Evidence-Upload bleibt erhalten
+- Integrationstest für Upload-Idempotenz und SHA-256-Receipt
+- neue Migration `20260924_029_create_offline_evidence_receipts.php`
+
 ## Noch offen vor 1.0.0
-- kontrollierte IndexedDB-Queue für Offline-Evidence evaluieren/umsetzen
 - Inline-CSS/JS aus Legacy-Views entfernen und CSP anschließend ohne `unsafe-inline` betreiben
 - produktive Retention-Fristen fachlich/rechtlich festlegen und Lösch-/Anonymisierungsengine aktivieren
 - vollständigen Deploy-, Backup-, Restore- und Rollback-Test auf dem ALL-INKL-Zielsystem durchführen
@@ -110,6 +125,6 @@ Der Entwicklungsstand auf `develop` enthält bereits die Migrationen `020`, `021
 - Production darf nicht mit `APP_DEBUG=true` als release-ready gelten.
 
 ## Release-Status
-`0.18.0-dev` ist noch kein Stable-Release. Nach Integration von M18 müssen die verbleibenden 1.0-Punkte umgesetzt, CI vollständig ausgeführt und das Release-/Restore-Runbook auf der Zielumgebung erfolgreich durchgespielt werden.
+`0.19.0-dev` ist noch kein Stable-Release. Nach Integration von M19 müssen die verbleibenden 1.0-Punkte umgesetzt, CI vollständig ausgeführt und das Release-/Restore-Runbook auf der Zielumgebung erfolgreich durchgespielt werden.
 
 Siehe `docs/RELEASE_RUNBOOK.md`.
