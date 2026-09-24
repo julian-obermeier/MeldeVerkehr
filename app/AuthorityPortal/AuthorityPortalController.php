@@ -84,6 +84,12 @@ final class AuthorityPortalController
                 (string) $detail['authority']['id'],
                 'authority.case.view'
             );
+
+            foreach ($detail['inquiries'] as &$inquiry) {
+                $inquiry['responses'] = AuthorityPortalServiceFactory::inquiries($this->app)
+                    ->authorityResponses($userId, (string) $inquiry['id']);
+            }
+            unset($inquiry);
         } catch (AuthorizationException|\DomainException $e) {
             return Response::html('<h1>404</h1><p>Behördenvorgang nicht gefunden.</p>', 404);
         }
