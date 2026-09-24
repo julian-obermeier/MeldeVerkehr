@@ -69,7 +69,7 @@ return new class implements MigrationInterface {
                 case_id CHAR(36) NOT NULL,
                 evidence_id CHAR(36) NULL,
                 suggestion_type VARCHAR(50) NOT NULL,
-                value_json LONGTEXT NOT NULL,
+                value_encrypted LONGTEXT NOT NULL,
                 confidence DECIMAL(5,4) NULL,
                 status VARCHAR(30) NOT NULL DEFAULT "PENDING",
                 decided_by_user_id CHAR(36) NULL,
