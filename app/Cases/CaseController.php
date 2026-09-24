@@ -165,6 +165,10 @@ final class CaseController
 
         try {
             $summary = $this->service()->reviewSummary($userId, $caseId);
+
+            if (($summary['data']['evidence_package'] ?? null) !== null) {
+                return Response::redirect('/cases/' . rawurlencode($caseId) . '/evidence/review');
+            }
         } catch (AuthorizationException $e) {
             return Response::html('<h1>403</h1><p>Kein Zugriff auf diesen Vorgang.</p>', 403);
         } catch (\DomainException $e) {
