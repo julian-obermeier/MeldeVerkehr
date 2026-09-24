@@ -218,7 +218,12 @@ final class EvidencePrivacyService
                 'width' => $public['width'],
                 'height' => $public['height'],
                 'processing' => json_encode(
-                    array_merge($public['processing'], ['regions_sha256' => $regionsHash]),
+                    array_merge($public['processing'], [
+                        'regions_sha256' => $regionsHash,
+                        'source_variant' => $source['variant'],
+                        'source_version_no' => (int) $source['version_no'],
+                        'source_sha256' => $source['sha256'],
+                    ]),
                     JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
                 ),
             ]);
@@ -318,7 +323,7 @@ final class EvidencePrivacyService
     private function sourceVariant(string $evidenceId): array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT storage_path, mime_type, version_no
+            'SELECT storage_path, mime_type, variant, version_no, sha256
              FROM evidence_versions
              WHERE evidence_id = :id AND variant IN ("WORKING","ORIGINAL")
              ORDER BY CASE variant WHEN "WORKING" THEN 0 ELSE 1 END, version_no DESC
