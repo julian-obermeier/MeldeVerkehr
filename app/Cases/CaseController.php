@@ -84,6 +84,8 @@ final class CaseController
             'data' => $case,
             'offenses' => $this->service()->availableOffenses(),
             'csrf' => Csrf::token(),
+            'message' => $this->pullFlash('case_message'),
+            'error' => $this->pullFlash('case_error'),
         ]));
     }
 
@@ -177,6 +179,14 @@ final class CaseController
         }
 
         return $userId;
+    }
+
+    private function pullFlash(string $key): ?string
+    {
+        $value = $_SESSION[$key] ?? null;
+        unset($_SESSION[$key]);
+
+        return is_string($value) ? $value : null;
     }
 
     private function service(): CaseService
