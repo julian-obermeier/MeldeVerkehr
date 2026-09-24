@@ -29,10 +29,14 @@ use MeldeVerkehr\Operations\OperationsController;
 use MeldeVerkehr\Release\ReleaseAdminController;
 use MeldeVerkehr\Release\ReleaseHealthController;
 use MeldeVerkehr\Release\ReleaseServiceFactory;
+use MeldeVerkehr\Support\ViewStyleController;
 use MeldeVerkehr\Witness\FinalReviewController;
 use MeldeVerkehr\Witness\WitnessController;
 
 /** @var Application $app */
+
+$viewStyles = new ViewStyleController($app->basePath() . '/resources/views');
+$app->router()->get('/assets/view-style.css', [$viewStyles, 'style']);
 
 $installer = new InstallerController($app->basePath());
 $installerService = new InstallerService($app->basePath());
