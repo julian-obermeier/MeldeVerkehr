@@ -78,6 +78,7 @@ final class EvidenceReviewService
                 'variant' => 'PUBLIC',
                 'version_no' => (int) $item['public_version_no'],
                 'sha256' => (string) $item['public_sha256'],
+                'original_sha256' => (string) $item['original_sha256'],
             ];
         }
 
@@ -222,8 +223,11 @@ final class EvidenceReviewService
             'SELECT e.id, e.category, e.original_filename, e.quality_state, e.created_at,
                     pr.public_version_no, pr.reviewed_at,
                     pv.storage_path, pv.sha256 AS public_sha256, pv.mime_type, pv.file_size,
-                    pv.width, pv.height
+                    pv.width, pv.height,
+                    ov.storage_path AS original_storage_path, ov.sha256 AS original_sha256
              FROM evidence_items e
+             INNER JOIN evidence_versions ov
+               ON ov.evidence_id = e.id AND ov.variant = "ORIGINAL" AND ov.version_no = 1
              LEFT JOIN evidence_privacy_reviews pr ON pr.evidence_id = e.id
              LEFT JOIN evidence_versions pv
                ON pv.evidence_id = e.id
@@ -250,6 +254,17 @@ final class EvidenceReviewService
         $categories = [];
         foreach ($items as $item) {
             $categories[(string) $item['category']] = true;
+
+            $originalAbsolute = $this->storage->absolute((string) $item['original_storage_path']);
+            if (
+                !is_file($originalAbsolute)
+                || !hash_equals((string) $item['original_sha256'], hash_file('sha256', $originalAbsolute))
+            ) {
+                $missing[] = sprintf(
+                    'Integrität des geschützten Originals „%s“ konnte nicht bestätigt werden.',
+                    (string) $item['original_filename']
+                );
+            }
 
             if ($item['public_version_no'] === null || $item['storage_path'] === null) {
                 $missing[] = sprintf(
