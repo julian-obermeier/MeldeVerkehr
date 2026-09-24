@@ -5,6 +5,15 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 ## [Unreleased]
 
 ### Added
+- M8-Datenmodell für private Problemstellen, Fallzuordnungen, Aggregationssnapshots und kommunale Reports
+- private schematische Vorgangskarte ohne externe Kartentiles
+- private Hotspot-Erkennung ausschließlich aus eigenen Vorgängen
+- benutzereigene Problemstellen mit Radius und automatischer Haversine-Zuordnung
+- versionierte Problemstellen-Snapshots mit SHA-256
+- privates Analytics-Center für Status, Orte, Tatbestandskategorien und Monatsverlauf
+- anonymisierte kommunale Problemberichte mit versioniertem SHA-256-Snapshot
+- Bürgeroberflächen für Karte, Problemstellen, Analytics und Problembericht
+- Integrationstests für Karten-Ownership, Hotspots, Analytics und anonymisierte Reports
 - M7-Datenmodell für lokale Fotoqualitätsmetriken, Assistenzläufe und verschlüsselte Vorschläge
 - lokale GD-basierte Analyse von Auflösung, Helligkeit, Kontrast und Schärfe
 - provider-neutrale Vision/OCR-Schnittstelle mit Disabled-Default
@@ -134,6 +143,8 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 - CSRF-Schutz für Installations- und Authentifizierungsformulare
 
 ### Changed
+- Dashboard verlinkt jetzt Karte, Problemstellen und Analytics
+- Bürgerportal-Version auf 0.8.0-dev aktualisiert
 - Installer und Beispielkonfiguration setzen ASSIST_PROVIDER standardmäßig auf disabled
 - Übernahme von Kennzeichen- oder Tatbestandsvorschlägen erzwingt erneut den Grunddaten-Review
 - Evidence-Qualitätsstatus kann durch versionierte lokale Qualitätsanalyse aktualisiert werden
@@ -170,6 +181,12 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 - native Mailheader werden gegen Zeilenumbrüche abgesichert und UTF-8-Betreffzeilen kodiert
 
 ### Security
+- Karten-/Analytics-Abfragen selektieren keine Kennzeichen oder Halterdaten
+- private Karte verwendet keine externen Kartentiles und sendet beim Rendern keine Standortdaten an Kartendienste
+- Problemstellen sind strikt an den angemeldeten Nutzer gebunden
+- Hotspot-Erkennung aggregiert ausschließlich eigene Vorgänge
+- kommunale Problemberichte enthalten keine Kennzeichen, Halterdaten, internen Fall-IDs oder Fotos
+- Problemstellen-Snapshots und kommunale Reports werden per SHA-256 gegen Manipulation geprüft
 - externe Vision/OCR-Analyse ist standardmäßig deaktiviert
 - Provider-Endpunkte müssen HTTPS verwenden und dürfen nicht auf private/reservierte IPs zeigen
 - validierte Provider-DNS-Auflösung wird für den HTTP-Request gepinnt

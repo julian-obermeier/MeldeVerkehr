@@ -5,6 +5,7 @@ declare(strict_types=1);
 use MeldeVerkehr\Assist\AssistService;
 use MeldeVerkehr\Assist\ImageQualityAnalyzer;
 use MeldeVerkehr\Assist\VisionProviderInterface;
+use MeldeVerkehr\Analytics\MapAnalyticsService;
 use MeldeVerkehr\Audit\AuditLogger;
 use MeldeVerkehr\Auth\AuthorizationService;
 use MeldeVerkehr\Auth\AuthService;
@@ -1578,6 +1579,164 @@ try {
         $foreignPrivacyBlocked = true;
     }
     $assert($foreignPrivacyBlocked, 'Foreign user cannot inspect another user privacy data');
+
+    $analyticsAudit = new AuditLogger($pdo, 'test-audit-key');
+    $mapAnalytics = new MapAnalyticsService(
+        $pdo,
+        new AuthorizationService($permissions),
+        $caseService,
+        $analyticsAudit
+    );
+
+    $mapCase1 = $caseService->createDraft((string) $user['id']);
+    $mapCase1Id = (string) $mapCase1['case']['id'];
+    $caseService->saveLocation((string) $user['id'], $mapCase1Id, [
+        'latitude' => '50.5841000',
+        'longitude' => '8.6781000',
+        'street' => 'Kartenstraße',
+        'house_number' => '1',
+        'postal_code' => '35390',
+        'city' => 'Gießen',
+        'traffic_space_type' => 'ROADWAY',
+        'access_type' => 'PUBLIC',
+    ]);
+    $caseService->saveObservation((string) $user['id'], $mapCase1Id, [
+        'observed_from' => '2026-09-20T12:00',
+        'observed_until' => '2026-09-20T12:10',
+    ]);
+
+    $mapCase2 = $caseService->createDraft((string) $user['id']);
+    $mapCase2Id = (string) $mapCase2['case']['id'];
+    $caseService->saveLocation((string) $user['id'], $mapCase2Id, [
+        'latitude' => '50.5843000',
+        'longitude' => '8.6783000',
+        'street' => 'Kartenstraße',
+        'house_number' => '3',
+        'postal_code' => '35390',
+        'city' => 'Gießen',
+        'traffic_space_type' => 'ROADWAY',
+        'access_type' => 'PUBLIC',
+    ]);
+    $caseService->saveObservation((string) $user['id'], $mapCase2Id, [
+        'observed_from' => '2026-09-21T18:00',
+        'observed_until' => '2026-09-21T18:05',
+    ]);
+
+    $foreignMapCase = $caseService->createDraft((string) $other['id']);
+    $foreignMapCaseId = (string) $foreignMapCase['case']['id'];
+    $caseService->saveLocation((string) $other['id'], $foreignMapCaseId, [
+        'latitude' => '50.5842000',
+        'longitude' => '8.6782000',
+        'street' => 'Kartenstraße',
+        'house_number' => '2',
+        'postal_code' => '35390',
+        'city' => 'Gießen',
+        'traffic_space_type' => 'ROADWAY',
+        'access_type' => 'PUBLIC',
+    ]);
+
+    $mapPoints = $mapAnalytics->mapData((string) $user['id']);
+    $mapIds = array_column($mapPoints, 'case_id');
+    $assert(
+        in_array($mapCase1Id, $mapIds, true)
+        && in_array($mapCase2Id, $mapIds, true)
+        && !in_array($foreignMapCaseId, $mapIds, true),
+        'Private map contains own geolocated cases and excludes foreign cases'
+    );
+    $assert(
+        !str_contains(json_encode($mapPoints, JSON_THROW_ON_ERROR), 'license_plate'),
+        'Private map data does not select license plate fields'
+    );
+
+    $hotspots = $mapAnalytics->hotspotCandidates((string) $user['id'], 2);
+    $assert(
+        $hotspots !== []
+        && (int) $hotspots[0]['case_count'] >= 2
+        && !in_array($foreignMapCaseId, $hotspots[0]['case_ids'], true),
+        'Hotspot detection aggregates only own cases'
+    );
+
+    $area = $mapAnalytics->createProblemArea(
+        (string) $user['id'],
+        'Test-Problemstelle',
+        50.5842,
+        8.6782,
+        200,
+        'MANUAL',
+        'Gießen',
+        'Kartenstraße'
+    );
+    $assert(
+        count($area['cases']) === 2,
+        'Problem area automatically links nearby own cases only'
+    );
+    $assert(
+        !array_key_exists('license_plate', $area['cases'][0] ?? []),
+        'Problem area detail contains no license plate data'
+    );
+
+    $foreignAreaBlocked = false;
+    try {
+        $mapAnalytics->problemArea((string) $other['id'], (string) $area['id']);
+    } catch (DomainException $e) {
+        $foreignAreaBlocked = true;
+    }
+    $assert(
+        $foreignAreaBlocked,
+        'Problem area ownership blocks foreign user access'
+    );
+
+    $analyticsResult = $mapAnalytics->analytics(
+        (string) $user['id'],
+        new DateTimeImmutable('2026-09-01'),
+        new DateTimeImmutable('2026-09-30')
+    );
+    $assert(
+        (int) $analyticsResult['total'] >= 2,
+        'Analytics aggregates own cases in requested period'
+    );
+
+    $municipalReport = $mapAnalytics->createMunicipalReport(
+        (string) $user['id'],
+        (string) $area['id'],
+        new DateTimeImmutable('2026-09-01'),
+        new DateTimeImmutable('2026-09-30')
+    );
+    $reportJson = json_encode(
+        $municipalReport['report'],
+        JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+    );
+    $assert(
+        ($municipalReport['report']['privacy']['contains_license_plates'] ?? true) === false
+        && ($municipalReport['report']['privacy']['contains_vehicle_owner_data'] ?? true) === false
+        && ($municipalReport['report']['privacy']['contains_case_ids'] ?? true) === false
+        && ($municipalReport['report']['privacy']['contains_photos'] ?? true) === false,
+        'Municipal problem report declares privacy-safe aggregate scope'
+    );
+    $assert(
+        !str_contains($reportJson, $mapCase1Id)
+        && !str_contains($reportJson, $mapCase2Id)
+        && !str_contains($reportJson, $foreignMapCaseId),
+        'Municipal problem report contains no internal case IDs'
+    );
+
+    $storedMunicipalReport = $mapAnalytics->municipalReport(
+        (string) $user['id'],
+        (string) $municipalReport['id']
+    );
+    $assert(
+        hash_equals(
+            (string) $storedMunicipalReport['report_sha256'],
+            hash(
+                'sha256',
+                json_encode(
+                    $storedMunicipalReport['report'],
+                    JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+                )
+            )
+        ),
+        'Municipal problem report verifies against stored SHA-256'
+    );
 
     $warningCase = $caseService->createDraft((string) $user['id']);
     $warningCaseId = (string) $warningCase['case']['id'];

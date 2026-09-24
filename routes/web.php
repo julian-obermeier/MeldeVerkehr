@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use MeldeVerkehr\Admin\AdminController;
+use MeldeVerkehr\Analytics\MapAnalyticsController;
 use MeldeVerkehr\Assist\AssistController;
 use MeldeVerkehr\Auth\AuthController;
 use MeldeVerkehr\Auth\DashboardController;
@@ -50,6 +51,7 @@ if ($installerService->isInstalled()) {
     $dispatch = new DispatchController($app);
     $communication = new CommunicationController($app);
     $assist = new AssistController($app);
+    $analytics = new MapAnalyticsController($app);
 
     $app->router()->get('/register', [$auth, 'registerForm']);
     $app->router()->post('/register', [$auth, 'register']);
@@ -126,6 +128,15 @@ if ($installerService->isInstalled()) {
     $app->router()->post('/assist/suggestions/{id}/reject', [$assist, 'reject']);
     $app->router()->post('/assist/suggestions/{id}/apply-plate', [$assist, 'applyPlate']);
     $app->router()->post('/assist/suggestions/{id}/apply-offense', [$assist, 'applyOffense']);
+
+    $app->router()->get('/map', [$analytics, 'map']);
+    $app->router()->get('/analytics', [$analytics, 'analytics']);
+    $app->router()->get('/problem-areas', [$analytics, 'areas']);
+    $app->router()->post('/problem-areas', [$analytics, 'createArea']);
+    $app->router()->get('/problem-areas/{id}', [$analytics, 'area']);
+    $app->router()->post('/problem-areas/{id}/sync', [$analytics, 'syncArea']);
+    $app->router()->post('/problem-areas/{id}/reports', [$analytics, 'createReport']);
+    $app->router()->get('/municipal-reports/{id}', [$analytics, 'report']);
 
     $app->router()->get('/settings/security', [$security, 'index']);
     $app->router()->post('/settings/security/totp/start', [$security, 'startTotp']);
