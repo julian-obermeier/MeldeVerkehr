@@ -40,6 +40,7 @@ final class OperationsServiceFactory
             $cipher,
             new NotificationDeliveryService(
                 $pdo,
+                $cipher,
                 $mail,
                 $push,
                 (string) $app->config()->get('app.url', '')
