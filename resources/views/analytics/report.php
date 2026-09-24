@@ -1,0 +1,9 @@
+<?php $e=static fn(mixed $v):string=>htmlspecialchars((string)$v,ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8'); $r=$report['report']; ?>
+<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title><?= $e($r['title']) ?></title>
+<style>body{font-family:system-ui,sans-serif;background:#f5f7fa;color:#172033;margin:0}main{max-width:900px;margin:28px auto;padding:20px}.card{background:#fff;border:1px solid #dfe5ec;border-radius:15px;padding:22px;margin-bottom:14px}.hash{font-family:ui-monospace,monospace;font-size:.82rem;word-break:break-all}.ok{padding:12px;border:1px solid #8fb799;border-radius:9px}.muted{color:#66758a}</style></head><body><main>
+<p><a href="/problem-areas">← Problemstellen</a></p><h1><?= $e($r['title']) ?></h1>
+<section class="card"><p>Zeitraum: <?= $e($r['period']['from']) ?> bis <?= $e($r['period']['to']) ?></p><p>Bereich: <?= $e($r['problem_area']['street']??'') ?> <?= $e($r['problem_area']['city']??'') ?> · Radius <?= $e($r['problem_area']['radius_m']) ?> m</p><p><strong><?= $e($r['metrics']['case_count']) ?></strong> aggregierte eigene Vorgänge</p></section>
+<section class="card"><h2>Verteilung</h2><?php foreach($r['metrics']['offense_category_counts'] as $row):?><p><?= $e($row['label']) ?>: <?= $e($row['count']) ?></p><?php endforeach;?></section>
+<section class="card"><h2>Datenschutz</h2><div class="ok">Keine Kennzeichen: <?= $r['privacy']['contains_license_plates']?'Nein':'Ja' ?> · Keine Halterdaten: <?= $r['privacy']['contains_vehicle_owner_data']?'Nein':'Ja' ?> · Keine Vorgangs-IDs: <?= $r['privacy']['contains_case_ids']?'Nein':'Ja' ?> · Keine Fotos: <?= $r['privacy']['contains_photos']?'Nein':'Ja' ?></div></section>
+<section class="card"><h2>Integrität</h2><p class="hash">SHA‑256: <?= $e($report['report_sha256']) ?></p><p class="muted">Version <?= $e($report['version_no']) ?> · Status <?= $e($report['status']) ?></p></section>
+</main></body></html>
