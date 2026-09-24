@@ -1,0 +1,15 @@
+<?php
+$e=static fn(mixed $v):string=>htmlspecialchars((string)$v,ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8');
+$labels=[
+'CASE_TASK_OPEN'=>'Offene Aufgabe',
+'CASE_DEADLINE_OPEN'=>'Offene Frist',
+'CASE_STATUS_DELIVERY_FAILED'=>'Zustellfehler',
+'CASE_STATUS_USER_ACTION_REQUIRED'=>'Aktion durch dich erforderlich',
+'CASE_STATUS_AUTHORITY_REPLY'=>'Neue Behördenantwort',
+];
+?>
+<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Benachrichtigungseinstellungen – MeldeVerkehr</title><style>body{font-family:system-ui,sans-serif;background:#f5f7fa;color:#172033;margin:0}main{max-width:980px;margin:28px auto;padding:20px}.card{background:#fff;border:1px solid #dfe5ec;border-radius:15px;padding:20px;margin-bottom:14px}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e9ee}th:not(:first-child),td:not(:first-child){text-align:center}input[type=checkbox]{width:20px;height:20px}button{padding:9px 13px;border:0;border-radius:9px;background:#172033;color:#fff;font-weight:700}.secondary{background:#fff;color:#172033;border:1px solid #9aa8b7}.message,.error{padding:10px;border-radius:8px;margin-bottom:12px}.message{border:1px solid #8fb799}.error{border:1px solid #c99}.muted{color:#66758a}</style></head><body><main><p><a href="/notifications">← Benachrichtigungen</a></p><h1>Benachrichtigungseinstellungen</h1>
+<?php if($message):?><div class="message"><?= $e($message) ?></div><?php endif;?><?php if($error):?><div class="error"><?= $e($error) ?></div><?php endif;?>
+<section class="card"><h2>Kanäle je Ereignis</h2><p class="muted">Alle Kanäle sind standardmäßig aktiviert. Du kannst sie je Ereignis einzeln abschalten.</p><form method="post" action="/notifications/settings"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><table><thead><tr><th>Ereignis</th><th>In-App</th><th>E-Mail</th><th>Push</th></tr></thead><tbody><?php foreach($preferences as $key=>$pref):?><tr><td><?= $e($labels[$key]??$key) ?></td><td><input type="checkbox" name="in_app[<?= $e($key) ?>]" value="1" <?= $pref['in_app']?'checked':'' ?>></td><td><input type="checkbox" name="email[<?= $e($key) ?>]" value="1" <?= $pref['email']?'checked':'' ?>></td><td><input type="checkbox" name="push[<?= $e($key) ?>]" value="1" <?= $pref['push']?'checked':'' ?>></td></tr><?php endforeach;?></tbody></table><p><button type="submit">Einstellungen speichern</button></p></form></section>
+<section class="card"><h2>Browser-Push</h2><?php if(!$pushConfigured):?><p class="muted">Push ist serverseitig noch nicht mit VAPID-Schlüsseln konfiguriert. Die Präferenz kann trotzdem bereits gespeichert werden.</p><?php else:?><p>Aktive Browser-Abonnements: <strong><?= $e($pushSubscriptions) ?></strong></p><button type="button" data-push-enable data-csrf="<?= $e($csrf) ?>">Push auf diesem Gerät aktivieren</button> <button type="button" class="secondary" data-push-disable data-csrf="<?= $e($csrf) ?>">Push auf diesem Gerät deaktivieren</button><p class="muted" data-push-status></p><?php endif;?></section>
+</main><script src="/assets/app.js" defer></script></body></html>
