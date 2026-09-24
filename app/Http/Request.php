@@ -6,6 +6,8 @@ namespace MeldeVerkehr\Http;
 
 final class Request
 {
+    private array $routeParams = [];
+
     public function __construct(
         private readonly string $method,
         private readonly string $path,
@@ -52,5 +54,20 @@ final class Request
     public function server(string $key, mixed $default = null): mixed
     {
         return $this->server[$key] ?? $default;
+    }
+
+    public function setRouteParams(array $params): void
+    {
+        $this->routeParams = $params;
+    }
+
+    public function route(string $key, mixed $default = null): mixed
+    {
+        return $this->routeParams[$key] ?? $default;
+    }
+
+    public function routeParams(): array
+    {
+        return $this->routeParams;
     }
 }

@@ -119,3 +119,20 @@ php tests/run.php
 ## PWA
 
 Die Anwendung enthält eine PWA-Grundlage mit Manifest, Service Worker und Offline-Fallback. Private Navigationsantworten werden bewusst nicht im Cache persistiert. Offline-Entwürfe mit IndexedDB folgen zusammen mit dem Meldungsworkflow.
+
+
+## M2 – Vorgänge
+
+Der aktuelle Entwicklungsstand enthält den ersten echten Bürger-Vorgangsworkflow:
+
+- neue Meldung als sicherer Entwurf
+- öffentliche Nummer im Format `OWI-YYYY-NNNNNN`
+- Fahrzeug und verschlüsseltes Kennzeichen
+- GPS oder Adresse sowie Verkehrsraum
+- versionierte Tatbestände
+- adaptive Schrittfolge Fahrzeug → Standort → Tatbestand
+- persönliche Vorgangsliste und Detailansicht
+- Statusfilter sowie Suche nach Nummer, Ort oder Kennzeichen
+- serverseitige Ownership-Prüfung
+
+Die produktive Tatbestandsdatenbank enthält zunächst bewusst nur neutrale Kategorien und einen internen Entwurfs-Platzhalter. Konkrete rechtliche Angaben werden erst nach fachlicher Verifikation ergänzt.

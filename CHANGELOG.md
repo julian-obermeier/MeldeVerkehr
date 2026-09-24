@@ -5,6 +5,18 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 ## [Unreleased]
 
 ### Added
+- M2-Vorgangskern mit UUID und öffentlicher OWI-Jahresnummer
+- Statusmaschine, Statushistorie und Vorgangstimeline
+- Fahrzeug- und Standortmodell
+- verschlüsselte Kennzeichen mit HMAC-Suchhash
+- versionierte Tatbestände und Tatbestandskategorien
+- neutrale Entwurfs-Tatbestandsversion ohne ungeprüfte Rechtsdaten
+- private Vorgangsliste mit Statusfilter und Suche
+- adaptive Vorgangserfassung für Fahrzeug, Standort und Tatbestand
+- Browser-GPS-Übernahme
+- reale Dashboard-Kennzahlen und letzte Vorgänge
+- parametrisierte Router-Pfade
+- M2-Integrationstests für Nummernkreis, Ownership, Suche, Status und Versionierung
 - resource-basierte AuthorizationService-Grundlage mit Ownership-Prüfung
 - TOTP-Zwei-Faktor-Authentifizierung nach RFC 6238
 - verschlüsselte TOTP-Secrets und gehashte Recovery-Codes
@@ -45,6 +57,10 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 - CSRF-Schutz für Installations- und Authentifizierungsformulare
 
 ### Changed
+- Bürger-Dashboard nutzt reale Vorgangsdaten statt Platzhalter
+- Vorgänge wechseln nach erster Eingabe von DRAFT zu CAPTURE_IN_PROGRESS
+- vollständig erfasste M2-Grunddaten wechseln bei konkretem Tatbestand zu WAITING_FOR_EVIDENCE
+- Tatbestandskategorien werden als eigene Stammdaten geführt
 - Passwort-Login fordert bei aktivem TOTP vor Sessionfreigabe den zweiten Faktor
 - Passkey-Login wird bei aktivem TOTP ebenfalls um den zweiten Faktor ergänzt
 - Dashboard zeigt Administration nur bei serverseitig bestätigter `admin.system`-Permission

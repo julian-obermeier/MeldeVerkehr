@@ -10,6 +10,9 @@ use MeldeVerkehr\Auth\PermissionService;
 use MeldeVerkehr\Auth\Totp;
 use MeldeVerkehr\Auth\WebAuthn\CborDecoder;
 use MeldeVerkehr\Auth\WebAuthn\WebAuthnService;
+use MeldeVerkehr\Cases\CaseService;
+use MeldeVerkehr\Cases\CaseStatus;
+use MeldeVerkehr\Cases\CaseStatusMachine;
 use MeldeVerkehr\Config\Config;
 use MeldeVerkehr\Database\Connection;
 use MeldeVerkehr\Database\MigrationRunner;
@@ -67,6 +70,146 @@ try {
     $permissions = new PermissionService($pdo);
     $assert($permissions->can((string) $user['id'], 'case.create'), 'USER permission assignment');
     $assert(!$permissions->can((string) $user['id'], 'admin.system'), 'USER denied admin permission');
+
+    $caseAudit = new AuditLogger($pdo, 'test-audit-key');
+    $caseService = new CaseService(
+        $pdo,
+        new AuthorizationService($permissions),
+        new SecretCipher('test-app-key'),
+        'test-app-key',
+        $caseAudit
+    );
+
+    $caseA = $caseService->createDraft((string) $user['id']);
+    $caseB = $caseService->createDraft((string) $user['id']);
+
+    $assert(
+        (bool) preg_match('/^OWI-\d{4}-\d{6}$/', (string) $caseA['case']['public_number']),
+        'Case public number format'
+    );
+    $assert(
+        $caseA['case']['public_number'] !== $caseB['case']['public_number'],
+        'Case public numbers are unique'
+    );
+    $assert($caseA['case']['status'] === CaseStatus::DRAFT, 'New case starts as DRAFT');
+
+    $machine = new CaseStatusMachine();
+    $assert($machine->can(CaseStatus::DRAFT, CaseStatus::CAPTURE_IN_PROGRESS), 'Valid draft transition');
+    $assert(!$machine->can(CaseStatus::DRAFT, CaseStatus::SENT), 'Invalid draft to sent transition rejected');
+
+    $caseId = (string) $caseA['case']['id'];
+
+    $caseService->saveVehicle((string) $user['id'], $caseId, [
+        'license_plate' => 'GI-AB 123',
+        'vehicle_type' => 'PKW',
+        'color' => 'Schwarz',
+    ]);
+    $afterVehicle = $caseService->findOwned((string) $user['id'], $caseId);
+    $assert(($afterVehicle['vehicle']['license_plate'] ?? null) === 'GI-AB 123', 'Vehicle plate encrypt/decrypt roundtrip');
+    $assert(($afterVehicle['case']['status'] ?? null) === CaseStatus::CAPTURE_IN_PROGRESS, 'Vehicle starts capture progress');
+
+    $caseService->saveLocation((string) $user['id'], $caseId, [
+        'street' => 'Teststraße',
+        'house_number' => '1',
+        'postal_code' => '35390',
+        'city' => 'Gießen',
+        'traffic_space_type' => 'SIDEWALK',
+        'access_type' => 'PUBLIC',
+    ]);
+    $afterLocation = $caseService->findOwned((string) $user['id'], $caseId);
+    $assert(($afterLocation['location']['city'] ?? null) === 'Gießen', 'Location saved');
+
+    $plateSearch = $caseService->listOwned((string) $user['id'], null, 'GI-AB 123');
+    $assert(
+        count(array_filter(
+            $plateSearch,
+            static fn(array $row): bool => ($row['id'] ?? null) === $caseId
+        )) === 1,
+        'Own case searchable by plate hash'
+    );
+
+    $locationSearch = $caseService->listOwned((string) $user['id'], null, 'Teststraße');
+    $assert(
+        count(array_filter(
+            $locationSearch,
+            static fn(array $row): bool => ($row['id'] ?? null) === $caseId
+        )) === 1,
+        'Own case searchable by location'
+    );
+
+    $offenseId = Uuid::v4();
+    $offenseVersionId = Uuid::v4();
+    $testStableKey = 'TEST_CONCRETE_OFFENSE_' . bin2hex(random_bytes(4));
+    $pdo->prepare(
+        'INSERT INTO offenses (id, stable_key, category_key, active, created_at, updated_at)
+         VALUES (:id, :stable_key, "OTHER", 1, UTC_TIMESTAMP(), UTC_TIMESTAMP())'
+    )->execute([
+        'id' => $offenseId,
+        'stable_key' => $testStableKey,
+    ]);
+    $pdo->prepare(
+        'INSERT INTO offense_versions
+         (id, offense_id, version, code, title, description, legal_reference, fine_amount, points,
+          duration_requirement, requires_sign, requires_duration, supports_obstruction,
+          supports_endangerment, supports_damage, valid_from, valid_until, created_at)
+         VALUES
+         (:id, :offense_id, 1, NULL, "Testtatbestand", "Nur automatisierter Test.", NULL, NULL, NULL,
+          NULL, 0, 0, 0, 0, 0, NULL, NULL, UTC_TIMESTAMP())'
+    )->execute([
+        'id' => $offenseVersionId,
+        'offense_id' => $offenseId,
+    ]);
+
+    $newerVersionId = Uuid::v4();
+    $pdo->prepare(
+        'INSERT INTO offense_versions
+         (id, offense_id, version, code, title, description, legal_reference, fine_amount, points,
+          duration_requirement, requires_sign, requires_duration, supports_obstruction,
+          supports_endangerment, supports_damage, valid_from, valid_until, created_at)
+         VALUES
+         (:id, :offense_id, 2, NULL, "Testtatbestand Version 2", "Nur automatisierter Test.", NULL, NULL, NULL,
+          NULL, 0, 0, 0, 0, 0, NULL, NULL, UTC_TIMESTAMP())'
+    )->execute([
+        'id' => $newerVersionId,
+        'offense_id' => $offenseId,
+    ]);
+
+    $available = $caseService->availableOffenses();
+    $matchingVersions = array_values(array_filter(
+        $available,
+        static function (array $row) use ($testStableKey): bool {
+            return ($row['stable_key'] ?? null) === $testStableKey;
+        }
+    ));
+    $assert(
+        count($matchingVersions) === 1 && (int) $matchingVersions[0]['version'] === 2,
+        'Available offenses expose latest version only'
+    );
+
+    $caseService->setPrimaryOffense((string) $user['id'], $caseId, $newerVersionId);
+    $afterOffense = $caseService->findOwned((string) $user['id'], $caseId);
+    $assert(
+        ($afterOffense['case']['status'] ?? null) === CaseStatus::WAITING_FOR_EVIDENCE,
+        'Complete M2 core advances to WAITING_FOR_EVIDENCE'
+    );
+
+    $other = $auth->register([
+        'first_name' => 'Other',
+        'last_name' => 'User',
+        'email' => 'other-' . bin2hex(random_bytes(5)) . '@example.test',
+        'password' => 'VeryStrongOtherPassword-123!',
+    ]);
+    $foreignBlocked = false;
+    try {
+        $caseService->findOwned((string) $other['id'], $caseId);
+    } catch (Throwable $e) {
+        $foreignBlocked = true;
+    }
+    $assert($foreignBlocked, 'Foreign user cannot read another user case');
+
+    $summary = $caseService->dashboardSummary((string) $user['id']);
+    $assert($summary['open'] >= 2, 'Dashboard counts own open cases');
+    $assert(count($summary['recent']) >= 2, 'Dashboard returns recent cases');
 
     $authorization = new AuthorizationService($permissions);
     $assert(

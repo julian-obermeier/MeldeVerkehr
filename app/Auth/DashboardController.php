@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace MeldeVerkehr\Auth;
 
+use MeldeVerkehr\Audit\AuditLogger;
 use MeldeVerkehr\Auth\WebAuthn\WebAuthnService;
+use MeldeVerkehr\Cases\CaseService;
 use MeldeVerkehr\Core\Application;
 use MeldeVerkehr\Http\Request;
 use MeldeVerkehr\Http\Response;
@@ -53,12 +55,25 @@ final class DashboardController
             (string) $this->app->config()->get('app.name', 'MeldeVerkehr')
         ))->listForUser($id);
 
+        $caseService = new CaseService(
+            $this->app->database(),
+            new AuthorizationService($permissions),
+            new SecretCipher((string) $this->app->config()->get('app.key', '')),
+            (string) $this->app->config()->get('app.key', ''),
+            new AuditLogger(
+                $this->app->database(),
+                (string) $this->app->config()->get('app.key', '')
+            )
+        );
+        $caseSummary = $caseService->dashboardSummary($id);
+
         return Response::html($this->view->render('dashboard/index', [
             'user' => $user,
             'csrf' => Csrf::token(),
             'canAdmin' => $permissions->can($id, 'admin.system'),
             'totpEnabled' => $twoFactor->enabled($id),
             'passkeyCount' => count($passkeys),
+            'caseSummary' => $caseSummary,
         ]));
     }
 }
