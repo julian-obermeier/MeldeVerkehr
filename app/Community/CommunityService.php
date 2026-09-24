@@ -559,11 +559,18 @@ final class CommunityService
 
         $acceptedBefore = $this->pdo->prepare(
             'SELECT COUNT(*) FROM community_messages
-             WHERE sender_user_id = :recipient
-               AND recipient_user_id = :sender
+             WHERE (
+                    (sender_user_id = :user_a AND recipient_user_id = :recipient_a)
+                 OR (sender_user_id = :recipient_b AND recipient_user_id = :user_b)
+             )
                AND status IN ("ACCEPTED","READ")'
         );
-        $acceptedBefore->execute(['recipient' => $recipientUserId, 'sender' => $userId]);
+        $acceptedBefore->execute([
+            'user_a' => $userId,
+            'recipient_a' => $recipientUserId,
+            'recipient_b' => $recipientUserId,
+            'user_b' => $userId,
+        ]);
 
         $status = (int) $acceptedBefore->fetchColumn() > 0 ? 'ACCEPTED' : 'REQUEST';
         $id = Uuid::v4();
@@ -583,6 +590,54 @@ final class CommunityService
         ]);
 
         return $id;
+    }
+
+    public function sendMessageToUsername(string $userId, string $username, string $body): string
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT user_id FROM community_profiles
+             WHERE LOWER(username) = LOWER(:username) AND status = "ACTIVE" LIMIT 1'
+        );
+        $stmt->execute(['username' => trim($username)]);
+        $recipient = $stmt->fetchColumn();
+
+        if (!is_string($recipient) || $recipient === '') {
+            throw new \DomainException('Community-Nutzer wurde nicht gefunden.');
+        }
+
+        return $this->sendMessage($userId, $recipient, $body);
+    }
+
+    public function acceptMessageRequest(string $userId, string $messageId): void
+    {
+        $stmt = $this->pdo->prepare(
+            'UPDATE community_messages
+             SET status = "ACCEPTED"
+             WHERE id = :id
+               AND recipient_user_id = :user_id
+               AND status = "REQUEST"'
+        );
+        $stmt->execute(['id' => $messageId, 'user_id' => $userId]);
+
+        if ($stmt->rowCount() !== 1) {
+            throw new \DomainException('Nachrichtenanfrage wurde nicht gefunden.');
+        }
+    }
+
+    public function blockUsername(string $userId, string $username): void
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT user_id FROM community_profiles
+             WHERE LOWER(username) = LOWER(:username) AND status = "ACTIVE" LIMIT 1'
+        );
+        $stmt->execute(['username' => trim($username)]);
+        $blocked = $stmt->fetchColumn();
+
+        if (!is_string($blocked) || $blocked === '') {
+            throw new \DomainException('Community-Nutzer wurde nicht gefunden.');
+        }
+
+        $this->block($userId, $blocked);
     }
 
     public function inbox(string $userId): array
