@@ -4,6 +4,7 @@ $data=$overview['case_data']; $c=$data['case']; $provider=$overview['provider'];
 $qualityLabels=['SUITABLE'=>'Geeignet','LIMITED'=>'Eingeschränkt','RETAKE_RECOMMENDED'=>'Neuaufnahme empfohlen'];
 $typeLabels=['LICENSE_PLATE'=>'Kennzeichen','TRAFFIC_SIGN'=>'Verkehrszeichen','ADDITIONAL_SIGN'=>'Zusatzzeichen','OFFENSE'=>'Tatbestand'];
 $statusLabels=['PENDING'=>'Offen','CONFIRMED'=>'Bestätigt','REJECTED'=>'Verworfen','APPLIED'=>'Übernommen'];
+$confirmedSignals=array_values(array_filter($overview['suggestions'],static fn(array $s):bool=>in_array($s['suggestion_type'],['TRAFFIC_SIGN','ADDITIONAL_SIGN'],true)&&in_array($s['status'],['CONFIRMED','APPLIED'],true)));
 ?>
 <!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#172033"><title>Intelligente Assistenz – MeldeVerkehr</title>
 <style>
@@ -48,7 +49,9 @@ body{font-family:system-ui,sans-serif;background:#f5f7fa;color:#172033;margin:0}
 <?php if($editable&&$s['status']==='CONFIRMED'&&$s['suggestion_type']==='LICENSE_PLATE'):?><form method="post" action="/assist/suggestions/<?= rawurlencode($s['id']) ?>/apply-plate"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="case_id" value="<?= $e($c['id']) ?>"><button type="submit">Bestätigtes Kennzeichen übernehmen</button></form><?php endif;?>
 <?php if($editable&&$s['status']==='CONFIRMED'&&$s['suggestion_type']==='OFFENSE'):?><form method="post" action="/assist/suggestions/<?= rawurlencode($s['id']) ?>/apply-offense"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="case_id" value="<?= $e($c['id']) ?>"><button type="submit">Bestätigten Tatbestand übernehmen</button></form><?php endif;?>
 </article><?php endforeach;?></div>
-<?php if($editable&&$provider['enabled']):?><p class="muted">Tatbestandsvorschläge werden erst erzeugt, nachdem Schild-/Zusatzzeichen-Vorschläge bestätigt wurden.</p><?php endif;?>
+<?php if($editable&&$provider['enabled']):?>
+<?php if($confirmedSignals&&$overview['evidence']):?><form method="post" action="/assist/evidence/<?= rawurlencode($overview['evidence'][0]['evidence_id']) ?>/analyze"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="case_id" value="<?= $e($c['id']) ?>"><input type="hidden" name="purpose" value="OFFENSE_SUGGESTIONS"><button type="submit">Tatbestandsvorschläge aus bestätigten Signalen erzeugen</button></form><?php else:?><p class="muted">Tatbestandsvorschläge werden erst erzeugt, nachdem Schild-/Zusatzzeichen-Vorschläge bestätigt wurden.</p><?php endif;?>
+<?php endif;?>
 </section>
 
 <section class="card"><h2>Analyseprotokoll</h2><?php foreach($overview['runs'] as $run):?><p><strong><?= $e($run['purpose']) ?></strong> · <?= $e($run['provider']) ?> · <?= $e($run['status']) ?> · <?= $e($run['created_at']) ?></p><?php endforeach;?><?php if(!$overview['runs']):?><p class="muted">Noch keine externen Analyse-Läufe.</p><?php endif;?></section>
