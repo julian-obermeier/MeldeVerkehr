@@ -13,6 +13,12 @@ use MeldeVerkehr\Auth\WebAuthn\WebAuthnService;
 use MeldeVerkehr\Cases\CaseService;
 use MeldeVerkehr\Cases\CaseStatus;
 use MeldeVerkehr\Cases\CaseStatusMachine;
+use MeldeVerkehr\Communication\AuthorityMessageClassifier;
+use MeldeVerkehr\Communication\AuthorityReplyJobHandler;
+use MeldeVerkehr\Communication\AuthorityReplyService;
+use MeldeVerkehr\Communication\CommunicationService;
+use MeldeVerkehr\Communication\CommunicationStorage;
+use MeldeVerkehr\Communication\ReplyAddressService;
 use MeldeVerkehr\Config\Config;
 use MeldeVerkehr\Database\Connection;
 use MeldeVerkehr\Database\MigrationRunner;
@@ -820,6 +826,13 @@ try {
 
     $dispatchQueue = new JobQueue($pdo);
     $dryRunTransport = new DryRunDispatchTransport($pdo);
+    $replyAddressService = new ReplyAddressService(
+        $pdo,
+        'reply.invalid',
+        'reply',
+        'test-app-key'
+    );
+
     $dispatchService = new DispatchService(
         $pdo,
         $dispatchAuthorization,
@@ -828,6 +841,7 @@ try {
         $dispatchPackageService,
         $dispatchQueue,
         $dryRunTransport,
+        $replyAddressService,
         $evidenceStorage,
         new AuditLogger($pdo, 'test-audit-key')
     );
@@ -943,6 +957,305 @@ try {
         && str_starts_with((string) $attempt['provider_reference'], 'dryrun:'),
         'Dispatch attempt stores dry-run provider reference'
     );
+
+    $dispatchMetaStmt = $pdo->prepare(
+        'SELECT reply_address_id, outbound_message_id
+         FROM dispatches WHERE id = :id LIMIT 1'
+    );
+    $dispatchMetaStmt->execute(['id' => $queuedDispatch['dispatch_id']]);
+    $dispatchMeta = $dispatchMetaStmt->fetch();
+    $assert(
+        is_array($dispatchMeta)
+        && $dispatchMeta['reply_address_id'] !== null
+        && is_string($dispatchMeta['outbound_message_id'])
+        && str_starts_with($dispatchMeta['outbound_message_id'], '<mv-'),
+        'Initial dispatch binds reply address and outbound Message-ID'
+    );
+
+    $replyStmt = $pdo->prepare(
+        'SELECT full_address FROM case_reply_addresses WHERE id = :id LIMIT 1'
+    );
+    $replyStmt->execute(['id' => $dispatchMeta['reply_address_id']]);
+    $replyAddress = (string) $replyStmt->fetchColumn();
+    $assert(
+        $replyAddress === $queuedDispatch['reply_address']
+        && str_ends_with($replyAddress, '@reply.invalid'),
+        'Per-dispatch random reply address is persisted'
+    );
+
+    $outboxThreadStmt = $pdo->prepare(
+        'SELECT reply_to, message_id, in_reply_to
+         FROM dispatch_dry_run_outbox
+         WHERE dispatch_id = :dispatch_id
+         ORDER BY id ASC LIMIT 1'
+    );
+    $outboxThreadStmt->execute(['dispatch_id' => $queuedDispatch['dispatch_id']]);
+    $outboxThread = $outboxThreadStmt->fetch();
+    $assert(
+        is_array($outboxThread)
+        && $outboxThread['reply_to'] === $replyAddress
+        && $outboxThread['message_id'] === $dispatchMeta['outbound_message_id']
+        && $outboxThread['in_reply_to'] === null,
+        'Initial dry-run transport records Reply-To and Message-ID'
+    );
+
+    $communicationStorage = new CommunicationStorage($basePath . '/storage/app');
+    $communicationService = new CommunicationService(
+        $pdo,
+        $dispatchAuthorization,
+        $caseService,
+        $replyAddressService,
+        new AuthorityMessageClassifier('Europe/Berlin'),
+        $witnessCipher,
+        $communicationStorage,
+        new AuditLogger($pdo, 'test-audit-key')
+    );
+
+    $inboundMail = [
+        'source_id' => '1001',
+        'message_id' => '<authority-reply-1@example.test>',
+        'in_reply_to' => $dispatchMeta['outbound_message_id'],
+        'from' => 'authority@example.test',
+        'to' => [$replyAddress],
+        'subject' => 'Rückfrage mit Frist bis 30.09.2026',
+        'text' => 'Bitte ergänzen Sie weitere Angaben und antworten Sie bis spätestens 30.09.2026.',
+        'received_at' => '2026-09-24 08:30:00',
+        'attachments' => [
+            [
+                'filename' => 'anforderung.pdf',
+                'mime_type' => 'application/pdf',
+                'content' => '%PDF-1.4 integration-test',
+            ],
+        ],
+    ];
+
+    $ingested = $communicationService->ingest($inboundMail);
+    $assert(
+        ($ingested['status'] ?? null) === 'INGESTED'
+        && ($ingested['classification'] ?? null) === 'DEADLINE'
+        && ($ingested['deadline_at'] ?? null) === '2026-09-30 21:59:59',
+        'Inbound authority mail is routed classified and deadline-extracted'
+    );
+
+    $afterInbound = $caseService->findOwned((string) $user['id'], $caseId);
+    $assert(
+        ($afterInbound['case']['status'] ?? null) === CaseStatus::USER_ACTION_REQUIRED,
+        'Inbound deadline mail advances case to USER_ACTION_REQUIRED'
+    );
+
+    $duplicateInbound = $communicationService->ingest($inboundMail);
+    $assert(
+        ($duplicateInbound['status'] ?? null) === 'DUPLICATE'
+        && ($duplicateInbound['message_id'] ?? null) === $ingested['message_id'],
+        'Inbound Message-ID deduplication prevents duplicate case messages'
+    );
+
+    $communication = $communicationService->listForCase((string) $user['id'], $caseId);
+    $inboundMessages = array_values(array_filter(
+        $communication['messages'],
+        static fn(array $message): bool => $message['direction'] === 'INBOUND'
+    ));
+    $assert(
+        count($inboundMessages) === 1
+        && $inboundMessages[0]['sender'] === 'authority@example.test'
+        && str_contains($inboundMessages[0]['body_text'], '30.09.2026')
+        && count($inboundMessages[0]['attachments']) === 1,
+        'Communication timeline decrypts one deduplicated inbound message with attachment'
+    );
+    $assert(
+        count(array_filter(
+            $communication['tasks'],
+            static fn(array $task): bool => $task['status'] === 'OPEN' && $task['task_type'] === 'DEADLINE'
+        )) === 1
+        && count(array_filter(
+            $communication['deadlines'],
+            static fn(array $deadline): bool => $deadline['status'] === 'OPEN'
+        )) === 1,
+        'Inbound deadline creates one open task and one open deadline'
+    );
+
+    $attachmentId = (string) $inboundMessages[0]['attachments'][0]['id'];
+    $attachment = $communicationService->attachment((string) $user['id'], $attachmentId);
+    $assert(
+        $attachment['filename'] === 'anforderung.pdf'
+        && hash_equals($attachment['sha256'], hash('sha256', $attachment['body'])),
+        'Inbound attachment is protected and hash-verified on retrieval'
+    );
+
+    $quarantined = $communicationService->ingest([
+        'source_id' => '1002',
+        'message_id' => '<unmatched@example.test>',
+        'in_reply_to' => null,
+        'from' => 'unknown@example.test',
+        'to' => ['unknown@reply.invalid'],
+        'subject' => 'Nicht zuordenbar',
+        'text' => 'Diese Nachricht gehört zu keinem bekannten Vorgang.',
+        'received_at' => '2026-09-24 08:45:00',
+        'attachments' => [],
+    ]);
+    $assert(
+        ($quarantined['status'] ?? null) === 'QUARANTINED',
+        'Unmatched inbound mail is quarantined instead of discarded'
+    );
+
+    $quarantineStmt = $pdo->prepare(
+        'SELECT sender_encrypted, body_text_encrypted
+         FROM inbound_mail_quarantine WHERE id = :id LIMIT 1'
+    );
+    $quarantineStmt->execute(['id' => $quarantined['quarantine_id']]);
+    $quarantineRow = $quarantineStmt->fetch();
+    $assert(
+        is_array($quarantineRow)
+        && !str_contains((string) $quarantineRow['sender_encrypted'], 'unknown@example.test')
+        && !str_contains((string) $quarantineRow['body_text_encrypted'], 'keinem bekannten Vorgang'),
+        'Quarantined mail content is encrypted at rest'
+    );
+
+    $replyService = new AuthorityReplyService(
+        $pdo,
+        $dispatchAuthorization,
+        $caseService,
+        $witnessCipher,
+        $dispatchQueue,
+        $dryRunTransport,
+        'noreply@example.test',
+        new AuditLogger($pdo, 'test-audit-key')
+    );
+
+    $draft = $replyService->createDraft(
+        (string) $user['id'],
+        (string) $ingested['message_id']
+    );
+    $assert(
+        (int) $draft['version_no'] === 1
+        && $draft['status'] === 'DRAFT'
+        && str_contains($draft['body'], 'Bitte ergänzen oder konkretisieren'),
+        'Authority reply assistant creates editable deterministic draft'
+    );
+
+    $draftStorageStmt = $pdo->prepare(
+        'SELECT body_encrypted FROM authority_reply_drafts WHERE id = :id LIMIT 1'
+    );
+    $draftStorageStmt->execute(['id' => $draft['id']]);
+    $assert(
+        !str_contains((string) $draftStorageStmt->fetchColumn(), 'Bitte ergänzen oder konkretisieren'),
+        'Authority reply draft is encrypted at rest'
+    );
+
+    $draftV2 = $replyService->saveDraft(
+        (string) $user['id'],
+        (string) $draft['id'],
+        $draft['body'] . "\n\nErgänzung für den Integrationstest."
+    );
+    $assert(
+        (int) $draftV2['version_no'] === 2,
+        'Edited authority reply creates a new version'
+    );
+
+    $unconfirmedReplyBlocked = false;
+    try {
+        $replyService->queueSend(
+            (string) $user['id'],
+            (string) $draftV2['id'],
+            false
+        );
+    } catch (InvalidArgumentException $e) {
+        $unconfirmedReplyBlocked = true;
+    }
+    $assert(
+        $unconfirmedReplyBlocked,
+        'Authority reply cannot enter queue without explicit user confirmation'
+    );
+
+    $queuedReply = $replyService->queueSend(
+        (string) $user['id'],
+        (string) $draftV2['id'],
+        true
+    );
+    $assert(
+        ($queuedReply['status'] ?? null) === 'QUEUED',
+        'Confirmed authority reply is queued'
+    );
+
+    $replyWorker = new JobWorker(
+        $dispatchQueue,
+        [new AuthorityReplyJobHandler($replyService)]
+    );
+    $replyWorkerResult = $replyWorker->run('reply-test-worker', 1);
+    $assert(
+        $replyWorkerResult['processed'] === 1
+        && $replyWorkerResult['errors'] === 0,
+        'Reply queue processes confirmed draft through dry-run transport'
+    );
+
+    $sentDraft = $replyService->latestForMessage(
+        (string) $user['id'],
+        (string) $ingested['message_id']
+    );
+    $assert(
+        is_array($sentDraft)
+        && $sentDraft['status'] === 'SENT'
+        && $sentDraft['sent_at'] !== null,
+        'Reply draft is marked SENT after accepted transport'
+    );
+
+    $replyOutboxStmt = $pdo->prepare(
+        'SELECT recipient, reply_to, message_id, in_reply_to, body_sha256
+         FROM dispatch_dry_run_outbox
+         WHERE dispatch_id = :dispatch_id
+         ORDER BY id DESC LIMIT 1'
+    );
+    $replyOutboxStmt->execute(['dispatch_id' => $queuedDispatch['dispatch_id']]);
+    $replyOutbox = $replyOutboxStmt->fetch();
+    $assert(
+        is_array($replyOutbox)
+        && $replyOutbox['recipient'] === 'authority@example.test'
+        && $replyOutbox['reply_to'] === $replyAddress
+        && $replyOutbox['in_reply_to'] === '<authority-reply-1@example.test>'
+        && str_starts_with((string) $replyOutbox['message_id'], '<mv-reply-'),
+        'Dry-run authority reply preserves recipient Reply-To Message-ID and In-Reply-To'
+    );
+
+    $communicationAfterReply = $communicationService->listForCase((string) $user['id'], $caseId);
+    $outboundReplies = array_values(array_filter(
+        $communicationAfterReply['messages'],
+        static fn(array $message): bool => $message['direction'] === 'OUTBOUND'
+    ));
+    $assert(
+        count($outboundReplies) === 1
+        && $outboundReplies[0]['classification'] === 'OUTBOUND_REPLY'
+        && str_contains($outboundReplies[0]['body_text'], 'Ergänzung für den Integrationstest'),
+        'Confirmed authority reply is stored as encrypted outbound timeline message'
+    );
+
+    $afterReply = $caseService->findOwned((string) $user['id'], $caseId);
+    $assert(
+        ($afterReply['case']['status'] ?? null) === CaseStatus::AUTHORITY_PROCESSING,
+        'Successful user reply returns case to AUTHORITY_PROCESSING'
+    );
+
+    $remainingOpenTasks = array_filter(
+        $communicationAfterReply['tasks'],
+        static fn(array $task): bool => $task['status'] === 'OPEN'
+    );
+    $assert(
+        count($remainingOpenTasks) === 0,
+        'Successful authority reply completes tasks derived from source message'
+    );
+
+    $openDeadline = array_values(array_filter(
+        $communicationAfterReply['deadlines'],
+        static fn(array $deadline): bool => $deadline['status'] === 'OPEN'
+    ))[0] ?? null;
+    $assert(is_array($openDeadline), 'Authority deadline remains visible until explicitly resolved');
+
+    if (is_array($openDeadline)) {
+        $resolvedCaseId = $communicationService->resolveDeadline(
+            (string) $user['id'],
+            (string) $openDeadline['id']
+        );
+        $assert($resolvedCaseId === $caseId, 'User can explicitly resolve tracked authority deadline');
+    }
 
     @unlink($evidenceSource);
 
