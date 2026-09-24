@@ -28,6 +28,8 @@ final class CaseService
 
     public function createDraft(string $userId): array
     {
+        $this->authorization->authorize($userId, 'case.create', $userId);
+
         try {
             $this->pdo->beginTransaction();
 
@@ -89,12 +91,15 @@ final class CaseService
         if ($search !== '') {
             $normalizedPlate = preg_replace('/[^A-Z0-9]/', '', mb_strtoupper($search, 'UTF-8')) ?? '';
             $sql .= ' AND (
-                c.public_number LIKE :search_text
-                OR l.street LIKE :search_text
-                OR l.city LIKE :search_text
+                c.public_number LIKE :search_number
+                OR l.street LIKE :search_street
+                OR l.city LIKE :search_city
                 OR v.license_plate_hash = :plate_hash
             )';
-            $params['search_text'] = '%' . $search . '%';
+            $like = '%' . $search . '%';
+            $params['search_number'] = $like;
+            $params['search_street'] = $like;
+            $params['search_city'] = $like;
             $params['plate_hash'] = hash_hmac('sha256', $normalizedPlate, $this->searchKey);
         }
 
@@ -393,16 +398,28 @@ final class CaseService
         $this->authorization->authorize($userId, 'case.edit_own', (string) $case['user_id']);
         (new CaseStatusMachine())->assert((string) $case['status'], $to);
 
-        $stmt = $this->pdo->prepare(
-            'UPDATE cases SET status = :status, updated_at = UTC_TIMESTAMP() WHERE id = :id'
-        );
-        $stmt->execute(['status' => $to, 'id' => $caseId]);
+        try {
+            $this->pdo->beginTransaction();
 
-        $this->recordStatus($caseId, (string) $case['status'], $to, 'USER', $userId, $reason);
-        $this->timeline($caseId, 'USER', 'STATUS_CHANGED', $userId, [
-            'from' => $case['status'],
-            'to' => $to,
-        ]);
+            $stmt = $this->pdo->prepare(
+                'UPDATE cases SET status = :status, updated_at = UTC_TIMESTAMP() WHERE id = :id'
+            );
+            $stmt->execute(['status' => $to, 'id' => $caseId]);
+
+            $this->recordStatus($caseId, (string) $case['status'], $to, 'USER', $userId, $reason);
+            $this->timeline($caseId, 'USER', 'STATUS_CHANGED', $userId, [
+                'from' => $case['status'],
+                'to' => $to,
+            ]);
+
+            $this->pdo->commit();
+        } catch (Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $e;
+        }
+
         $this->audit->log('CASE_STATUS_CHANGED', 'case', $caseId, 'USER', $userId, [
             'from' => $case['status'],
             'to' => $to,
