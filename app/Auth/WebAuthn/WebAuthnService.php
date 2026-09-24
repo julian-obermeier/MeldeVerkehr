@@ -222,6 +222,10 @@ final class WebAuthnService
         if (($data['origin'] ?? null) !== $this->origin()) {
             throw new \DomainException('WebAuthn origin mismatch.');
         }
+
+        if (($data['crossOrigin'] ?? false) === true) {
+            throw new \DomainException('Cross-origin WebAuthn requests are not accepted.');
+        }
     }
 
     private function validateAuthenticatorData(string $data, bool $registration): int
@@ -317,7 +321,14 @@ final class WebAuthnService
             throw new \RuntimeException('APP_URL is invalid.');
         }
 
-        $origin = strtolower((string) $parts['scheme']) . '://' . strtolower((string) $parts['host']);
+        $scheme = strtolower((string) $parts['scheme']);
+        $host = strtolower((string) $parts['host']);
+
+        if ($scheme !== 'https' && !in_array($host, ['localhost', '127.0.0.1', '::1'], true)) {
+            throw new \RuntimeException('WebAuthn requires HTTPS outside localhost.');
+        }
+
+        $origin = $scheme . '://' . $host;
         if (isset($parts['port'])) {
             $origin .= ':' . (int) $parts['port'];
         }
