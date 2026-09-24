@@ -3,13 +3,18 @@
 declare(strict_types=1);
 
 use MeldeVerkehr\Audit\AuditLogger;
+use MeldeVerkehr\Auth\AuthorizationService;
 use MeldeVerkehr\Auth\AuthService;
 use MeldeVerkehr\Auth\LoginRateLimiter;
 use MeldeVerkehr\Auth\PermissionService;
+use MeldeVerkehr\Auth\Totp;
+use MeldeVerkehr\Auth\WebAuthn\CborDecoder;
+use MeldeVerkehr\Auth\WebAuthn\WebAuthnService;
 use MeldeVerkehr\Config\Config;
 use MeldeVerkehr\Database\Connection;
 use MeldeVerkehr\Database\MigrationRunner;
 use MeldeVerkehr\Queue\JobQueue;
+use MeldeVerkehr\Security\SecretCipher;
 use MeldeVerkehr\Support\Env;
 use MeldeVerkehr\Support\Uuid;
 
@@ -62,6 +67,35 @@ try {
     $permissions = new PermissionService($pdo);
     $assert($permissions->can((string) $user['id'], 'case.create'), 'USER permission assignment');
     $assert(!$permissions->can((string) $user['id'], 'admin.system'), 'USER denied admin permission');
+
+    $authorization = new AuthorizationService($permissions);
+    $assert(
+        $authorization->can((string) $user['id'], 'case.view_own', (string) $user['id']),
+        'Owner can access own resource'
+    );
+    $assert(
+        !$authorization->can((string) $user['id'], 'case.view_own', Uuid::v4()),
+        'Owner permission does not grant foreign resource access'
+    );
+
+    $cipher = new SecretCipher('test-app-key');
+    $encrypted = $cipher->encrypt('sensitive-secret');
+    $assert($encrypted !== 'sensitive-secret', 'Secret encryption changes plaintext');
+    $assert($cipher->decrypt($encrypted) === 'sensitive-secret', 'Secret encryption roundtrip');
+
+    $assert(
+        Totp::verify('GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ', '287082', 59, 0),
+        'TOTP RFC 6238 vector'
+    );
+
+    $roundtrip = WebAuthnService::b64url('webauthn-test');
+    $assert(WebAuthnService::fromB64url($roundtrip) === 'webauthn-test', 'WebAuthn Base64URL roundtrip');
+
+    $decodedCbor = (new CborDecoder())->decode(hex2bin('a201020326') ?: '');
+    $assert(
+        is_array($decodedCbor) && ($decodedCbor['1'] ?? null) === 2 && ($decodedCbor['3'] ?? null) === -7,
+        'WebAuthn CBOR decoder handles COSE integer map'
+    );
 
     $limiter = new LoginRateLimiter($pdo, 'test-key', 3, 15, 15);
     $limitKey = $limiter->keyFor($email, '127.0.0.1');
