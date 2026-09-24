@@ -52,6 +52,20 @@ final class CommunityServiceFactory
         );
     }
 
+    public static function social(Application $app): CommunitySocialService
+    {
+        $pdo = $app->database();
+        $key = (string) $app->config()->get('app.key', '');
+
+        return new CommunitySocialService(
+            $pdo,
+            new AuthorizationService(new PermissionService($pdo)),
+            new SecretCipher($key),
+            new AuditLogger($pdo, $key),
+            new CommunityAbuseService($pdo)
+        );
+    }
+
     public static function reputation(Application $app): ReputationService
     {
         $pdo = $app->database();
