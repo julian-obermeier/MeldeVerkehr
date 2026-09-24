@@ -130,6 +130,35 @@ final class CaseController
         );
     }
 
+    public function saveObservation(Request $request): Response
+    {
+        return $this->mutate($request, fn (string $userId, string $caseId) =>
+            $this->service()->saveObservation($userId, $caseId, [
+                'observed_from' => $request->input('observed_from'),
+                'observed_until' => $request->input('observed_until'),
+            ])
+        );
+    }
+
+    public function review(Request $request): Response
+    {
+        $userId = $this->requireUser();
+        if ($userId instanceof Response) {
+            return $userId;
+        }
+
+        try {
+            $review = $this->service()->reviewChecklist($userId, (string) $request->route('id', ''));
+        } catch (AuthorizationException $e) {
+            return Response::html('<h1>403</h1><p>Kein Zugriff auf diesen Vorgang.</p>', 403);
+        }
+
+        return Response::html($this->view->render('cases/review', [
+            'review' => $review,
+            'timezone' => (string) $this->app->config()->get('app.timezone', 'Europe/Berlin'),
+        ]));
+    }
+
     public function saveOffense(Request $request): Response
     {
         return $this->mutate($request, fn (string $userId, string $caseId) =>
@@ -206,6 +235,7 @@ final class CaseController
             new AuthorizationService($permissions),
             new SecretCipher((string) $this->app->config()->get('app.key', '')),
             (string) $this->app->config()->get('app.key', ''),
+            (string) $this->app->config()->get('app.timezone', 'Europe/Berlin'),
             new AuditLogger(
                 $this->app->database(),
                 (string) $this->app->config()->get('app.key', '')
