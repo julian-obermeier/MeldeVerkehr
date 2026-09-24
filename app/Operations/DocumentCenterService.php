@@ -19,6 +19,7 @@ final class DocumentCenterService
             $this->witnessReports($userId),
             $this->dispatchPackages($userId),
             $this->authorityAttachments($userId),
+            $this->closureDossiers($userId),
             $this->municipalReports($userId),
             $this->exports($userId)
         );
@@ -168,6 +169,34 @@ final class DocumentCenterService
             'created_at' => $row['created_at'],
             'open_url' => '/cases/' . rawurlencode((string) $row['case_id']) . '/communication',
             'download_url' => '/communication-attachments/' . rawurlencode((string) $row['id']),
+        ], $stmt->fetchAll());
+    }
+
+    private function closureDossiers(string $userId): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT cr.id, cr.case_id, cr.closure_no, cr.closure_reason, cr.dossier_sha256, cr.closed_at,
+                    c.public_number
+             FROM case_closure_records cr
+             INNER JOIN cases c ON c.id = cr.case_id
+             WHERE c.user_id = :user_id'
+        );
+        $stmt->execute(['user_id' => $userId]);
+
+        return array_map(static fn(array $row): array => [
+            'type' => 'CLOSURE_DOSSIER',
+            'id' => $row['id'],
+            'case_id' => $row['case_id'],
+            'public_number' => $row['public_number'],
+            'title' => 'Abschlussakte ' . $row['public_number'] . ' #' . $row['closure_no'],
+            'filename' => $row['public_number'] . '_Abschlussakte_' . str_pad((string) $row['closure_no'], 2, '0', STR_PAD_LEFT) . '.json',
+            'version' => (int) $row['closure_no'],
+            'mime_type' => 'application/json',
+            'file_size' => null,
+            'sha256' => $row['dossier_sha256'],
+            'created_at' => $row['closed_at'],
+            'open_url' => '/cases/' . rawurlencode((string) $row['case_id']) . '/lifecycle',
+            'download_url' => '/cases/' . rawurlencode((string) $row['case_id']) . '/lifecycle/closures/' . rawurlencode((string) $row['id']) . '/export',
         ], $stmt->fetchAll());
     }
 
