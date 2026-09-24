@@ -86,7 +86,8 @@ final class SmtpDispatchTransport implements DispatchTransportInterface
                 $this->command($socket, base64_encode($this->password), [235], false);
             }
 
-            $this->command($socket, 'MAIL FROM:<' . $this->fromAddress . '>', [250]);
+            $envelopeFrom = $replyTo !== null ? $replyTo : $this->fromAddress;
+            $this->command($socket, 'MAIL FROM:<' . $envelopeFrom . '>', [250]);
             $this->command($socket, 'RCPT TO:<' . $recipient . '>', [250, 251]);
             $this->command($socket, 'DATA', [354]);
 
