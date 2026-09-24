@@ -23,6 +23,10 @@ use MeldeVerkehr\Communication\AuthorityReplyService;
 use MeldeVerkehr\Communication\CommunicationService;
 use MeldeVerkehr\Communication\CommunicationStorage;
 use MeldeVerkehr\Communication\ReplyAddressService;
+use MeldeVerkehr\Community\CommunityReleaseService;
+use MeldeVerkehr\Community\CommunityService;
+use MeldeVerkehr\Community\ModerationService;
+use MeldeVerkehr\Community\ReputationService;
 use MeldeVerkehr\Config\Config;
 use MeldeVerkehr\Database\Connection;
 use MeldeVerkehr\Database\MigrationRunner;
@@ -1736,6 +1740,361 @@ try {
             )
         ),
         'Municipal problem report verifies against stored SHA-256'
+    );
+
+    $communityCipher = new SecretCipher('test-app-key');
+    $communityService = new CommunityService(
+        $pdo,
+        new AuthorizationService($permissions),
+        $communityCipher,
+        new AuditLogger($pdo, 'test-audit-key')
+    );
+    $reputationService = new ReputationService($pdo);
+    $communityReleaseService = new CommunityReleaseService(
+        $pdo,
+        $caseService,
+        $evidenceStorage,
+        new AuditLogger($pdo, 'test-audit-key')
+    );
+    $moderationService = new ModerationService($pdo, $permissions);
+
+    $communityService->saveProfile((string) $user['id'], [
+        'username' => 'testuser',
+        'bio' => 'Öffentliche Test-Bio ohne private Kontaktdaten.',
+        'region_state' => 'Hessen',
+        'region_district' => 'Gießen',
+        'region_city' => 'Gießen',
+        'visibility_bio' => 'PUBLIC',
+        'visibility_state' => 'PUBLIC',
+        'visibility_district' => 'LOGGED_IN',
+        'visibility_city' => 'PRIVATE',
+        'leaderboard_opt_in' => true,
+    ]);
+    $communityService->saveProfile((string) $other['id'], [
+        'username' => 'otheruser',
+        'bio' => 'Andere Testperson.',
+        'region_state' => 'Bayern',
+        'region_district' => 'München',
+        'region_city' => 'München',
+        'visibility_bio' => 'PUBLIC',
+        'visibility_state' => 'PUBLIC',
+        'visibility_district' => 'LOGGED_IN',
+        'visibility_city' => 'PRIVATE',
+        'leaderboard_opt_in' => false,
+    ]);
+
+    $publicCommunityProfile = $communityService->profileByUsername(null, 'testuser');
+    $assert(
+        is_array($publicCommunityProfile)
+        && ($publicCommunityProfile['username'] ?? null) === 'testuser'
+        && ($publicCommunityProfile['region_state'] ?? null) === 'Hessen'
+        && !array_key_exists('region_city', $publicCommunityProfile)
+        && !array_key_exists('email', $publicCommunityProfile),
+        'Community profile honors field visibility and never exposes account email'
+    );
+
+    $loggedCommunityProfile = $communityService->profileByUsername((string) $other['id'], 'testuser');
+    $assert(
+        is_array($loggedCommunityProfile)
+        && ($loggedCommunityProfile['region_district'] ?? null) === 'Gießen'
+        && !array_key_exists('region_city', $loggedCommunityProfile),
+        'Logged-in profile view still respects private city field'
+    );
+
+    $group = $communityService->createGroup((string) $user['id'], [
+        'group_type' => 'REGION',
+        'name' => 'Gießen Verkehr',
+        'description' => 'Regionale Testgruppe.',
+        'region_level' => 'CITY',
+        'region_code' => 'Gießen',
+    ]);
+    $communityService->joinGroup((string) $other['id'], (string) $group['id']);
+    $groupList = $communityService->groups((string) $other['id']);
+    $joinedGroup = array_values(array_filter(
+        $groupList,
+        static fn(array $row): bool => ($row['id'] ?? null) === $group['id']
+    ))[0] ?? null;
+    $assert(
+        is_array($joinedGroup) && (int) $joinedGroup['joined'] === 1,
+        'Community group membership is tracked'
+    );
+
+    $communityPost = $communityService->createPost((string) $user['id'], [
+        'group_id' => $group['id'],
+        'topic' => 'Testbeitrag',
+        'body' => 'Sachlicher Community-Testbeitrag.',
+    ]);
+    $comment = $communityService->comment(
+        (string) $other['id'],
+        (string) $communityPost['id'],
+        'Hilfreicher Kommentar zum Test.'
+    );
+    $assert(
+        isset($comment['id']),
+        'Community comments can be added by accessible users'
+    );
+
+    $helpfulInserted = $communityService->reactHelpful(
+        (string) $other['id'],
+        (string) $communityPost['id']
+    );
+    $assert($helpfulInserted, 'Helpful reaction is stored once');
+    $assert(
+        $reputationService->awardHelpfulReaction(
+            (string) $other['id'],
+            (string) $communityPost['id']
+        ),
+        'Helpful reaction awards transparent community reputation once'
+    );
+    $assert(
+        !$reputationService->awardHelpfulReaction(
+            (string) $other['id'],
+            (string) $communityPost['id']
+        ),
+        'Reputation unique key prevents reaction point gaming'
+    );
+
+    $score = $reputationService->score((string) $user['id']);
+    $assert(
+        $score['total'] >= 2
+        && count($score['badges']) >= 1,
+        'Community reputation and badges derive from transparent events'
+    );
+
+    $leaderboard = $reputationService->leaderboard('TOTAL');
+    $assert(
+        count(array_filter(
+            $leaderboard,
+            static fn(array $row): bool => ($row['username'] ?? null) === 'testuser'
+        )) === 1
+        && count(array_filter(
+            $leaderboard,
+            static fn(array $row): bool => ($row['username'] ?? null) === 'otheruser'
+        )) === 0,
+        'Leaderboard includes only explicit opt-in profiles'
+    );
+
+    $messageId = $communityService->sendMessageToUsername(
+        (string) $user['id'],
+        'otheruser',
+        'Private Community-Testnachricht.'
+    );
+    $messageStorageStmt = $pdo->prepare(
+        'SELECT body_encrypted, status FROM community_messages WHERE id = :id LIMIT 1'
+    );
+    $messageStorageStmt->execute(['id' => $messageId]);
+    $messageStorage = $messageStorageStmt->fetch();
+    $assert(
+        is_array($messageStorage)
+        && $messageStorage['status'] === 'REQUEST'
+        && !str_contains((string) $messageStorage['body_encrypted'], 'Private Community-Testnachricht'),
+        'First community DM is a request and encrypted at rest'
+    );
+
+    $communityService->acceptMessageRequest((string) $other['id'], $messageId);
+    $replyMessageId = $communityService->sendMessageToUsername(
+        (string) $other['id'],
+        'testuser',
+        'Angenommene Antwort.'
+    );
+    $replyStatusStmt = $pdo->prepare(
+        'SELECT status FROM community_messages WHERE id = :id LIMIT 1'
+    );
+    $replyStatusStmt->execute(['id' => $replyMessageId]);
+    $assert(
+        $replyStatusStmt->fetchColumn() === 'ACCEPTED',
+        'Accepted DM relationship allows subsequent messages without request state'
+    );
+
+    $communityService->blockUsername((string) $user['id'], 'otheruser');
+    $blockedMessage = false;
+    try {
+        $communityService->sendMessageToUsername(
+            (string) $other['id'],
+            'testuser',
+            'Diese Nachricht muss blockiert werden.'
+        );
+    } catch (DomainException $e) {
+        $blockedMessage = true;
+    }
+    $assert($blockedMessage, 'Community block prevents DMs in both directions');
+
+    $releaseDraft = $communityReleaseService->createDraft(
+        (string) $user['id'],
+        $caseId,
+        [
+            'public_text' => 'Anonymisierte Darstellung eines wiederkehrenden Verkehrsproblems.',
+            'location_level' => 'STREET',
+            'include_date' => true,
+            'include_offense' => true,
+        ],
+        [(string) $storedEvidence['id']]
+    );
+    $releaseSnapshotJson = json_encode(
+        $releaseDraft['snapshot'],
+        JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+    );
+    $privateCase = $caseService->findOwned((string) $user['id'], $caseId);
+    $assert(
+        !str_contains($releaseSnapshotJson, $caseId)
+        && !str_contains($releaseSnapshotJson, (string) $privateCase['case']['public_number'])
+        && !str_contains($releaseSnapshotJson, 'GI-X 777')
+        && !str_contains($releaseSnapshotJson, 'Teststraße 1'),
+        'Community release snapshot excludes case IDs public case number plate and house number'
+    );
+    $assert(
+        ($releaseDraft['snapshot']['privacy']['contains_license_plate'] ?? true) === false
+        && ($releaseDraft['snapshot']['privacy']['evidence_variant'] ?? null) === 'PUBLIC',
+        'Community release explicitly records sanitized PUBLIC evidence scope'
+    );
+
+    $publishedRelease = $communityReleaseService->publish(
+        (string) $user['id'],
+        (string) $releaseDraft['id']
+    );
+    $publicRelease = $communityReleaseService->publicRelease(
+        (string) $publishedRelease['public_token']
+    );
+    $assert(
+        is_array($publicRelease)
+        && ($publicRelease['snapshot']['author']['username'] ?? null) === 'testuser',
+        'Published sanitized release can be read by public token'
+    );
+
+    $publicReleaseImage = $communityReleaseService->publicEvidence(
+        (string) $publishedRelease['public_token'],
+        1
+    );
+    $assert(
+        hash_equals((string) $publicReleaseImage['sha256'], (string) $publicPreview['sha256']),
+        'Community release serves exact privacy-reviewed PUBLIC image hash'
+    );
+
+    $releasePost = $communityService->createPost((string) $user['id'], [
+        'body' => 'Öffentliche anonymisierte Fallkopie zum Community-Test.',
+        'case_release_id' => $publishedRelease['id'],
+    ]);
+    $assert(
+        ($releasePost['case_release_id'] ?? null) === $publishedRelease['id'],
+        'Community post can reference owned published sanitized release'
+    );
+
+    $moderator = $auth->register([
+        'first_name' => 'Regional',
+        'last_name' => 'Moderator',
+        'email' => 'moderator-' . bin2hex(random_bytes(5)) . '@example.test',
+        'password' => 'VeryStrongModeratorPassword-123!',
+    ]);
+    $pdo->prepare(
+        'INSERT IGNORE INTO user_roles (user_id, role_id, created_at)
+         SELECT :user_id, id, UTC_TIMESTAMP()
+         FROM roles WHERE name = "REGIONAL_MODERATOR"'
+    )->execute(['user_id' => $moderator['id']]);
+
+    $communityService->saveProfile((string) $moderator['id'], [
+        'username' => 'regionalmod',
+        'region_state' => 'Hessen',
+        'region_district' => 'Gießen',
+        'region_city' => 'Gießen',
+        'visibility_state' => 'PUBLIC',
+        'visibility_district' => 'LOGGED_IN',
+        'visibility_city' => 'PRIVATE',
+        'leaderboard_opt_in' => false,
+    ]);
+
+    $hessenProblem = $communityService->createPublicProblemArea((string) $user['id'], [
+        'name' => 'Hessische Testproblemstelle',
+        'city' => 'Gießen',
+        'district' => 'Gießen',
+        'state' => 'Hessen',
+        'latitude' => 50.58423,
+        'longitude' => 8.67821,
+        'radius_m' => 300,
+    ]);
+    $bayernProblem = $communityService->createPublicProblemArea((string) $other['id'], [
+        'name' => 'Bayerische Testproblemstelle',
+        'city' => 'München',
+        'district' => 'München',
+        'state' => 'Bayern',
+        'latitude' => 48.1371,
+        'longitude' => 11.5754,
+        'radius_m' => 300,
+    ]);
+
+    $pendingProblems = $moderationService->pendingProblemAreas((string) $moderator['id']);
+    $pendingIds = array_column($pendingProblems, 'id');
+    $assert(
+        in_array($hessenProblem['id'], $pendingIds, true)
+        && !in_array($bayernProblem['id'], $pendingIds, true),
+        'Regional moderator sees only pending public problems in own region scope'
+    );
+
+    $moderationService->approveProblemArea(
+        (string) $moderator['id'],
+        (string) $hessenProblem['id']
+    );
+    $reputationService->award(
+        (string) $user['id'],
+        'PROBLEM_REPORT',
+        5,
+        'PUBLIC_PROBLEM_APPROVED',
+        'PUBLIC_PROBLEM_AREA',
+        (string) $hessenProblem['id'],
+        'problem-approved:' . $hessenProblem['id']
+    );
+    $approvedProblem = $communityService->publicProblemArea((string) $hessenProblem['id']);
+    $assert(
+        is_array($approvedProblem)
+        && $approvedProblem['moderation_status'] === 'APPROVED'
+        && abs(((float) $approvedProblem['generalized_latitude']) - 50.5842) < 0.00001,
+        'Approved public problem area exposes only generalized coordinates'
+    );
+
+    $problemObservationId = $communityService->addPublicProblemObservation(
+        (string) $user['id'],
+        (string) $hessenProblem['id'],
+        '2026-09-24',
+        'OTHER',
+        'Anonymisierte Beobachtung ohne Kennzeichen.'
+    );
+    $assert(
+        $reputationService->award(
+            (string) $user['id'],
+            'PROBLEM_REPORT',
+            1,
+            'PUBLIC_PROBLEM_OBSERVATION',
+            'PROBLEM_OBSERVATION',
+            $problemObservationId,
+            'problem-observation:' . $problemObservationId
+        ),
+        'Approved public problem observation can create transparent reputation event'
+    );
+
+    $reportId = $moderationService->report(
+        (string) $other['id'],
+        'POST',
+        (string) $communityPost['id'],
+        'PRIVACY',
+        'Integrationstest für regionale Moderation.'
+    );
+    $moderationQueue = $moderationService->queue((string) $moderator['id']);
+    $assert(
+        count(array_filter(
+            $moderationQueue,
+            static fn(array $row): bool => ($row['id'] ?? null) === $reportId
+        )) === 1,
+        'Regional moderator receives reports for targets in own region'
+    );
+
+    $moderationService->resolve(
+        (string) $moderator['id'],
+        $reportId,
+        'HIDE',
+        'Integrationstest abgeschlossen.'
+    );
+    $assert(
+        $communityService->post((string) $moderator['id'], (string) $communityPost['id']) === null,
+        'Moderation HIDE removes reported post from public feed'
     );
 
     $warningCase = $caseService->createDraft((string) $user['id']);

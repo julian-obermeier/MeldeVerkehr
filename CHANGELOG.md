@@ -5,6 +5,21 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 ## [Unreleased]
 
 ### Added
+- M9-Community-Datenmodell für Profile, Gruppen, Posts, Kommentare, Reaktionen, öffentliche Problemstellen, kontrollierte Fallfreigaben, Nachrichten, Moderation, Reputation und Badges
+- separate Community-Profile mit feldbezogener Sichtbarkeit
+- regionale und thematische Gruppen mit Mitgliedschaften
+- Community-Feed, Posts, Kommentare und Helpful-Reaktionen
+- moderierte öffentliche Problemstellen mit vergröberten Koordinaten
+- kontrollierte anonymisierte Fallfreigabe als separater Snapshot
+- ausschließlich Privacy-bestätigte PUBLIC-Evidence-Versionen für Community-Freigaben
+- öffentliche Release-Tokens und hashgeprüfte PUBLIC-Bildauslieferung
+- verschlüsselte Direktnachrichten mit Anfrage-/Accept-Flow
+- gegenseitiges Blockierungssystem
+- transparente Reputationsevents, Level und Badges
+- Opt-in-Leaderboards
+- regionale Moderationsscopes und Moderationsqueue
+- Community-Portal mit Profil, Gruppen, Problemstellen, Nachrichten, Leaderboard, Releases und Moderation
+- Integrationstests für Community-Privacy, Releases, Reputation, Messaging und Regionalmoderation
 - M8-Datenmodell für private Problemstellen, Fallzuordnungen, Aggregationssnapshots und kommunale Reports
 - private schematische Vorgangskarte ohne externe Kartentiles
 - private Hotspot-Erkennung ausschließlich aus eigenen Vorgängen
@@ -143,6 +158,9 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 - CSRF-Schutz für Installations- und Authentifizierungsformulare
 
 ### Changed
+- Bürgerdashboard verlinkt jetzt die Community
+- private Vorgangsansicht bietet kontrollierte Community-Freigaben für abgeschlossene Evidence-Pakete
+- Bürgerportal-Version auf 0.9.0-dev aktualisiert
 - Dashboard verlinkt jetzt Karte, Problemstellen und Analytics
 - Bürgerportal-Version auf 0.8.0-dev aktualisiert
 - Installer und Beispielkonfiguration setzen ASSIST_PROVIDER standardmäßig auf disabled
@@ -181,6 +199,17 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 - native Mailheader werden gegen Zeilenumbrüche abgesichert und UTF-8-Betreffzeilen kodiert
 
 ### Security
+- Community-Profilabfragen geben keine Konto-E-Mail oder privaten Vorgangsdaten aus
+- kontrollierte Fallfreigaben enthalten weder Kennzeichen noch interne/öffentliche Vorgangsnummern
+- Community-Freigaben nutzen ausschließlich Privacy-bestätigte PUBLIC-Evidence-Versionen
+- ORIGINAL- und WORKING-Evidence werden nicht über Community-Freigaben ausgeliefert
+- Release-Snapshots und freigegebene Bilder werden per SHA-256 geprüft
+- Direktnachrichten werden verschlüsselt gespeichert und integritätsgeprüft
+- gegenseitige Blockierungen verhindern Direktnachrichten und gegenseitige Feed-Sichtbarkeit
+- öffentliche Problemstellen starten PENDING und benötigen Moderationsfreigabe
+- öffentliche Problemstellen speichern nur vergröberte Koordinaten
+- Regionalmoderation ist auf den Profil-Regionsscope begrenzt
+- Leaderboards sind ausdrücklich opt-in
 - Karten-/Analytics-Abfragen selektieren keine Kennzeichen oder Halterdaten
 - private Karte verwendet keine externen Kartentiles und sendet beim Rendern keine Standortdaten an Kartendienste
 - Problemstellen sind strikt an den angemeldeten Nutzer gebunden
