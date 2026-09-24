@@ -7,6 +7,7 @@ $n=$detail['narrative'];
 $r=$detail['report'];
 $package=$data['evidence_package']??null;
 $reportConfirmed=is_array($r)&&$r['confirmed_at']!==null&&($r['current']??false)===true&&is_array($r['declaration']??null);
+$editable=$c['status']===\MeldeVerkehr\Cases\CaseStatus::READY_FOR_REVIEW;
 ?>
 <!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#172033"><title>Sachverhalt & Zeugenbericht – MeldeVerkehr</title>
 <style>
@@ -26,27 +27,28 @@ body{font-family:system-ui,sans-serif;background:#f5f7fa;color:#172033;margin:0}
 
 <section class="card"><h2>1. Eigene Beobachtung</h2>
 <p class="muted">Beschreibe nur, was du selbst wahrgenommen hast. Vermutungen oder Aussagen anderer Personen sollten nicht als eigene Beobachtung formuliert werden.</p>
-<form method="post" action="/cases/<?= rawurlencode($c['id']) ?>/witness/observation"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>">
+<?php if($editable):?><form method="post" action="/cases/<?= rawurlencode($c['id']) ?>/witness/observation"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>">
 <label>Eigene Beobachtung</label><textarea name="observation_text" maxlength="10000" required><?= $e($o['observation_text']??'') ?></textarea>
 <label>Beobachtete Auswirkung optional</label><textarea name="impact_text" maxlength="10000"><?= $e($o['impact_text']??'') ?></textarea>
 <label>Ergänzender Kontext optional</label><textarea name="context_text" maxlength="10000"><?= $e($o['context_text']??'') ?></textarea>
 <button type="submit"><?= $o?'Neue Version speichern':'Beobachtung speichern' ?></button>
 <?php if($o):?><p class="muted">Aktuelle Version: <?= $e($o['version_no']) ?> · gespeichert <?= $e($o['created_at']) ?></p><?php endif;?>
-</form></section>
+</form><?php else:?><div class="ok">Finaler Review abgeschlossen. Beobachtung ist nur noch lesbar.</div><?php endif;?></section>
 
 <section class="card"><h2>2. Neutraler Sachverhaltstext</h2>
 <?php if(!$o):?><p>Speichere zuerst deine eigene Beobachtung.</p>
 <?php else:?>
-<form method="post" action="/cases/<?= rawurlencode($c['id']) ?>/witness/narrative/generate"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><button type="submit" class="secondary">Neutralen Text aus bestätigten Daten erzeugen</button></form>
+<?php if($editable):?><form method="post" action="/cases/<?= rawurlencode($c['id']) ?>/witness/narrative/generate"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><button type="submit" class="secondary">Neutralen Text aus bestätigten Daten erzeugen</button></form>
 <?php if($n):?>
 <form method="post" action="/cases/<?= rawurlencode($c['id']) ?>/witness/narrative"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><label>Bearbeitbarer Sachverhalt</label><textarea name="narrative_text" maxlength="15000" required><?= $e($n['final_text']) ?></textarea><button type="submit">Bearbeiteten Text als neue Version speichern</button></form>
 <p class="muted">Aktuelle Narrative-Version <?= $e($n['version_no']) ?> · Generator <?= $e($n['generator_version']) ?></p>
 <?php endif;?>
+<?php else:?><div class="snapshot"><?= $e($n['final_text']??'Noch kein Sachverhaltstext vorhanden.') ?></div><?php endif;?>
 <?php endif;?></section>
 
 <section class="card"><h2>3. Zeugenbericht-Snapshot</h2>
 <?php if(!$o||!$n):?><p>Beobachtung und Sachverhalt müssen vollständig sein.</p>
-<?php else:?><form method="post" action="/cases/<?= rawurlencode($c['id']) ?>/witness/report"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><button type="submit">Zeugenbericht aus aktuellem Aktenstand erzeugen</button></form><?php endif;?>
+<?php elseif($editable):?><form method="post" action="/cases/<?= rawurlencode($c['id']) ?>/witness/report"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><button type="submit">Zeugenbericht aus aktuellem Aktenstand erzeugen</button></form><?php endif;?>
 
 <?php if($r):?>
 <?php if(!($r['current']??false)):?><div class="warn">Dieser Bericht gehört nicht mehr zum aktuellen Beobachtungs-/Sachverhaltsstand. Er muss neu erzeugt werden.</div><?php endif;?>
