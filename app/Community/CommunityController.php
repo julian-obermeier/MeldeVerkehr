@@ -111,6 +111,8 @@ final class CommunityController
             ),
             'viewerUserId' => $viewer,
             'csrf' => $viewer !== null ? Csrf::token() : null,
+            'message' => $this->pullFlash('community_message'),
+            'error' => $this->pullFlash('community_error'),
         ]));
     }
 
