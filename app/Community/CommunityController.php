@@ -36,6 +36,7 @@ final class CommunityController
             'profile' => $core->profileByUser($userId, $userId),
             'posts' => $core->feed($userId, $this->nullable($request->query('group'))),
             'groups' => $core->groups($userId),
+            'favoriteIds' => CommunityServiceFactory::social($this->app)->favoritePostIds($userId),
             'csrf' => Csrf::token(),
             'message' => $this->pullFlash('community_message'),
             'error' => $this->pullFlash('community_error'),
@@ -104,6 +105,10 @@ final class CommunityController
 
         return Response::html($this->view->render('community/user', [
             'profile' => $profile,
+            'stats' => CommunityServiceFactory::social($this->app)->profileStats(
+                $viewer,
+                (string) $profile['user_id']
+            ),
             'viewerUserId' => $viewer,
             'csrf' => $viewer !== null ? Csrf::token() : null,
         ]));
@@ -216,6 +221,9 @@ final class CommunityController
 
         return Response::html($this->view->render('community/post', [
             'post' => $post,
+            'isFavorite' => $viewer !== null
+                ? CommunityServiceFactory::social($this->app)->isFavorite($viewer, (string) $post['id'])
+                : false,
             'viewerUserId' => $viewer,
             'csrf' => $viewer !== null ? Csrf::token() : null,
         ]));
@@ -269,6 +277,164 @@ final class CommunityController
         }
 
         return Response::redirect('/community/posts/' . rawurlencode($postId));
+    }
+
+    public function followUser(Request $request): Response
+    {
+        $userId = $this->requireUser();
+        if ($userId instanceof Response) {
+            return $userId;
+        }
+
+        $username = (string) $request->route('username', '');
+        if (!$this->csrf($request, '/community/u/' . rawurlencode($username))) {
+            return Response::redirect('/community/u/' . rawurlencode($username));
+        }
+
+        try {
+            CommunityServiceFactory::social($this->app)->followUsername($userId, $username);
+            $_SESSION['community_message'] = 'Du folgst diesem Profil jetzt.';
+        } catch (\InvalidArgumentException|\DomainException $e) {
+            $_SESSION['community_error'] = $e->getMessage();
+        }
+
+        return Response::redirect('/community/u/' . rawurlencode($username));
+    }
+
+    public function unfollowUser(Request $request): Response
+    {
+        $userId = $this->requireUser();
+        if ($userId instanceof Response) {
+            return $userId;
+        }
+
+        $username = (string) $request->route('username', '');
+        if (!$this->csrf($request, '/community/u/' . rawurlencode($username))) {
+            return Response::redirect('/community/u/' . rawurlencode($username));
+        }
+
+        try {
+            CommunityServiceFactory::social($this->app)->unfollowUsername($userId, $username);
+            $_SESSION['community_message'] = 'Du folgst diesem Profil nicht mehr.';
+        } catch (\DomainException $e) {
+            $_SESSION['community_error'] = $e->getMessage();
+        }
+
+        return Response::redirect('/community/u/' . rawurlencode($username));
+    }
+
+    public function network(Request $request): Response
+    {
+        $userId = $this->requireUser();
+        if ($userId instanceof Response) {
+            return $userId;
+        }
+
+        return Response::html($this->view->render('community/network', [
+            'network' => CommunityServiceFactory::social($this->app)->network($userId),
+        ]));
+    }
+
+    public function favorites(Request $request): Response
+    {
+        $userId = $this->requireUser();
+        if ($userId instanceof Response) {
+            return $userId;
+        }
+
+        return Response::html($this->view->render('community/favorites', [
+            'posts' => CommunityServiceFactory::social($this->app)->favorites($userId),
+            'csrf' => Csrf::token(),
+        ]));
+    }
+
+    public function favoritePost(Request $request): Response
+    {
+        $userId = $this->requireUser();
+        if ($userId instanceof Response) {
+            return $userId;
+        }
+
+        $postId = (string) $request->route('id', '');
+        if (!$this->csrf($request, '/community/posts/' . rawurlencode($postId))) {
+            return Response::redirect('/community/posts/' . rawurlencode($postId));
+        }
+
+        try {
+            CommunityServiceFactory::social($this->app)->favorite($userId, $postId);
+        } catch (\DomainException $e) {
+            $_SESSION['community_error'] = $e->getMessage();
+        }
+
+        return Response::redirect('/community/posts/' . rawurlencode($postId));
+    }
+
+    public function unfavoritePost(Request $request): Response
+    {
+        $userId = $this->requireUser();
+        if ($userId instanceof Response) {
+            return $userId;
+        }
+
+        $postId = (string) $request->route('id', '');
+        if (!$this->csrf($request, '/community/posts/' . rawurlencode($postId))) {
+            return Response::redirect('/community/posts/' . rawurlencode($postId));
+        }
+
+        CommunityServiceFactory::social($this->app)->unfavorite($userId, $postId);
+
+        return $request->input('redirect') === '/community/favorites'
+            ? Response::redirect('/community/favorites')
+            : Response::redirect('/community/posts/' . rawurlencode($postId));
+    }
+
+    public function groupChat(Request $request): Response
+    {
+        $userId = $this->requireUser();
+        if ($userId instanceof Response) {
+            return $userId;
+        }
+
+        $groupId = (string) $request->route('id', '');
+
+        try {
+            $data = CommunityServiceFactory::social($this->app)->groupChat($userId, $groupId);
+        } catch (\DomainException $e) {
+            return Response::html('<h1>403</h1><p>Kein Zugriff auf diesen Gruppenchat.</p>', 403);
+        }
+
+        return Response::html($this->view->render('community/group-chat', [
+            'data' => $data,
+            'csrf' => Csrf::token(),
+            'message' => $this->pullFlash('community_message'),
+            'error' => $this->pullFlash('community_error'),
+        ]));
+    }
+
+    public function sendGroupMessage(Request $request): Response
+    {
+        $userId = $this->requireUser();
+        if ($userId instanceof Response) {
+            return $userId;
+        }
+
+        $groupId = (string) $request->route('id', '');
+        $redirect = '/community/groups/' . rawurlencode($groupId) . '/chat';
+        if (!$this->csrf($request, $redirect)) {
+            return Response::redirect($redirect);
+        }
+
+        try {
+            CommunityServiceFactory::social($this->app)->sendGroupMessage(
+                $userId,
+                $groupId,
+                (string) $request->input('body', '')
+            );
+        } catch (\InvalidArgumentException|\DomainException|\MeldeVerkehr\Auth\AuthorizationException $e) {
+            $_SESSION['community_error'] = $e->getMessage();
+        }
+
+        return Response::redirect($redirect);
     }
 
     public function problems(Request $request): Response
