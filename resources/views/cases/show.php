@@ -40,7 +40,7 @@ textarea{min-height:80px}button,.button{display:inline-block;margin-top:12px;pad
 <div><span class="step <?= $observationDone?'done':'todo' ?>">3. Beobachtungszeit <?= $observationDone?'✓':'' ?></span></div>
 <div><span class="step <?= $offenseDone?'done':'todo' ?>">4. Tatbestand <?= $offenseDone?'✓':'' ?></span></div>
 <div><span class="step <?= $reviewDone?'done':'todo' ?>">5. Grunddaten-Review <?= $reviewDone?'✓':'' ?></span></div>
-<div><span class="step todo">6. Beweise – M3</span></div>
+<div><span class="step <?= $evidencePackage?'done':'todo' ?>">6. Beweise – M3 <?= $evidencePackage?'✓':'' ?></span></div>
 </div>
 <?php if(!$vehicleDone):?><p class="muted">Als Nächstes: Fahrzeug erfassen.</p>
 <?php elseif(!$locationDone):?><p class="muted">Als Nächstes: Standort erfassen.</p>
