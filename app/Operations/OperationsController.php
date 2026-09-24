@@ -343,8 +343,7 @@ final class OperationsController
             ], 401);
         }
 
-        $items = OperationsServiceFactory::notifications($this->app)->list($userId, true, 1);
-        $item = $items[0] ?? null;
+        $item = OperationsServiceFactory::notifications($this->app)->latestPushPayload($userId);
 
         return Response::json([
             'success' => true,
