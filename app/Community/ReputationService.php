@@ -412,6 +412,52 @@ final class ReputationService
         return $correctionId;
     }
 
+    public function adminCorrectionByUsername(
+        string $adminUserId,
+        string $username,
+        string $category,
+        int $points,
+        string $reason
+    ): string {
+        $this->assertAdmin($adminUserId);
+
+        $stmt = $this->pdo->prepare(
+            'SELECT user_id FROM community_profiles
+             WHERE LOWER(username) = LOWER(:username) LIMIT 1'
+        );
+        $stmt->execute(['username' => trim($username)]);
+        $userId = $stmt->fetchColumn();
+
+        if (!is_string($userId) || $userId === '') {
+            throw new \DomainException('Community-Nutzer wurde nicht gefunden.');
+        }
+
+        return $this->adminCorrection(
+            $adminUserId,
+            $userId,
+            $category,
+            $points,
+            $reason
+        );
+    }
+
+    public function recentCorrections(string $adminUserId, int $limit = 50): array
+    {
+        $this->assertAdmin($adminUserId);
+        $limit = max(1, min(100, $limit));
+
+        $stmt = $this->pdo->query(
+            'SELECT rac.*, cp.username, admin.email AS admin_email
+             FROM reputation_admin_corrections rac
+             LEFT JOIN community_profiles cp ON cp.user_id = rac.user_id
+             INNER JOIN users admin ON admin.id = rac.admin_user_id
+             ORDER BY rac.created_at DESC
+             LIMIT ' . $limit
+        );
+
+        return $stmt->fetchAll();
+    }
+
     public function policies(): array
     {
         $stmt = $this->pdo->query(
