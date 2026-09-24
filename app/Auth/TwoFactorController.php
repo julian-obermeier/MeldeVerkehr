@@ -53,7 +53,24 @@ final class TwoFactorController
             new SecretCipher((string) $this->app->config()->get('app.key', ''))
         );
 
+        $limiter = new LoginRateLimiter(
+            $this->app->database(),
+            (string) $this->app->config()->get('app.key', 'meldeverkehr'),
+            5,
+            15,
+            15
+        );
+        $limitKey = $limiter->keyFor('2fa:' . $userId, (string) $request->server('REMOTE_ADDR', ''));
+
+        if ($limiter->blocked($limitKey)) {
+            return Response::html($this->view->render('auth/two_factor', [
+                'csrf' => Csrf::token(),
+                'error' => 'Zu viele ungültige Codes. Bitte später erneut versuchen.',
+            ]), 429);
+        }
+
         if (!$service->verify($userId, trim((string) $request->input('code', '')))) {
+            $limiter->hit($limitKey);
             $this->audit()->log(
                 'SECOND_FACTOR_FAILED',
                 'user',
@@ -69,6 +86,7 @@ final class TwoFactorController
             ]), 422);
         }
 
+        $limiter->clear($limitKey);
         $this->auth->completeSecondFactor();
         Csrf::rotate();
 
