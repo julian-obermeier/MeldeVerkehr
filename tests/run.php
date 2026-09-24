@@ -2901,7 +2901,7 @@ try {
     );
     $assert(
         str_contains($pwaScript, 'enhanceAccessibility')
-        && str_contains($pwaScript, 'data.skipLink')
+        && str_contains($pwaScript, 'dataset.skipLink')
         && str_contains($pwaScript, ':focus-visible')
         && str_contains($pwaScript, "setAttribute('role', 'alert')")
         && str_contains($pwaScript, "setAttribute('aria-live', 'polite')"),
