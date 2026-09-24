@@ -181,6 +181,10 @@ final class CaseService
             throw new \InvalidArgumentException('Kennzeichen ist erforderlich.');
         }
 
+        if (mb_strlen($plate) > 40) {
+            throw new \InvalidArgumentException('Kennzeichen ist zu lang.');
+        }
+
         if (!in_array($type, self::VEHICLE_TYPES, true)) {
             throw new \InvalidArgumentException('Ungültige Fahrzeugart.');
         }
@@ -243,6 +247,10 @@ final class CaseService
         $street = $this->nullable($input['street'] ?? null, 190);
         $city = $this->nullable($input['city'] ?? null, 120);
 
+        if (($latitude === null) !== ($longitude === null)) {
+            throw new \InvalidArgumentException('Breiten- und Längengrad müssen gemeinsam angegeben werden.');
+        }
+
         if ($latitude === null && $longitude === null && ($street === null || $city === null)) {
             throw new \InvalidArgumentException('Bitte GPS-Koordinaten oder mindestens Straße und Ort angeben.');
         }
@@ -299,6 +307,11 @@ final class CaseService
             'SELECT ov.id
              FROM offense_versions ov
              INNER JOIN offenses o ON o.id = ov.offense_id
+             INNER JOIN (
+                SELECT offense_id, MAX(version) AS max_version
+                FROM offense_versions
+                GROUP BY offense_id
+             ) latest ON latest.offense_id = ov.offense_id AND latest.max_version = ov.version
              WHERE ov.id = :id AND o.active = 1
              LIMIT 1',
             ['id' => $offenseVersionId]
