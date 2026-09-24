@@ -107,11 +107,7 @@
     const box = document.createElement('div');
     box.dataset.offlineDraftNotice = '1';
     box.setAttribute('role', 'status');
-    box.style.margin = '12px 0';
-    box.style.padding = '12px';
-    box.style.border = '1px solid #d6b36b';
-    box.style.borderRadius = '8px';
-    box.style.background = '#fffaf0';
+    box.className = 'mv-offline-notice';
 
     const title = document.createElement('strong');
     title.textContent = conflict
@@ -137,7 +133,7 @@
     const discard = document.createElement('button');
     discard.type = 'button';
     discard.textContent = 'Lokalen Entwurf verwerfen';
-    discard.style.marginLeft = '8px';
+    discard.classList.add('mv-button-gap');
     discard.addEventListener('click', async () => {
       await deleteDraft(draft.key);
       box.remove();
@@ -204,10 +200,7 @@
 
         const message = document.createElement('div');
         message.setAttribute('role', 'alert');
-        message.style.margin = '12px 0';
-        message.style.padding = '12px';
-        message.style.border = '1px solid #d6b36b';
-        message.style.borderRadius = '8px';
+        message.className = 'mv-offline-alert';
         message.textContent = 'Keine Verbindung: Der Stand wurde nur lokal als Entwurf gespeichert und nicht an den Server gesendet.';
         form.parentElement?.insertBefore(message, form);
       });
@@ -533,6 +526,76 @@
     }
   };
 
+  const attachPrivacyEditor = () => {
+    document.querySelectorAll('[data-privacy-region="1"]').forEach(region => {
+      const x = Number(region.dataset.x || 0);
+      const y = Number(region.dataset.y || 0);
+      const width = Number(region.dataset.width || 0);
+      const height = Number(region.dataset.height || 0);
+      region.style.left = Math.max(0, Math.min(100, x)) + '%';
+      region.style.top = Math.max(0, Math.min(100, y)) + '%';
+      region.style.width = Math.max(0, Math.min(100, width)) + '%';
+      region.style.height = Math.max(0, Math.min(100, height)) + '%';
+    });
+
+    const stage = document.getElementById('privacyStage');
+    const img = document.getElementById('privacyImage');
+    const selection = document.getElementById('selection');
+    if (!stage || !img || !selection) return;
+
+    const values = {
+      x: document.getElementById('xPct'),
+      y: document.getElementById('yPct'),
+      w: document.getElementById('wPct'),
+      h: document.getElementById('hPct'),
+    };
+    if (!values.x || !values.y || !values.w || !values.h) return;
+
+    let start = null;
+    const point = event => {
+      const rect = img.getBoundingClientRect();
+      return {
+        x: Math.max(0, Math.min(rect.width, event.clientX - rect.left)),
+        y: Math.max(0, Math.min(rect.height, event.clientY - rect.top)),
+        rect,
+      };
+    };
+
+    stage.addEventListener('pointerdown', event => {
+      if (event.button !== 0) return;
+      start = point(event);
+      stage.setPointerCapture(event.pointerId);
+      selection.hidden = false;
+    });
+
+    stage.addEventListener('pointermove', event => {
+      if (!start) return;
+      const current = point(event);
+      const x = Math.min(start.x, current.x);
+      const y = Math.min(start.y, current.y);
+      const width = Math.abs(current.x - start.x);
+      const height = Math.abs(current.y - start.y);
+      selection.style.left = (x / current.rect.width * 100) + '%';
+      selection.style.top = (y / current.rect.height * 100) + '%';
+      selection.style.width = (width / current.rect.width * 100) + '%';
+      selection.style.height = (height / current.rect.height * 100) + '%';
+    });
+
+    stage.addEventListener('pointerup', event => {
+      if (!start) return;
+      const current = point(event);
+      const x = Math.min(start.x, current.x);
+      const y = Math.min(start.y, current.y);
+      const width = Math.abs(current.x - start.x);
+      const height = Math.abs(current.y - start.y);
+      values.x.value = (x / current.rect.width * 100).toFixed(2);
+      values.y.value = (y / current.rect.height * 100).toFixed(2);
+      values.w.value = (width / current.rect.width * 100).toFixed(2);
+      values.h.value = (height / current.rect.height * 100).toFixed(2);
+      start = null;
+    });
+  };
+
   const attachGps = () => {
     const button = document.getElementById('useGps');
     if (!button) return;
@@ -576,17 +639,7 @@
         link.href = '#' + main.id;
         link.dataset.skipLink = '1';
         link.textContent = 'Zum Hauptinhalt';
-        link.style.position = 'fixed';
-        link.style.left = '12px';
-        link.style.top = '-80px';
-        link.style.zIndex = '9999';
-        link.style.padding = '10px 14px';
-        link.style.background = '#ffffff';
-        link.style.color = '#172033';
-        link.style.border = '2px solid #172033';
-        link.style.borderRadius = '8px';
-        link.addEventListener('focus', () => { link.style.top = '12px'; });
-        link.addEventListener('blur', () => { link.style.top = '-80px'; });
+        link.className = 'mv-skip-link';
         document.body.prepend(link);
       }
     }
@@ -600,11 +653,6 @@
       if (!node.hasAttribute('aria-live')) node.setAttribute('aria-live', 'polite');
     });
 
-    const style = document.createElement('style');
-    style.textContent =
-      ':focus-visible{outline:3px solid currentColor;outline-offset:3px}' +
-      '[aria-disabled="true"]{cursor:not-allowed}';
-    document.head.appendChild(style);
   };
 
   const base64UrlBytes = value => {
@@ -707,6 +755,7 @@
 
   window.addEventListener('DOMContentLoaded', () => {
     enhanceAccessibility();
+    attachPrivacyEditor();
     attachGps();
     attachOfflineDrafts().catch(() => {});
     attachOfflineEvidence().catch(() => {});
