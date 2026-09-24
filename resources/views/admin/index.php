@@ -14,6 +14,17 @@ $e=static fn(mixed $v):string=>htmlspecialchars((string)$v,ENT_QUOTES|ENT_SUBSTI
 <div class="card"><h2>Queue</h2>
 <?php if(!$jobCounts):?><p class="muted">Noch keine Jobs vorhanden.</p><?php else:?><div class="grid"><?php foreach($jobCounts as $status=>$count):?><div><strong><?= $e($status) ?></strong>: <?= $e($count) ?></div><?php endforeach;?></div><?php endif;?>
 </div>
+<div class="card"><h2>Betriebsdiagnostik</h2>
+<div class="grid">
+<div><strong>Storage</strong><br><?= !empty($diagnostics['storage']['exists'])?'vorhanden':'fehlt' ?> · <?= !empty($diagnostics['storage']['writable'])?'schreibbar':'nicht schreibbar' ?></div>
+<div><strong>Mail-Quarantäne</strong><br><?= $e($diagnostics['mail']['quarantine_open']) ?> offen</div>
+<div><strong>Dispatch-Fehler</strong><br><?= $e($diagnostics['mail']['dispatch_failed']) ?></div>
+<div><strong>Retention</strong><br><?= $e($diagnostics['retention']['planned']) ?> geplant · <?= $e($diagnostics['retention']['due']) ?> fällig</div>
+<div><strong>Exporte</strong><br><?= $e($diagnostics['exports']['ready']) ?> bereit · <?= $e($diagnostics['exports']['expired_ready']) ?> abgelaufen</div>
+<div><strong>Audit</strong><br><?= !empty($diagnostics['audit']['ok'])?'OK':'FEHLER' ?></div>
+</div>
+<?php if($diagnostics['cron']['latest_run']):?><p class="muted">Letzter Cron: <?= $e($diagnostics['cron']['latest_run']['task']) ?> · <?= $e($diagnostics['cron']['latest_run']['status']) ?> · <?= $e($diagnostics['cron']['latest_run']['started_at']) ?></p><?php endif;?>
+</div>
 <div class="card"><h2>Letzte Cron-Läufe</h2>
 <?php if(!$cronRuns):?><p class="muted">Noch keine Cron-Läufe protokolliert.</p><?php else:?><table><thead><tr><th>Task</th><th>Status</th><th>Start</th><th>Verarbeitet</th><th>Fehler</th></tr></thead><tbody><?php foreach($cronRuns as $run):?><tr><td><?= $e($run['task']) ?></td><td><?= $e($run['status']) ?></td><td><?= $e($run['started_at']) ?></td><td><?= $e($run['processed_count']) ?></td><td><?= $e($run['error_count']) ?></td></tr><?php endforeach;?></tbody></table><?php endif;?>
 </div>
