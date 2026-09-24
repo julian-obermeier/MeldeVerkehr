@@ -542,6 +542,7 @@ final class CommunicationService
             'DEADLINE' => 'Frist aus Behördenantwort bearbeiten',
             'REJECTION' => 'Behördenantwort mit Ablehnung/Einstellung prüfen',
             'CLOSURE' => 'Abschlussmitteilung der Behörde prüfen',
+            'DELIVERY_FAILURE' => 'Versandproblem prüfen',
         ];
 
         if (isset($taskTitles[$class])) {
@@ -602,6 +603,18 @@ final class CommunicationService
         $status = (string) $row['status'];
 
         try {
+            if ($classification === 'DELIVERY_FAILURE') {
+                if (in_array($status, [CaseStatus::SENT, CaseStatus::DELIVERY_UNKNOWN], true)) {
+                    $this->cases->changeStatus(
+                        $userId,
+                        $caseId,
+                        CaseStatus::DELIVERY_FAILED,
+                        'Unzustellbarkeitsmeldung für Behördenversand eingegangen'
+                    );
+                }
+                return;
+            }
+
             if (in_array($status, [CaseStatus::SENT, CaseStatus::DELIVERY_UNKNOWN], true)) {
                 $this->cases->changeStatus(
                     $userId,
