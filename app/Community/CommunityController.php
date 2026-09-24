@@ -376,6 +376,7 @@ final class CommunityController
         }
 
         return Response::html($this->view->render('community/messages', [
+            'userId' => $userId,
             'messages' => CommunityServiceFactory::core($this->app)->inbox($userId),
             'csrf' => Csrf::token(),
             'message' => $this->pullFlash('community_message'),
