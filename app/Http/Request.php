@@ -14,7 +14,8 @@ final class Request
         private readonly array $query,
         private readonly array $post,
         private readonly array $server,
-        private readonly array $files = []
+        private readonly array $files = [],
+        private readonly string $rawBody = ''
     ) {
     }
 
@@ -29,7 +30,8 @@ final class Request
             $_GET,
             $_POST,
             $_SERVER,
-            $_FILES
+            $_FILES,
+            (string) (file_get_contents('php://input') ?: '')
         );
     }
 
@@ -61,6 +63,28 @@ final class Request
     public function server(string $key, mixed $default = null): mixed
     {
         return $this->server[$key] ?? $default;
+    }
+
+    public function rawBody(): string
+    {
+        return $this->rawBody;
+    }
+
+    public function json(): array
+    {
+        $body = trim($this->rawBody);
+
+        if ($body === '') {
+            return [];
+        }
+
+        $decoded = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
+
+        if (!is_array($decoded)) {
+            throw new \InvalidArgumentException('JSON request body must be an object.');
+        }
+
+        return $decoded;
     }
 
     public function setRouteParams(array $params): void
