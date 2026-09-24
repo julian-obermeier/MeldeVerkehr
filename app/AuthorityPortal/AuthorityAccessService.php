@@ -164,10 +164,18 @@ final class AuthorityAccessService
             throw new AuthorizationException('Access denied.');
         }
 
-        $authorityIds = array_map(
-            static fn(array $row): string => (string) $row['authority_id'],
-            $this->scopes($userId)
-        );
+        $authorityIds = [];
+        foreach ($this->scopes($userId) as $scope) {
+            $scopeRole = (string) ($scope['scope_role'] ?? '');
+            $allowed = self::SCOPE_PERMISSIONS[$scopeRole] ?? [];
+
+            if (
+                $this->permissions->hasRole($userId, 'SUPER_ADMIN')
+                || in_array($permission, $allowed, true)
+            ) {
+                $authorityIds[] = (string) $scope['authority_id'];
+            }
+        }
 
         if ($authorityIds === []) {
             throw new AuthorizationException('Access denied.');
