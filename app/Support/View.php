@@ -10,7 +10,7 @@ final class View
     {
     }
 
-    public function render(string $template, array $data = []): string
+    public function render(string $template, array $viewData = []): string
     {
         $path = rtrim($this->basePath, '/') . '/' . ltrim($template, '/') . '.php';
 
@@ -18,7 +18,7 @@ final class View
             throw new \RuntimeException(sprintf('View %s not found.', $template));
         }
 
-        extract($data, EXTR_SKIP);
+        extract($viewData, EXTR_SKIP);
 
         ob_start();
         require $path;
