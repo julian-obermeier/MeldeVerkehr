@@ -24,6 +24,7 @@ final class DryRunDispatchTransport implements DispatchTransportInterface
         $reference = 'dryrun:' . Uuid::v4();
         $messageId = $headers['Message-ID'] ?? ('<mv-' . Uuid::v4() . '@dry-run.invalid>');
         $replyTo = $headers['Reply-To'] ?? null;
+        $inReplyTo = $headers['In-Reply-To'] ?? null;
 
         $attachmentManifest = array_map(
             static fn(array $attachment): array => [
@@ -37,8 +38,8 @@ final class DryRunDispatchTransport implements DispatchTransportInterface
 
         $stmt = $this->pdo->prepare(
             'INSERT INTO dispatch_dry_run_outbox
-             (dispatch_id, recipient, reply_to, subject, message_id, body_sha256, attachment_manifest_json, created_at)
-             VALUES (:dispatch_id, :recipient, :reply_to, :subject, :message_id, :body_sha256, :attachments, UTC_TIMESTAMP())'
+             (dispatch_id, recipient, reply_to, subject, message_id, in_reply_to, body_sha256, attachment_manifest_json, created_at)
+             VALUES (:dispatch_id, :recipient, :reply_to, :subject, :message_id, :in_reply_to, :body_sha256, :attachments, UTC_TIMESTAMP())'
         );
         $stmt->execute([
             'dispatch_id' => $dispatchId,
@@ -46,6 +47,7 @@ final class DryRunDispatchTransport implements DispatchTransportInterface
             'reply_to' => $replyTo,
             'subject' => $subject,
             'message_id' => $messageId,
+            'in_reply_to' => $inReplyTo,
             'body_sha256' => hash('sha256', $text),
             'attachments' => json_encode(
                 $attachmentManifest,
@@ -60,6 +62,7 @@ final class DryRunDispatchTransport implements DispatchTransportInterface
                 'mode' => 'dry_run',
                 'attachment_count' => count($attachmentManifest),
                 'reply_to' => $replyTo,
+                'in_reply_to' => $inReplyTo,
             ],
             'message_id' => $messageId,
         ];
