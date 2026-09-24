@@ -96,9 +96,19 @@ final class AuthorityPortalService
         return $stmt->fetchAll();
     }
 
-    public function caseDetail(string $userId, string $caseId): array
-    {
-        $access = $this->access->assertCase($userId, $caseId, 'authority.case.view');
+    public function caseDetail(
+        string $userId,
+        string $caseId,
+        ?string $authorityId = null
+    ): array {
+        $access = $authorityId === null
+            ? $this->access->assertCase($userId, $caseId, 'authority.case.view')
+            : $this->access->assertCaseForAuthority(
+                $userId,
+                $authorityId,
+                $caseId,
+                'authority.case.view'
+            );
         $package = $this->loadPackage((string) $access['dispatch_package_id']);
 
         $stmt = $this->pdo->prepare(
@@ -147,9 +157,17 @@ final class AuthorityPortalService
         string $type,
         string $subject,
         string $body,
-        ?\DateTimeImmutable $dueAt = null
+        ?\DateTimeImmutable $dueAt = null,
+        ?string $authorityId = null
     ): array {
-        $access = $this->access->assertCase($userId, $caseId, 'authority.case.reply');
+        $access = $authorityId === null
+            ? $this->access->assertCase($userId, $caseId, 'authority.case.reply')
+            : $this->access->assertCaseForAuthority(
+                $userId,
+                $authorityId,
+                $caseId,
+                'authority.case.reply'
+            );
 
         $type = strtoupper(trim($type));
         if (!in_array($type, self::INQUIRY_TYPES, true)) {
