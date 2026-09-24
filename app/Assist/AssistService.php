@@ -37,7 +37,8 @@ final class AssistService
         private readonly EvidenceStorage $storage,
         private readonly SecretCipher $cipher,
         private readonly VisionProviderInterface $provider,
-        private readonly AuditLogger $audit
+        private readonly AuditLogger $audit,
+        private readonly ImageQualityAnalyzer $qualityAnalyzer = new ImageQualityAnalyzer()
     ) {
     }
 
@@ -143,6 +144,105 @@ final class AssistService
             'suggestions' => $suggestions,
             'runs' => $runs,
             'editable' => (string) $case['case']['status'] === CaseStatus::WAITING_FOR_EVIDENCE,
+        ];
+    }
+
+    public function analyzeQuality(string $userId, string $evidenceId): array
+    {
+        $source = $this->editableEvidence($userId, $evidenceId);
+        $absolute = $this->storage->absolute((string) $source['storage_path']);
+
+        if (!is_file($absolute) || !is_readable($absolute)) {
+            throw new \RuntimeException('Analysebild fehlt im geschützten Storage.');
+        }
+
+        if (!hash_equals((string) $source['sha256'], hash_file('sha256', $absolute))) {
+            throw new \RuntimeException('Integrität der Analysequelle ist verletzt.');
+        }
+
+        $metrics = $this->qualityAnalyzer->analyze(
+            $absolute,
+            (string) $source['mime_type']
+        );
+
+        if (!is_array($metrics)) {
+            throw new \DomainException(
+                'Lokale Qualitätsanalyse ist auf diesem Server nicht verfügbar.'
+            );
+        }
+
+        $versionStmt = $this->pdo->prepare(
+            'SELECT COALESCE(MAX(version_no), 0) + 1
+             FROM evidence_quality_metrics
+             WHERE evidence_id = :evidence_id'
+        );
+        $versionStmt->execute(['evidence_id' => $evidenceId]);
+        $version = max(1, (int) $versionStmt->fetchColumn());
+        $id = Uuid::v4();
+
+        $stmt = $this->pdo->prepare(
+            'INSERT INTO evidence_quality_metrics
+             (id, evidence_id, version_no, source_variant, width, height,
+              brightness_mean, contrast_stddev, sharpness_score,
+              resolution_state, brightness_state, contrast_state, sharpness_state,
+              overall_state, metrics_json, created_at)
+             VALUES
+             (:id, :evidence_id, :version_no, :source_variant, :width, :height,
+              :brightness_mean, :contrast_stddev, :sharpness_score,
+              :resolution_state, :brightness_state, :contrast_state, :sharpness_state,
+              :overall_state, :metrics_json, UTC_TIMESTAMP())'
+        );
+        $stmt->execute([
+            'id' => $id,
+            'evidence_id' => $evidenceId,
+            'version_no' => $version,
+            'source_variant' => $source['variant'],
+            'width' => $metrics['width'],
+            'height' => $metrics['height'],
+            'brightness_mean' => $metrics['brightness_mean'],
+            'contrast_stddev' => $metrics['contrast_stddev'],
+            'sharpness_score' => $metrics['sharpness_score'],
+            'resolution_state' => $metrics['resolution_state'],
+            'brightness_state' => $metrics['brightness_state'],
+            'contrast_state' => $metrics['contrast_state'],
+            'sharpness_state' => $metrics['sharpness_state'],
+            'overall_state' => $metrics['overall_state'],
+            'metrics_json' => json_encode(
+                $metrics,
+                JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+            ),
+        ]);
+
+        $this->pdo->prepare(
+            'UPDATE evidence_items
+             SET quality_state = :quality_state, updated_at = UTC_TIMESTAMP()
+             WHERE id = :id'
+        )->execute([
+            'quality_state' => $metrics['overall_state'],
+            'id' => $evidenceId,
+        ]);
+
+        $this->audit->log(
+            'EVIDENCE_LOCAL_QUALITY_ANALYZED',
+            'evidence',
+            $evidenceId,
+            'USER',
+            $userId,
+            [
+                'case_id' => $source['case_id'],
+                'version_no' => $version,
+                'source_variant' => $source['variant'],
+                'input_sha256' => $source['sha256'],
+                'algorithm' => $metrics['algorithm'],
+                'overall_state' => $metrics['overall_state'],
+            ]
+        );
+
+        return [
+            'id' => $id,
+            'version_no' => $version,
+            'evidence_id' => $evidenceId,
+            'metrics' => $metrics,
         ];
     }
 
