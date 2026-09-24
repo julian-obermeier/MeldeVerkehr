@@ -59,11 +59,11 @@ Die Plattform verbindet vier Bereiche:
 
 ## Entwicklungsreihenfolge
 
-M1 Fundament → M2 Vorgangskern → M3 Beweissystem → M4 Sachverhalt/Final Review → M5 Behördenrouting/Versand → M6 Kommunikation → M7 KI/OCR → M8 Analyse/Problemstellen → M9 Community → M10 Suche/Dokumente/Notifications → M11 Behördenportal/API → M12 Produktionshärtung/Release Candidate → M13 Vorgangsversionierung/Lifecycle → M14 Moderation/Safety
+M1 Fundament → M2 Vorgangskern → M3 Beweissystem → M4 Sachverhalt/Final Review → M5 Behördenrouting/Versand → M6 Kommunikation → M7 KI/OCR → M8 Analyse/Problemstellen → M9 Community → M10 Suche/Dokumente/Notifications → M11 Behördenportal/API → M12 Produktionshärtung/Release Candidate → M13 Vorgangsversionierung/Lifecycle → M14 Moderation/Safety → M15 Reputation/Governance
 
 ## Status
 
-Der aktuelle Entwicklungsstand ist `0.14.0-dev` – M14 komplettiert Moderation mit Einsprüchen, Abuse-Signalen, Eskalationen und Anti-Spam-/Bot-Erkennung. Siehe `PROJECT_STATUS.md`.
+Der aktuelle Entwicklungsstand ist `0.15.0-dev` – M15 ergänzt Reputation um Achievements, Tageslimits, Diminishing Returns, Anomalien und revisionssichere Admin-Korrekturen. Siehe `PROJECT_STATUS.md`.
 
 
 ## Installation (Entwicklungsstand)
