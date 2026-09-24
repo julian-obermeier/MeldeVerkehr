@@ -199,6 +199,7 @@ final class CaseService
         ]);
 
         $this->touchProgress($case, $userId);
+        $this->refreshCaptureState($userId, $caseId);
         $this->timeline($caseId, 'USER', 'VEHICLE_UPDATED', $userId, ['vehicle_type' => $type]);
         $this->audit->log('CASE_VEHICLE_UPDATED', 'case', $caseId, 'USER', $userId);
     }
@@ -263,6 +264,7 @@ final class CaseService
         ]);
 
         $this->touchProgress($case, $userId);
+        $this->refreshCaptureState($userId, $caseId);
         $this->timeline($caseId, 'USER', 'LOCATION_UPDATED', $userId, [
             'traffic_space_type' => $trafficSpace,
             'access_type' => $accessType,
@@ -314,6 +316,7 @@ final class CaseService
         }
 
         $this->touchProgress($case, $userId);
+        $this->refreshCaptureState($userId, $caseId);
         $this->timeline($caseId, 'USER', 'PRIMARY_OFFENSE_SET', $userId, ['offense_version_id' => $offenseVersionId]);
         $this->audit->log('CASE_PRIMARY_OFFENSE_SET', 'case', $caseId, 'USER', $userId);
     }
@@ -333,6 +336,38 @@ final class CaseService
              ORDER BY o.category, ov.title',
             []
         );
+    }
+
+    public function dashboardSummary(string $userId): array
+    {
+        $countsStmt = $this->pdo->prepare(
+            'SELECT
+                SUM(CASE WHEN status NOT IN ("CLOSED","ARCHIVED","DELETION_PENDING") THEN 1 ELSE 0 END) AS open_count,
+                SUM(CASE WHEN status IN ("DRAFT","CAPTURE_IN_PROGRESS","WAITING_FOR_EVIDENCE") THEN 1 ELSE 0 END) AS draft_count,
+                SUM(CASE WHEN status IN ("USER_ACTION_REQUIRED","REVIEW_REQUIRED","DELIVERY_FAILED") THEN 1 ELSE 0 END) AS action_count,
+                SUM(CASE WHEN status = "DELIVERY_FAILED" THEN 1 ELSE 0 END) AS delivery_error_count
+             FROM cases
+             WHERE user_id = :user_id'
+        );
+        $countsStmt->execute(['user_id' => $userId]);
+        $counts = $countsStmt->fetch() ?: [];
+
+        $recentStmt = $this->pdo->prepare(
+            'SELECT id, public_number, status, updated_at
+             FROM cases
+             WHERE user_id = :user_id
+             ORDER BY updated_at DESC
+             LIMIT 5'
+        );
+        $recentStmt->execute(['user_id' => $userId]);
+
+        return [
+            'open' => (int) ($counts['open_count'] ?? 0),
+            'drafts' => (int) ($counts['draft_count'] ?? 0),
+            'actions' => (int) ($counts['action_count'] ?? 0),
+            'delivery_errors' => (int) ($counts['delivery_error_count'] ?? 0),
+            'recent' => $recentStmt->fetchAll(),
+        ];
     }
 
     public function changeStatus(string $userId, string $caseId, string $to, ?string $reason = null): void
@@ -391,6 +426,49 @@ final class CaseService
 
         if ($case['status'] === CaseStatus::DRAFT) {
             $this->changeStatus($userId, (string) $case['id'], CaseStatus::CAPTURE_IN_PROGRESS, 'Erfassung begonnen');
+        }
+    }
+
+    private function refreshCaptureState(string $userId, string $caseId): void
+    {
+        $case = $this->findRaw($caseId);
+
+        if ($case === null || $case['status'] !== CaseStatus::CAPTURE_IN_PROGRESS) {
+            return;
+        }
+
+        $vehicleExists = $this->fetchOne(
+            'SELECT 1 AS found FROM vehicles WHERE case_id = :case_id LIMIT 1',
+            ['case_id' => $caseId]
+        ) !== null;
+
+        $locationExists = $this->fetchOne(
+            'SELECT 1 AS found FROM locations WHERE case_id = :case_id LIMIT 1',
+            ['case_id' => $caseId]
+        ) !== null;
+
+        $offense = $this->fetchOne(
+            'SELECT o.stable_key
+             FROM case_offenses co
+             INNER JOIN offense_versions ov ON ov.id = co.offense_version_id
+             INNER JOIN offenses o ON o.id = ov.offense_id
+             WHERE co.case_id = :case_id AND co.is_primary = 1 AND co.user_confirmed = 1
+             LIMIT 1',
+            ['case_id' => $caseId]
+        );
+
+        if (
+            $vehicleExists
+            && $locationExists
+            && $offense !== null
+            && ($offense['stable_key'] ?? '') !== 'UNCLASSIFIED_PARKING'
+        ) {
+            $this->changeStatus(
+                $userId,
+                $caseId,
+                CaseStatus::WAITING_FOR_EVIDENCE,
+                'Grunddaten vollständig; Beweisdokumentation ausstehend'
+            );
         }
     }
 
