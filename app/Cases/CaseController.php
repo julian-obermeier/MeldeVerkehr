@@ -87,7 +87,7 @@ final class CaseController
         }
 
         return Response::html($this->view->render('cases/show', [
-            'data' => $case,
+            'caseData' => $case,
             'offenses' => $this->service()->availableOffenses(),
             'csrf' => Csrf::token(),
             'message' => $this->pullFlash('case_message'),
