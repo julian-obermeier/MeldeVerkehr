@@ -2,6 +2,9 @@
 
 declare(strict_types=1);
 
+use MeldeVerkehr\Assist\AssistService;
+use MeldeVerkehr\Assist\ImageQualityAnalyzer;
+use MeldeVerkehr\Assist\VisionProviderInterface;
 use MeldeVerkehr\Audit\AuditLogger;
 use MeldeVerkehr\Auth\AuthorizationService;
 use MeldeVerkehr\Auth\AuthService;
@@ -326,6 +329,282 @@ try {
             hash_file('sha256', $basePath . '/storage/app/' . $workingRow['storage_path'])
         ),
         'Evidence working copy is separately stored and hashed'
+    );
+
+    $fakeVisionProvider = new class($testStableKey) implements VisionProviderInterface {
+        public function __construct(private readonly string $stableKey)
+        {
+        }
+
+        public function name(): string
+        {
+            return 'fake_vision';
+        }
+
+        public function enabled(): bool
+        {
+            return true;
+        }
+
+        public function analyze(
+            string $purpose,
+            string $imagePath,
+            string $mimeType,
+            array $context = []
+        ): array {
+            if (!is_file($imagePath)) {
+                throw new RuntimeException('Fake provider expected readable image.');
+            }
+
+            if ($purpose === 'PLATE_OCR') {
+                return [
+                    'suggestions' => [[
+                        'type' => 'LICENSE_PLATE',
+                        'value' => [
+                            'plate' => 'GI-X 777',
+                            'region' => ['x' => 0.20, 'y' => 0.30, 'width' => 0.30, 'height' => 0.15],
+                        ],
+                        'confidence' => 0.93,
+                    ]],
+                    'metadata' => ['model' => 'fake-test-v1'],
+                ];
+            }
+
+            if ($purpose === 'TRAFFIC_SIGNS') {
+                return [
+                    'suggestions' => [
+                        [
+                            'type' => 'TRAFFIC_SIGN',
+                            'value' => [
+                                'code' => 'TEST-SIGN-283',
+                                'label' => 'Test-Verkehrszeichen',
+                                'region' => ['x' => 0.10, 'y' => 0.10, 'width' => 0.20, 'height' => 0.30],
+                            ],
+                            'confidence' => 0.88,
+                        ],
+                        [
+                            'type' => 'ADDITIONAL_SIGN',
+                            'value' => ['text' => 'werktags 7-17 h'],
+                            'confidence' => 0.77,
+                        ],
+                    ],
+                    'metadata' => ['model' => 'fake-test-v1'],
+                ];
+            }
+
+            if ($purpose === 'OFFENSE_SUGGESTIONS') {
+                $ids = array_values(array_map(
+                    static fn(array $signal): string => (string) $signal['suggestion_id'],
+                    is_array($context['confirmed_signals'] ?? null) ? $context['confirmed_signals'] : []
+                ));
+
+                return [
+                    'suggestions' => [[
+                        'type' => 'OFFENSE',
+                        'value' => [
+                            'stable_key' => $this->stableKey,
+                            'basis_suggestion_ids' => $ids,
+                            'rationale' => 'Testvorschlag ausschließlich aus bestätigten Signalen.',
+                        ],
+                        'confidence' => 0.82,
+                    ]],
+                    'metadata' => ['model' => 'fake-test-v1'],
+                ];
+            }
+
+            return ['suggestions' => [], 'metadata' => ['model' => 'fake-test-v1']];
+        }
+    };
+
+    $assistService = new AssistService(
+        $pdo,
+        new AuthorizationService($permissions),
+        $caseService,
+        $evidenceStorage,
+        new SecretCipher('test-app-key'),
+        $fakeVisionProvider,
+        new AuditLogger($pdo, 'test-audit-key'),
+        new ImageQualityAnalyzer()
+    );
+
+    $qualityResult = $assistService->analyzeQuality(
+        (string) $user['id'],
+        (string) $storedEvidence['id']
+    );
+    $assert(
+        (int) $qualityResult['version_no'] === 1
+        && isset($qualityResult['metrics']['brightness_mean'])
+        && isset($qualityResult['metrics']['contrast_stddev'])
+        && isset($qualityResult['metrics']['sharpness_score']),
+        'Local assist quality analysis stores deterministic metrics'
+    );
+
+    $qualityStoredStmt = $pdo->prepare(
+        'SELECT overall_state, metrics_json
+         FROM evidence_quality_metrics
+         WHERE evidence_id = :id AND version_no = 1'
+    );
+    $qualityStoredStmt->execute(['id' => $storedEvidence['id']]);
+    $qualityStored = $qualityStoredStmt->fetch();
+    $assert(
+        is_array($qualityStored)
+        && in_array($qualityStored['overall_state'], ['SUITABLE','LIMITED','RETAKE_RECOMMENDED'], true)
+        && is_array(json_decode((string) $qualityStored['metrics_json'], true)),
+        'Local quality metrics are versioned in database'
+    );
+
+    $plateRun = $assistService->analyzeEvidence(
+        (string) $user['id'],
+        (string) $storedEvidence['id'],
+        'PLATE_OCR'
+    );
+    $assert(
+        $plateRun['status'] === 'COMPLETED' && (int) $plateRun['suggestion_count'] === 1,
+        'Fake OCR provider produces one plate suggestion'
+    );
+
+    $assistOverview = $assistService->overview((string) $user['id'], $caseId);
+    $plateSuggestion = array_values(array_filter(
+        $assistOverview['suggestions'],
+        static fn(array $row): bool => $row['suggestion_type'] === 'LICENSE_PLATE'
+    ))[0] ?? null;
+    $assert(
+        is_array($plateSuggestion)
+        && ($plateSuggestion['value']['plate'] ?? null) === 'GI-X 777'
+        && abs(((float) $plateSuggestion['confidence']) - 0.93) < 0.0001,
+        'Plate suggestion is normalized and readable to owner'
+    );
+
+    $encryptedSuggestionStmt = $pdo->prepare(
+        'SELECT value_encrypted FROM assist_suggestions WHERE id = :id LIMIT 1'
+    );
+    $encryptedSuggestionStmt->execute(['id' => $plateSuggestion['id']]);
+    $encryptedSuggestion = (string) $encryptedSuggestionStmt->fetchColumn();
+    $assert(
+        !str_contains($encryptedSuggestion, 'GI-X 777'),
+        'Assist suggestion payload is encrypted at rest'
+    );
+
+    $assistService->decideSuggestion(
+        (string) $user['id'],
+        (string) $plateSuggestion['id'],
+        true
+    );
+    $afterPlateConfirm = $caseService->findOwned((string) $user['id'], $caseId);
+    $assert(
+        ($afterPlateConfirm['vehicle']['license_plate'] ?? null) === 'GI-AB 123',
+        'Confirming OCR suggestion does not overwrite plate'
+    );
+
+    $assistService->applyPlateSuggestion(
+        (string) $user['id'],
+        (string) $plateSuggestion['id']
+    );
+    $afterPlateApply = $caseService->findOwned((string) $user['id'], $caseId);
+    $assert(
+        ($afterPlateApply['vehicle']['license_plate'] ?? null) === 'GI-X 777',
+        'Explicit apply step changes plate'
+    );
+    $assert(
+        ($afterPlateApply['case']['status'] ?? null) === CaseStatus::READY_FOR_REVIEW,
+        'Applying plate suggestion forces core review again'
+    );
+    $caseService->confirmCoreReview((string) $user['id'], $caseId, false);
+
+    $signRun = $assistService->analyzeEvidence(
+        (string) $user['id'],
+        (string) $storedEvidence['id'],
+        'TRAFFIC_SIGNS'
+    );
+    $assert(
+        (int) $signRun['suggestion_count'] === 2,
+        'Fake vision provider produces sign and additional-sign suggestions'
+    );
+
+    $assistOverview = $assistService->overview((string) $user['id'], $caseId);
+    $signSuggestion = array_values(array_filter(
+        $assistOverview['suggestions'],
+        static fn(array $row): bool => $row['suggestion_type'] === 'TRAFFIC_SIGN' && $row['status'] === 'PENDING'
+    ))[0] ?? null;
+    $additionalSuggestion = array_values(array_filter(
+        $assistOverview['suggestions'],
+        static fn(array $row): bool => $row['suggestion_type'] === 'ADDITIONAL_SIGN' && $row['status'] === 'PENDING'
+    ))[0] ?? null;
+
+    $assistService->decideSuggestion(
+        (string) $user['id'],
+        (string) $signSuggestion['id'],
+        true
+    );
+    $assistService->decideSuggestion(
+        (string) $user['id'],
+        (string) $additionalSuggestion['id'],
+        false
+    );
+
+    $offenseRun = $assistService->analyzeEvidence(
+        (string) $user['id'],
+        (string) $storedEvidence['id'],
+        'OFFENSE_SUGGESTIONS'
+    );
+    $assert(
+        (int) $offenseRun['suggestion_count'] === 1,
+        'Offense suggestion can be generated from confirmed assist signals only'
+    );
+
+    $assistOverview = $assistService->overview((string) $user['id'], $caseId);
+    $offenseSuggestion = array_values(array_filter(
+        $assistOverview['suggestions'],
+        static fn(array $row): bool => $row['suggestion_type'] === 'OFFENSE' && $row['status'] === 'PENDING'
+    ))[0] ?? null;
+    $assert(
+        is_array($offenseSuggestion)
+        && ($offenseSuggestion['value']['stable_key'] ?? null) === $testStableKey
+        && count($offenseSuggestion['value']['basis_suggestion_ids'] ?? []) === 1,
+        'Offense suggestion stores confirmed signal basis'
+    );
+
+    $assistService->decideSuggestion(
+        (string) $user['id'],
+        (string) $offenseSuggestion['id'],
+        true
+    );
+    $beforeOffenseApply = $caseService->findOwned((string) $user['id'], $caseId);
+    $assert(
+        ($beforeOffenseApply['offenses'][0]['stable_key'] ?? null) === $testStableKey,
+        'Confirming offense suggestion does not silently mutate primary offense'
+    );
+
+    $assistService->applyOffenseSuggestion(
+        (string) $user['id'],
+        (string) $offenseSuggestion['id']
+    );
+    $afterOffenseApply = $caseService->findOwned((string) $user['id'], $caseId);
+    $assert(
+        ($afterOffenseApply['case']['status'] ?? null) === CaseStatus::READY_FOR_REVIEW,
+        'Applying offense suggestion forces core review again'
+    );
+    $caseService->confirmCoreReview((string) $user['id'], $caseId, false);
+
+    $assistRunStmt = $pdo->prepare(
+        'SELECT provider, purpose, status, input_sha256, output_sha256, metadata_json
+         FROM assist_runs
+         WHERE case_id = :case_id
+         ORDER BY created_at'
+    );
+    $assistRunStmt->execute(['case_id' => $caseId]);
+    $assistRuns = $assistRunStmt->fetchAll();
+    $assert(
+        count($assistRuns) === 3
+        && count(array_filter(
+            $assistRuns,
+            static fn(array $row): bool =>
+                $row['provider'] === 'fake_vision'
+                && $row['status'] === 'COMPLETED'
+                && !empty($row['input_sha256'])
+                && !empty($row['output_sha256'])
+        )) === 3,
+        'Assist runs audit provider purpose and input/output hashes'
     );
 
     $removedEvidence = $evidenceService->storeFile(

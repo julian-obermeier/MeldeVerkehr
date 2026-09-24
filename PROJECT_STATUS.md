@@ -1,69 +1,64 @@
 # Projektstatus
 
 ## Aktuelle Version
-0.6.0-dev
+0.7.0-dev
 
 ## Phase
-M6 – Zustellmonitoring und Behördenkommunikation
+M7 – Intelligente Assistenz
 
-## M1–M5
-Fundament, Bürger-Vorgangskern, Beweissystem, Sachverhalt/Zeugenbericht, finaler Review sowie Behördenrouting/Dispatch sind abgeschlossen und auf `develop` integriert.
+## M1–M6
+Fundament, Vorgangskern, Beweissystem, Zeugenbericht/finaler Review, Behördenrouting/Dispatch und Behördenkommunikation sind abgeschlossen und auf `develop` integriert.
 
-## M6 – umgesetzt
-- zufällige, nicht erratbare Reply-Adresse je Dispatch
-- sichere Defaults `COMM_REPLY_DOMAIN=reply.invalid` und `COMM_INBOUND_ENABLED=false`
-- Reply-Adresse wird an Dispatch und ausgehende Nachricht gebunden
-- stabile Message-ID je Erstversand
-- `Reply-To`, `Message-ID` und `In-Reply-To` transportübergreifend
-- optionaler SMTP-Transport mit STARTTLS/SSL und AUTH LOGIN
-- PHP-`mail()` bleibt als optionale Alternative
-- DB-Dry-Run bleibt Standard und protokolliert Threading-Metadaten
-- SMTP nutzt die Reply-Adresse als Envelope-Sender für Bounce-Routing
-- IMAP-Adapter für ungesehene Nachrichten
-- separater Cron `php cron.php inbound-mail`
-- Inbound-Cron ist standardmäßig deaktiviert
-- Zuordnung eingehender Mails über Reply-Adresse oder `In-Reply-To`
-- Deduplizierung über Message-ID/Fingerprint
-- verschlüsselte Quarantäne für nicht zuordenbare Nachrichten
-- verschlüsselte Speicherung von Absender, Empfänger, Betreff und Nachrichtentext
-- SHA-256-Integrität für Nachrichtentexte
-- geschützter Storage für eingehende Anhänge
-- Hashprüfung beim Download von Behördenanhängen
-- deterministische Klassifikation: Eingangsbestätigung, Rückfrage, Frist, Nachforderung, Ablehnung/Einstellung, Abschluss, Unzustellbarkeit, Sonstiges
-- deterministische Fristerkennung aus absoluten Datumsangaben und „innerhalb von X Tagen“
-- automatische Aufgaben aus Rückfragen/Nachforderungen/Fristen
-- separate Fristdatensätze mit expliziter Erledigung
-- kontrollierte Statusfortschreibung bis `DELIVERED`, `AUTHORITY_REPLY`, `USER_ACTION_REQUIRED`, `AUTHORITY_PROCESSING` bzw. `DELIVERY_FAILED`
-- Behördenabschluss/-ablehnung schließt einen Vorgang **nicht** automatisch
-- versionierte, verschlüsselte Antwortentwürfe
-- Antwortassistent verwendet nur bereits bestätigte Vorgangsdaten
-- Antwortentwürfe werden niemals automatisch versendet
-- explizite Nutzerbestätigung vor Reply-Queue
-- Reply-Queue über bestehende DB-Jobqueue
-- erfolgreicher Reply wird als eigener verschlüsselter OUTBOUND-Verlauf gespeichert
-- Threading über `In-Reply-To`/Message-ID
-- Aufgaben aus der beantworteten Nachricht werden nach erfolgreichem Versand geschlossen
-- Fristen bleiben sichtbar, bis der Nutzer sie ausdrücklich erledigt
-- gemeinsame Bürger-Timeline für Ein-/Ausgänge, Anhänge, Aufgaben und Fristen
-- Integrationstests für Reply-Routing, Deduplizierung, Quarantäne, Fristen, Anhänge, Antwortentwurf und Dry-Run-Reply
+## M7 – umgesetzt
+- lokale deterministische Fotoqualitätsanalyse ohne externen Dienst
+- Metriken für Auflösung, mittlere Helligkeit, Helligkeitskontrast und lokale Schärfe
+- technische Einstufungen `SUITABLE`, `LIMITED`, `RETAKE_RECOMMENDED`
+- versionierte Speicherung der Qualitätsmetriken je Evidence-Item
+- lokale Qualitätsanalyse aktualisiert ausschließlich den technischen Evidence-Qualitätsstatus
+- provider-neutrale Vision/OCR-Schnittstelle
+- sicherer Default `ASSIST_PROVIDER=disabled`
+- keine externe Bildübertragung ohne explizite Konfiguration
+- optionaler HTTPS-JSON-Provider
+- externer Provider akzeptiert nur HTTPS ohne eingebettete Zugangsdaten
+- Provider-Ziel darf nicht auf private/reservierte IP-Adressen auflösen
+- validierte DNS-Auflösung wird für den Request gepinnt
+- Uploadlimit für externe Analyse 12 MB
+- Provider-Antwortlimit 2 MB
+- Kennzeichen-OCR als verschlüsselter Vorschlag mit Confidence und optionaler Bildregion
+- Verkehrszeichen- und Zusatzzeichen-Vorschläge
+- Tatbestandsvorschläge ausschließlich auf Basis zuvor bestätigter Schild-/Zusatzzeichen-Hinweise
+- Tatbestandsvorschläge müssen auf lokal vorhandene, versionierte Tatbestände verweisen
+- Vorschlagsdaten werden verschlüsselt gespeichert
+- Vorschläge besitzen getrennte Zustände `PENDING`, `CONFIRMED`, `REJECTED`, `APPLIED`
+- Bestätigen allein verändert keine Vorgangsdaten
+- Kennzeichen/Tatbestand werden erst über einen separaten Übernahme-Schritt geändert
+- Übernahme rechtlich relevanter Daten erzwingt erneut den Grunddaten-Review
+- jeder externe Assistenzlauf protokolliert Provider, Zweck, Input-Hash, Output-Hash, Status und minimierte Metadaten
+- Provider-Rohmetadaten werden nicht vollständig persistiert; nur Schlüssel/technische Zusammenfassung
+- Assistenzcenter im Bürgerportal
+- Providerstatus, lokale Qualitätsmetriken, Confidence, Vorschläge und Run-Historie sichtbar
+- explizites Bestätigen/Verwerfen von Vorschlägen
+- Integrationstests mit lokalem Fake-Provider ohne externe Netzwerkzugriffe
 
-## M6-Status
-Der technische Kommunikationskern ist umgesetzt. Ohne explizite Konfiguration werden weder IMAP-Nachrichten eingelesen noch reale E-Mails versendet.
+## M7-Status
+Der technische Assistenzkern ist abgeschlossen. Intelligente Funktionen sind strikt assistiv: Kein OCR-, Vision-, Schild- oder Tatbestandsvorschlag verändert rechtlich relevante Vorgangsdaten ohne separate Nutzeraktion.
 
 ## Sicherheitsprinzipien
-- produktiver Eingang und produktiver Versand sind getrennt opt-in.
-- unbekannte eingehende Nachrichten werden nicht verworfen, sondern verschlüsselt quarantänisiert.
-- eingehende Anhänge liegen außerhalb des Webroots und werden nur nach Ownership- und Hashprüfung ausgeliefert.
-- Behördenantworten werden deterministisch klassifiziert; eine spätere KI darf nur assistieren.
-- Ablehnung/Abschluss einer Behörde führt nicht automatisch zum Schließen des Vorgangs.
-- Nutzerantworten benötigen immer eine explizite Versandbestätigung.
+- externe Vision/OCR ist standardmäßig deaktiviert.
+- für externe Analyse wird bevorzugt die getrennte WORKING-Kopie statt des geschützten Originals verwendet.
+- die Analysequelle wird vor Übertragung per SHA-256 geprüft.
+- Providerantworten gelten als untrusted input und werden normalisiert/whitelisted.
+- Kennzeichen-, Schild- und Tatbestandsvorschläge werden verschlüsselt gespeichert.
+- Tatbestandsvorschläge brauchen bestätigte Signalgrundlagen.
+- ein externer Vorschlag ersetzt weder Nutzerbestätigung noch behördliche Würdigung.
+- lokale Qualitätsmetriken sind technische Heuristiken und keine Aussage über rechtliche Beweiskraft.
 
 ## Bekannte Einschränkungen
-- PHP-IMAP muss für den produktiven IMAP-Adapter verfügbar sein.
-- PHP-`mail()` kann den Envelope-Sender nicht so kontrolliert setzen wie SMTP; vollständiges Bounce-Routing ist daher mit SMTP vorzuziehen.
-- DSN-Parsing ist aktuell keyword-/nachrichtenbasiert und noch kein vollständiger RFC-3464-Parser.
-- eingehende Anhangstypen werden geschützt gespeichert, aber noch nicht zusätzlich malware-gescannt.
-- KI-gestützte Antwortklassifikation ist noch nicht aktiviert.
+- die lokale Schärfemetrik ist eine technische Laplace-Heuristik und keine motivbezogene Bildbewertung.
+- konkrete Vision/OCR-Qualität hängt vom später konfigurierten Provider ab.
+- produktive Tatbestandsdaten müssen weiterhin fachlich/rechtlich gepflegt werden.
+- automatische Verkehrszeichenlogik für Zeiträume/Ausnahmen wird in einer späteren Fachlogik-Ausbaustufe vertieft.
+- es gibt bewusst keine automatische Übernahme eines KI-Ergebnisses.
 
 ## Nächster Schritt
-M6 per CI integrieren; anschließend M7 – intelligente Assistenz: OCR, Fotoqualität, Schild-/Zusatzzeichenerkennung und assistive Tatbestandsvorschläge.
+M7 per CI integrieren; danach M8 – Karten, persönliche Problemstellen, Analytics und strukturierte kommunale Problemberichte.

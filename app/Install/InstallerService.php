@@ -95,6 +95,9 @@ final class InstallerService
             'IMAP_USERNAME' => '',
             'IMAP_PASSWORD' => '',
             'IMAP_FOLDER' => 'INBOX',
+            'ASSIST_PROVIDER' => 'disabled',
+            'ASSIST_ENDPOINT' => '',
+            'ASSIST_API_KEY' => '',
         ]);
 
         $directory = dirname($this->lockPath());

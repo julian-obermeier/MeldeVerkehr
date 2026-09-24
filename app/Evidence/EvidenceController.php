@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MeldeVerkehr\Evidence;
 
+use MeldeVerkehr\Assist\ImageQualityAnalyzer;
 use MeldeVerkehr\Audit\AuditLogger;
 use MeldeVerkehr\Auth\AuthorizationService;
 use MeldeVerkehr\Auth\AuthManager;
@@ -168,7 +169,8 @@ final class EvidenceController
                 $this->app->database(),
                 (string) $this->app->config()->get('app.key', '')
             ),
-            new EvidenceImageProcessor($storage)
+            new EvidenceImageProcessor($storage),
+            new ImageQualityAnalyzer()
         );
     }
 

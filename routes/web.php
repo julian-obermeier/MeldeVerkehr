@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use MeldeVerkehr\Admin\AdminController;
+use MeldeVerkehr\Assist\AssistController;
 use MeldeVerkehr\Auth\AuthController;
 use MeldeVerkehr\Auth\DashboardController;
 use MeldeVerkehr\Auth\PasskeyLoginController;
@@ -48,6 +49,7 @@ if ($installerService->isInstalled()) {
     $finalReview = new FinalReviewController($app);
     $dispatch = new DispatchController($app);
     $communication = new CommunicationController($app);
+    $assist = new AssistController($app);
 
     $app->router()->get('/register', [$auth, 'registerForm']);
     $app->router()->post('/register', [$auth, 'register']);
@@ -116,6 +118,14 @@ if ($installerService->isInstalled()) {
     $app->router()->post('/authority-messages/{id}/reply-draft', [$communication, 'createDraft']);
     $app->router()->post('/authority-reply-drafts/{id}/save', [$communication, 'saveDraft']);
     $app->router()->post('/authority-reply-drafts/{id}/queue', [$communication, 'queueDraft']);
+
+    $app->router()->get('/cases/{id}/assist', [$assist, 'index']);
+    $app->router()->post('/assist/evidence/{id}/quality', [$assist, 'quality']);
+    $app->router()->post('/assist/evidence/{id}/analyze', [$assist, 'analyze']);
+    $app->router()->post('/assist/suggestions/{id}/confirm', [$assist, 'confirm']);
+    $app->router()->post('/assist/suggestions/{id}/reject', [$assist, 'reject']);
+    $app->router()->post('/assist/suggestions/{id}/apply-plate', [$assist, 'applyPlate']);
+    $app->router()->post('/assist/suggestions/{id}/apply-offense', [$assist, 'applyOffense']);
 
     $app->router()->get('/settings/security', [$security, 'index']);
     $app->router()->post('/settings/security/totp/start', [$security, 'startTotp']);

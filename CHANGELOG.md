@@ -5,6 +5,15 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 ## [Unreleased]
 
 ### Added
+- M7-Datenmodell für lokale Fotoqualitätsmetriken, Assistenzläufe und verschlüsselte Vorschläge
+- lokale GD-basierte Analyse von Auflösung, Helligkeit, Kontrast und Schärfe
+- provider-neutrale Vision/OCR-Schnittstelle mit Disabled-Default
+- optionaler HTTPS-JSON-Vision-Provider
+- Kennzeichen-OCR-, Verkehrszeichen-, Zusatzzeichen- und Tatbestandsvorschläge
+- explizite Confirm/Reject/Apply-Workflows für Assistenzvorschläge
+- Input-/Output-Hash-Audit für externe Assistenzläufe
+- Assistenzcenter im Bürgerportal
+- Integrationstests mit Fake-Vision-Provider ohne externe API
 - M6-Kommunikationsdatenmodell für Reply-Adressen, Behördennachrichten, Anhänge, Aufgaben, Fristen, Quarantäne und Antwortentwürfe
 - zufällige Reply-Adresse je Dispatch
 - Message-ID-/Reply-To-/In-Reply-To-Threading
@@ -125,6 +134,9 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 - CSRF-Schutz für Installations- und Authentifizierungsformulare
 
 ### Changed
+- Installer und Beispielkonfiguration setzen ASSIST_PROVIDER standardmäßig auf disabled
+- Übernahme von Kennzeichen- oder Tatbestandsvorschlägen erzwingt erneut den Grunddaten-Review
+- Evidence-Qualitätsstatus kann durch versionierte lokale Qualitätsanalyse aktualisiert werden
 - SMTP-Dispatch nutzt die vorgangsbezogene Reply-Adresse als Envelope-Sender für Bounce-Routing
 - Queue verarbeitet neben DISPATCH_SEND jetzt auch AUTHORITY_REPLY_SEND
 - Cron bietet zusätzlich inbound-mail für kontrolliertes IMAP-Polling
@@ -158,6 +170,13 @@ Alle relevanten Änderungen an MeldeVerkehr werden hier dokumentiert.
 - native Mailheader werden gegen Zeilenumbrüche abgesichert und UTF-8-Betreffzeilen kodiert
 
 ### Security
+- externe Vision/OCR-Analyse ist standardmäßig deaktiviert
+- Provider-Endpunkte müssen HTTPS verwenden und dürfen nicht auf private/reservierte IPs zeigen
+- validierte Provider-DNS-Auflösung wird für den HTTP-Request gepinnt
+- Analysequelle wird vor Provider-Aufruf per SHA-256 verifiziert
+- Providerantworten werden als untrusted input normalisiert und typ-/zweckbezogen whitelisted
+- Assistenzvorschläge werden verschlüsselt gespeichert
+- bestätigte Vorschläge verändern noch keine Vorgangsdaten; dafür ist eine separate Apply-Aktion nötig
 - eingehende Behördeninhalte und Quarantäne-Mails werden verschlüsselt gespeichert
 - Behördenanhänge liegen außerhalb des Webroots und werden bei Abruf per SHA-256 geprüft
 - unbekannte eingehende Mails werden nicht still verworfen
