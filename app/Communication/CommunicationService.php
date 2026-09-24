@@ -243,6 +243,52 @@ final class CommunicationService
         ];
     }
 
+    public function attachment(string $userId, string $attachmentId): array
+    {
+        $row = $this->fetchOne(
+            'SELECT a.original_filename, a.storage_path, a.mime_type, a.file_size, a.sha256,
+                    m.case_id, c.user_id
+             FROM authority_message_attachments a
+             INNER JOIN authority_messages m ON m.id = a.message_id
+             INNER JOIN cases c ON c.id = m.case_id
+             WHERE a.id = :id LIMIT 1',
+            ['id' => $attachmentId]
+        );
+
+        if ($row === null) {
+            throw new \DomainException('Anhang nicht gefunden.');
+        }
+
+        $this->authorization->authorize(
+            $userId,
+            'case.view_own',
+            (string) $row['user_id']
+        );
+
+        $absolute = $this->storage->absolute((string) $row['storage_path']);
+        if (!is_file($absolute) || !is_readable($absolute)) {
+            throw new \RuntimeException('Anhang fehlt im geschützten Storage.');
+        }
+
+        $hash = hash_file('sha256', $absolute);
+        if (!hash_equals((string) $row['sha256'], $hash)) {
+            throw new \RuntimeException('Integrität des Behördenanhangs ist verletzt.');
+        }
+
+        $body = file_get_contents($absolute);
+        if ($body === false) {
+            throw new \RuntimeException('Anhang konnte nicht gelesen werden.');
+        }
+
+        return [
+            'body' => $body,
+            'mime_type' => (string) $row['mime_type'],
+            'filename' => (string) $row['original_filename'],
+            'sha256' => $hash,
+            'size' => (int) $row['file_size'],
+        ];
+    }
+
     public function completeTask(string $userId, string $taskId): string
     {
         $row = $this->fetchOne(
