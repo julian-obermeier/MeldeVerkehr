@@ -1,59 +1,85 @@
 # Projektstatus
 
 ## Aktuelle Version
-0.8.0-dev
+0.9.0-dev
 
 ## Phase
-M8 – Private Karten, Problemstellen, Analytics und kommunale Problemberichte
+M9 – Community, kontrollierte Fallfreigaben, Reputation und Moderation
 
-## M1–M7
-Fundament, Vorgangskern, Beweissystem, Zeugenbericht/finaler Review, Behördenrouting/Dispatch, Behördenkommunikation und intelligente Assistenz sind abgeschlossen und auf `develop` integriert.
+## M1–M8
+Fundament, Vorgangskern, Beweissystem, Zeugenbericht/finaler Review, Behördenrouting/Dispatch, Behördenkommunikation, intelligente Assistenz sowie private Karten/Analytics/Problemstellen sind abgeschlossen und auf `develop` integriert.
 
-## M8 – umgesetzt
-- private Vorgangskarte mit ausschließlich eigenen Vorgängen
-- Karte selektiert keine Fahrzeug- oder Kennzeichendaten
-- schematische SVG-Karte ohne externe Kartentiles oder Drittanbieter-Requests
-- Statusfilter-Grundlage für private Kartendaten
-- private Hotspot-Erkennung aus ausschließlich eigenen geolokalisierten Vorgängen
-- private Problemstellen mit Eigentümerbindung, Mittelpunkt und Radius
-- automatische Fallzuordnung über Haversine-Distanz
-- serverseitige Ownership-Prüfung für Problemstellen
-- Problemstellen-Detail mit ausschließlich eigenen zugeordneten Fällen
-- Aggregation nach Status, Tatbestandskategorie und Tageszeit
-- versionierte Problemstellen-Snapshots für frei wählbare Zeiträume
-- SHA-256-Integrität je Snapshot
-- Analytics-Center mit eigenen Vorgängen
-- Auswertungen nach Status, Ort, Tatbestandskategorie und Monat
-- frei begrenzbare Analysezeiträume auf Serviceebene
-- anonymisierte kommunale Problemberichte
-- kommunale Reports enthalten standardmäßig keine Kennzeichen
-- kommunale Reports enthalten keine Halter-/Eigentümerdaten
-- kommunale Reports enthalten keine internen Vorgangs-IDs
-- kommunale Reports enthalten standardmäßig keine Fotos
-- Reportkoordinaten werden gegenüber den internen Fallkoordinaten reduziert dargestellt
-- versionierte kommunale Reports mit SHA-256-Integrität
-- Dashboard-Navigation für Karte, Problemstellen und Analytics
-- Integrationstests für Ownership, private Kartenabgrenzung, Hotspots, Aggregationen und anonymisierte Reports
+## M9 – umgesetzt
+- technisch getrennte Community-Profile
+- Community-Profil veröffentlicht niemals Konto-E-Mail oder private Vorgangsdaten
+- feldbezogene Sichtbarkeit für Bio und Region
+- opt-in Leaderboard
+- regionale und thematische Gruppen
+- Gruppenmitgliedschaften und Owner-/Member-Rollen
+- Community-Feed, Beiträge, Kommentare und hilfreiche Reaktionen
+- öffentliche Problemstellen als getrennte Community-Entitäten
+- öffentliche Problemstellen starten immer im Moderationsstatus `PENDING`
+- öffentliche Problemstellen verwenden vergröberte Koordinaten
+- anonymisierte Beobachtungen zu freigegebenen öffentlichen Problemstellen
+- kontrollierte Fallfreigabe als separate Community-Kopie
+- private Akte wird durch Community-Freigabe nicht verändert
+- Fallfreigabe enthält keine interne Case-ID
+- Fallfreigabe enthält keine öffentliche OWI-Vorgangsnummer
+- Fallfreigabe enthält kein Kennzeichen
+- Fallfreigabe enthält keine Halter-/Eigentümerdaten
+- Standortfreigabe ist explizit auswählbar: kein Standort / Ort-Region / Straße ohne Hausnummer
+- Beobachtungsdatum und Tatbestand sind separat opt-in
+- Bilder können nur aus bestätigten Privacy-`PUBLIC`-Versionen übernommen werden
+- öffentliche Bildkopien werden vor Veröffentlichung und Auslieferung per SHA-256 geprüft
+- veröffentlichte Fallkopien besitzen einen separaten öffentlichen Token
+- Community-Posts können eine veröffentlichte eigene Fallkopie referenzieren
+- verschlüsselte Direktnachrichten
+- erste Direktnachricht an unbekannte Nutzer wird als Anfrage behandelt
+- Nachrichtenanfragen können explizit angenommen werden
+- gegenseitig wirksames Blockierungssystem
+- transparente Reputationsevents
+- Helpful-Reaktionen vergeben qualitätsgewichtete Community-Punkte
+- idempotente Unique-Keys verhindern Mehrfachpunkte für dieselbe Interaktion
+- Reputation ist in getrennte Kategorien aufgeteilt
+- Badge-Stammdaten und Levelmodell
+- Leaderboards zeigen nur Nutzer mit ausdrücklichem Opt-in
+- Moderationsmeldungen für Beiträge, Kommentare, Problemstellen, Profile und Nachrichten
+- Community-/Regionalmoderatorrollen nutzen vorhandene Moderationspermissions
+- Regionalmoderatoren sind auf den eigenen Profil-Regionsscope beschränkt
+- öffentliche Problemstellen brauchen explizite Moderationsfreigabe
+- Moderationsaktionen werden separat protokolliert
+- HIDE entfernt Inhalte aus öffentlichen Abfragen, ohne die Originaldatensätze still zu löschen
+- Community-Dashboard/Feed, Profil, Gruppen, Problemstellen, Nachrichten, Leaderboard und Moderationsoberfläche
+- Community-Link im Bürgerdashboard
+- Community-Freigabeverwaltung aus dem privaten Vorgang
+- umfassende Integrationstests für Profile, Sichtbarkeit, Gruppen, Beiträge, DMs, Blockierungen, Reputation, Fallfreigaben und Regionalmoderation
 
-## M8-Status
-Der private Karten-/Analytics-Kern ist abgeschlossen. Alle Karten-, Hotspot- und Problemstellenfunktionen arbeiten ausschließlich mit dem Datenbestand des angemeldeten Nutzers. Es existiert weiterhin keine öffentliche Kennzeichen-, Fahrzeug- oder Fallkarte.
-
-## Datenschutzprinzipien
-- private Kartendaten verlassen beim Rendern der aktuellen Kartenansicht nicht automatisch den Server/Browser-Kontext zu einem externen Kartendienst.
-- die Karten-/Analytics-Abfragen lesen keine Kennzeichen aus der Fahrzeugtabelle.
-- Problemstellen sind private Benutzerressourcen.
-- Hotspots werden nur aus eigenen Fällen erzeugt.
-- kommunale Problemberichte sind eigenständige anonymisierte Aggregationsartefakte.
-- interne Case-IDs, Kennzeichen, Halterdaten und Fotos werden nicht in den kommunalen Report-Snapshot aufgenommen.
-- Report- und Snapshot-Inhalte sind versioniert und gehasht.
-- ein späteres öffentliches Problemstellenmodul muss technisch getrennt bleiben und darf nur ausdrücklich freigegebene, anonymisierte Kopien verwenden.
+## Datenschutz- und Sicherheitsprinzipien
+- private Fallakte und Community-Datenmodell sind getrennt.
+- Community-Profil enthält keine Konto-E-Mail, Anschrift oder privaten Vorgangsdaten.
+- öffentliche Fallkopien sind eigenständige Snapshots und keine Live-Ansicht der privaten Akte.
+- ausschließlich Privacy-bestätigte `PUBLIC`-Evidence-Versionen dürfen in Community-Freigaben erscheinen.
+- ORIGINAL- und WORKING-Evidence werden nie über Community-URLs ausgeliefert.
+- jede freigegebene Bildkopie wird gegen den im Release gespeicherten Hash geprüft.
+- öffentliche Freigaben enthalten weder Kennzeichen noch interne oder öffentliche Vorgangsnummern.
+- öffentliche Standortdaten werden nur gemäß expliziter Nutzerwahl übernommen; Hausnummern werden nicht veröffentlicht.
+- Direktnachrichten werden verschlüsselt gespeichert und per SHA-256 auf Integrität geprüft.
+- Blockierungen wirken für Direktnachrichten und Feed-Sichtbarkeit in beide Richtungen.
+- öffentliche Problemstellen werden vor Veröffentlichung moderiert und verwenden vergröberte Koordinaten.
+- Reputation basiert auf transparenten Ereignissen statt bloßer Beitragsmenge.
+- Leaderboards sind opt-in.
+- Regionalmoderatoren sehen nur Inhalte, deren Erstellerprofil in ihren Region-Scope fällt.
 
 ## Bekannte Einschränkungen
-- die aktuelle Karte ist bewusst eine schematische SVG-Darstellung ohne Straßen-/Basiskarte.
-- Clusterbildung verwendet derzeit eine einfache geografische Rasterung; komplexere räumliche Clusterverfahren können später ergänzt werden.
-- kommunale Reports enthalten noch keinen PDF-/Dokumentexport und noch keinen eigenen Behördenversandworkflow.
-- automatisch erkannte Hotspots werden aktuell als Vorschläge angezeigt; das Anlegen erfolgt bewusst durch den Nutzer.
-- Behördenreaktionsmetriken können in einer späteren Analytics-Ausbaustufe detaillierter aufbereitet werden.
+- Avatar-Dateiupload ist im M9-Kern noch nicht umgesetzt; Profile enthalten derzeit textuelle Community-Daten.
+- Gruppen-Chats sind noch nicht enthalten; Direktnachrichten sind umgesetzt.
+- Follow-/Follower-Beziehungen und Favoriten sind noch offen.
+- Community-Suche und paginierte Feeds werden in einer späteren Ausbauphase ergänzt.
+- automatische Privacy-Erkennung für Freitext ist derzeit bewusst konservativ und ersetzt keine Nutzerprüfung.
+- öffentliche Problemstellen nutzen noch keine interaktive Basiskarte.
+- Moderator-Scope basiert aktuell auf Community-Profilregionen; eine separate verifizierte Regionszuweisung kann später ergänzt werden.
+- Appeals/Widerspruch gegen Moderationsaktionen ist noch nicht als eigener Workflow umgesetzt.
+- Reputation kann später um stärkere Diminishing-Returns-/Anomalieerkennung erweitert werden.
 
 ## Nächster Schritt
-M8 per CI integrieren; anschließend M9 – Community-Grundlage mit separaten öffentlichen Profilen, Beiträgen, regionalen Gruppen, moderierten öffentlichen Problemstellen und kontrollierter anonymisierter Freigabe privater Vorgänge.
+M9 per CI integrieren; anschließend M10 – Dokumentcenter, globale eigene Vorgangssuche, gespeicherte Filter, Benachrichtigungscenter, Exporte und Betriebs-/Qualitätsausbau.
