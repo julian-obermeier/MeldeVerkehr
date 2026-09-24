@@ -17,6 +17,8 @@ use MeldeVerkehr\Config\Config;
 use MeldeVerkehr\Database\Connection;
 use MeldeVerkehr\Database\MigrationRunner;
 use MeldeVerkehr\Evidence\EvidenceImageProcessor;
+use MeldeVerkehr\Evidence\EvidencePrivacyService;
+use MeldeVerkehr\Evidence\EvidenceReviewService;
 use MeldeVerkehr\Evidence\EvidenceService;
 use MeldeVerkehr\Evidence\EvidenceStorage;
 use MeldeVerkehr\Queue\JobQueue;
@@ -311,6 +313,163 @@ try {
         'Evidence working copy is separately stored and hashed'
     );
 
+    $removedEvidence = $evidenceService->storeFile(
+        (string) $user['id'],
+        $caseId,
+        $evidenceSource,
+        'remove-test.png',
+        'CONTEXT'
+    );
+    $evidenceService->markRemoved((string) $user['id'], (string) $removedEvidence['id']);
+    $removedList = $evidenceService->listForCase((string) $user['id'], $caseId);
+    $removedRow = array_values(array_filter(
+        $removedList,
+        static fn(array $row): bool => ($row['id'] ?? null) === $removedEvidence['id']
+    ))[0] ?? null;
+    $assert(
+        is_array($removedRow) && ($removedRow['status'] ?? null) === 'REMOVED',
+        'Evidence removal is logical and retains original record'
+    );
+
+    $privacyService = new EvidencePrivacyService(
+        $pdo,
+        new AuthorizationService($permissions),
+        $evidenceStorage,
+        new EvidenceImageProcessor($evidenceStorage),
+        new AuditLogger($pdo, 'test-audit-key')
+    );
+    $reviewService = new EvidenceReviewService(
+        $pdo,
+        new AuthorizationService($permissions),
+        $evidenceStorage,
+        new AuditLogger($pdo, 'test-audit-key'),
+        $caseService
+    );
+
+    $beforePrivacy = $reviewService->summary((string) $user['id'], $caseId);
+    $assert(
+        $beforePrivacy['ready'] === false
+        && count(array_filter(
+            $beforePrivacy['missing'],
+            static fn(string $message): bool => str_contains($message, 'Privacy-Prüfung')
+        )) >= 1,
+        'Unreviewed privacy blocks evidence package'
+    );
+
+    $regionId = $privacyService->addRegion(
+        (string) $user['id'],
+        (string) $storedEvidence['id'],
+        'FACE',
+        0.10,
+        0.10,
+        0.20,
+        0.20
+    );
+    $privacyDetail = $privacyService->detail((string) $user['id'], (string) $storedEvidence['id']);
+    $assert(
+        count($privacyDetail['regions']) === 1 && $privacyDetail['review'] === null,
+        'Privacy region invalidates previous review snapshot'
+    );
+
+    $privacyResult = $privacyService->confirmReview(
+        (string) $user['id'],
+        (string) $storedEvidence['id']
+    );
+    $assert(
+        (int) $privacyResult['public_version_no'] === 1
+        && (int) $privacyResult['region_count'] === 1,
+        'Privacy review creates first PUBLIC version'
+    );
+
+    $publicPreview = $privacyService->preview(
+        (string) $user['id'],
+        (string) $storedEvidence['id'],
+        'PUBLIC'
+    );
+    $assert(
+        hash_equals((string) $publicPreview['sha256'], hash('sha256', (string) $publicPreview['body'])),
+        'PUBLIC preview hash matches stored redacted copy'
+    );
+
+    $processingStmt = $pdo->prepare(
+        'SELECT processing_json FROM evidence_versions
+         WHERE evidence_id = :id AND variant = "PUBLIC" AND version_no = 1'
+    );
+    $processingStmt->execute(['id' => $storedEvidence['id']]);
+    $processing = json_decode((string) $processingStmt->fetchColumn(), true);
+    $assert(
+        is_array($processing)
+        && ($processing['source_variant'] ?? null) === 'WORKING'
+        && !empty($processing['source_sha256'])
+        && !empty($processing['regions_sha256']),
+        'PUBLIC version records source and privacy provenance'
+    );
+
+    $afterPrivacy = $reviewService->summary((string) $user['id'], $caseId);
+    $assert($afterPrivacy['ready'] === true, 'Confirmed privacy clears blocking evidence checks');
+    $assert($afterPrivacy['warnings'] !== [], 'Evidence review exposes non-blocking quality/category warnings');
+
+    $warningsBlocked = false;
+    try {
+        $reviewService->confirm((string) $user['id'], $caseId, false);
+    } catch (DomainException $e) {
+        $warningsBlocked = true;
+    }
+    $assert($warningsBlocked, 'Evidence warnings require explicit acknowledgement');
+
+    $package = $reviewService->confirm((string) $user['id'], $caseId, true);
+    $assert(
+        (int) $package['package_version'] === 1 && (int) $package['item_count'] === 1,
+        'Evidence review freezes versioned package with active evidence only'
+    );
+
+    $afterEvidenceReview = $caseService->findOwned((string) $user['id'], $caseId);
+    $assert(
+        ($afterEvidenceReview['case']['status'] ?? null) === CaseStatus::READY_FOR_REVIEW
+        && (int) ($afterEvidenceReview['evidence_package']['version_no'] ?? 0) === 1,
+        'Frozen evidence package advances case to READY_FOR_REVIEW'
+    );
+
+    $packageStmt = $pdo->prepare(
+        'SELECT manifest_json, manifest_sha256 FROM evidence_packages
+         WHERE id = :id LIMIT 1'
+    );
+    $packageStmt->execute(['id' => $package['package_id']]);
+    $packageRow = $packageStmt->fetch();
+    $assert(
+        is_array($packageRow)
+        && hash_equals(
+            (string) $packageRow['manifest_sha256'],
+            hash('sha256', (string) $packageRow['manifest_json'])
+        ),
+        'Frozen evidence package manifest hash verifies'
+    );
+
+    $packageItemStmt = $pdo->prepare(
+        'SELECT variant, version_no, sha256_snapshot FROM evidence_package_items
+         WHERE package_id = :package_id AND evidence_id = :evidence_id'
+    );
+    $packageItemStmt->execute([
+        'package_id' => $package['package_id'],
+        'evidence_id' => $storedEvidence['id'],
+    ]);
+    $packageItem = $packageItemStmt->fetch();
+    $assert(
+        is_array($packageItem)
+        && $packageItem['variant'] === 'PUBLIC'
+        && (int) $packageItem['version_no'] === 1
+        && hash_equals((string) $packageItem['sha256_snapshot'], (string) $publicPreview['sha256']),
+        'Package item freezes exact PUBLIC version and hash'
+    );
+
+    $frozenEditBlocked = false;
+    try {
+        $evidenceService->markRemoved((string) $user['id'], (string) $storedEvidence['id']);
+    } catch (DomainException $e) {
+        $frozenEditBlocked = true;
+    }
+    $assert($frozenEditBlocked, 'Evidence edits are blocked after package freeze');
+
     @unlink($evidenceSource);
 
     $other = $auth->register([
@@ -335,9 +494,13 @@ try {
     }
     $assert($foreignEvidenceBlocked, 'Foreign user cannot read another user evidence');
 
-    $evidenceService->markRemoved((string) $user['id'], (string) $storedEvidence['id']);
-    $removedList = $evidenceService->listForCase((string) $user['id'], $caseId);
-    $assert(($removedList[0]['status'] ?? null) === 'REMOVED', 'Evidence removal is logical and retains original record');
+    $foreignPrivacyBlocked = false;
+    try {
+        $privacyService->detail((string) $other['id'], (string) $storedEvidence['id']);
+    } catch (Throwable $e) {
+        $foreignPrivacyBlocked = true;
+    }
+    $assert($foreignPrivacyBlocked, 'Foreign user cannot inspect another user privacy data');
 
     $warningCase = $caseService->createDraft((string) $user['id']);
     $warningCaseId = (string) $warningCase['case']['id'];
