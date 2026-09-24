@@ -63,13 +63,18 @@ final class FinalReviewService
         }
 
         $report = null;
+        $reportIntegrityError = null;
         try {
             $report = $this->witness->currentConfirmedReport($userId, $caseId);
         } catch (\DomainException) {
             $report = null;
+        } catch (\RuntimeException $e) {
+            $reportIntegrityError = $e->getMessage();
         }
 
-        if ($report === null) {
+        if ($reportIntegrityError !== null) {
+            $red[] = 'Integrität des aktuellen Zeugenberichts konnte nicht bestätigt werden.';
+        } elseif ($report === null) {
             $red[] = 'Kein aktueller bestätigter Zeugenbericht mit elektronischer Erklärung vorhanden.';
         } else {
             $green[] = sprintf(
