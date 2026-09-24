@@ -1,7 +1,7 @@
 <?php
 $e=static fn(mixed $v):string=>htmlspecialchars((string)$v,ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8');
 $data=$summary['data']; $c=$data['case']; $v=$data['vehicle']; $l=$data['location']; $o=$data['offenses'][0]??null;
-$canConfirm=$summary['ready'] && $c['status']===MeldeVerkehrCasesCaseStatus::READY_FOR_REVIEW;
+$canConfirm=$summary['ready'] && $c['status']===\MeldeVerkehr\Cases\CaseStatus::READY_FOR_REVIEW;
 $duration=$c['observation_duration_seconds']??null;
 ?>
 <!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#172033"><link rel="manifest" href="/manifest.webmanifest"><title>Grunddaten prüfen – <?= $e($c['public_number']) ?></title>
@@ -26,7 +26,7 @@ body{font-family:system-ui,sans-serif;background:#f5f7fa;color:#172033;margin:0}
 
 <section class="card"><h2>Übergang zur Beweiserfassung</h2>
 <?php if($canConfirm):?><form method="post" action="/cases/<?= rawurlencode($c['id']) ?>/review"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><?php if($summary['warnings']):?><div class="checks"><label><input type="checkbox" name="acknowledge_warnings" value="1" required><span>Ich habe die Hinweise geprüft und möchte mit diesen Grunddaten zur Beweiserfassung weitergehen.</span></label></div><?php else:?><input type="hidden" name="acknowledge_warnings" value="0"><?php endif;?><button type="submit">Grunddaten bestätigen und weiter</button></form>
-<?php elseif($c['status']===MeldeVerkehrCasesCaseStatus::WAITING_FOR_EVIDENCE):?><div class="ok">Die Grunddaten wurden bereits bestätigt. Der Vorgang ist bereit für M3.</div>
+<?php elseif($c['status']===\MeldeVerkehr\Cases\CaseStatus::WAITING_FOR_EVIDENCE):?><div class="ok">Die Grunddaten wurden bereits bestätigt. Der Vorgang ist bereit für M3.</div>
 <?php else:?><p>Der Vorgang kann erst bestätigt werden, wenn alle Pflichtangaben vollständig sind und der Status „Grunddaten prüfen“ erreicht ist.</p><?php endif;?>
 </section>
 </main><script src="/assets/app.js" defer></script></body></html>
