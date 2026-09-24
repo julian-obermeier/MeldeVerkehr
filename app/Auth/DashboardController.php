@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MeldeVerkehr\Auth;
 
 use MeldeVerkehr\Audit\AuditLogger;
+use MeldeVerkehr\AuthorityPortal\AuthorityPortalServiceFactory;
 use MeldeVerkehr\Auth\WebAuthn\WebAuthnService;
 use MeldeVerkehr\Cases\CaseService;
 use MeldeVerkehr\Core\Application;
