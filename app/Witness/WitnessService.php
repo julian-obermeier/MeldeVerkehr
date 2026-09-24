@@ -17,7 +17,7 @@ final class WitnessService
 {
     public const DECLARATION_KEY = 'OWN_OBSERVATION_CONFIRMATION';
     public const DECLARATION_VERSION = 1;
-    public const DECLARATION_TEXT = 'Ich bestätige, dass die in diesem Zeugenbericht als eigene Beobachtung gekennzeichneten Angaben nach bestem Wissen auf meiner eigenen Wahrnehmung beruhen und die von mir bestätigten Vorgangsdaten korrekt wiedergegeben sind. Diese Bestätigung ist keine eidesstattliche Versicherung.';
+    public const DECLARATION_TEXT = 'Ich bestätige, dass die in diesem Zeugenbericht als eigene Beobachtung gekennzeichneten Angaben nach bestem Wissen auf meiner eigenen Wahrnehmung beruhen und die von mir bestätigten Vorgangsdaten korrekt wiedergegeben sind.';
 
     public function __construct(
         private readonly PDO $pdo,
@@ -31,13 +31,21 @@ final class WitnessService
 
     public function detail(string $userId, string $caseId): array
     {
-        $caseData = $this->m4Case($userId, $caseId, true);
+        $caseData = $this->m4Case($userId, $caseId);
         $observation = $this->latestObservation($caseId);
         $narrative = $this->latestNarrative($caseId);
         $report = $this->latestReport($caseId);
 
         if ($report !== null) {
-            $report['snapshot'] = $this->decryptSnapshot((string) $report['snapshot_json']);
+            $snapshotJson = $this->cipher->decrypt((string) $report['snapshot_json']);
+            if (!hash_equals((string) $report['snapshot_sha256'], hash('sha256', $snapshotJson))) {
+                throw new \RuntimeException('Integrität des Zeugenbericht-Snapshots ist verletzt.');
+            }
+            $decodedSnapshot = json_decode($snapshotJson, true, 512, JSON_THROW_ON_ERROR);
+            if (!is_array($decodedSnapshot)) {
+                throw new \RuntimeException('Zeugenbericht-Snapshot ist ungültig.');
+            }
+            $report['snapshot'] = $decodedSnapshot;
             unset($report['snapshot_json']);
             $report['current'] = $this->reportMatchesCurrentContext(
                 $caseId,
@@ -66,7 +74,7 @@ final class WitnessService
 
     public function saveObservation(string $userId, string $caseId, array $input): array
     {
-        $this->m4Case($userId, $caseId);
+        $this->m4Case($userId, $caseId, true);
 
         $observationText = trim((string) ($input['observation_text'] ?? ''));
         $impactText = trim((string) ($input['impact_text'] ?? ''));
@@ -164,7 +172,7 @@ final class WitnessService
 
     public function createReport(string $userId, string $caseId): array
     {
-        $caseData = $this->m4Case($userId, $caseId);
+        $caseData = $this->m4Case($userId, $caseId, true);
         $observation = $this->latestObservation($caseId);
         $narrative = $this->latestNarrative($caseId);
         $package = $caseData['evidence_package'] ?? null;
@@ -243,7 +251,7 @@ final class WitnessService
             throw new \DomainException('Der Vorgang ist nicht im finalen Review.');
         }
 
-        $caseData = $this->m4Case($userId, (string) $report['case_id']);
+        $caseData = $this->m4Case($userId, (string) $report['case_id'], true);
         $observation = $this->latestObservation((string) $report['case_id']);
         $narrative = $this->latestNarrative((string) $report['case_id']);
 
