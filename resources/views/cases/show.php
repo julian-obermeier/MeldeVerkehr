@@ -16,7 +16,7 @@ $observationDone=!empty($c['observed_from']);
 $primaryOffense=$data['offenses'][0]??null;
 $offenseDone=$primaryOffense!==null && ($primaryOffense['stable_key']??'')!=='UNCLASSIFIED_PARKING';
 $coreComplete=$vehicleDone&&$locationDone&&$observationDone&&$offenseDone;
-$reviewDone=$c['status']===MeldeVerkehrCasesCaseStatus::WAITING_FOR_EVIDENCE;
+$reviewDone=$c['status']===\MeldeVerkehr\Cases\CaseStatus::WAITING_FOR_EVIDENCE;
 $duration=$c['observation_duration_seconds']??null;
 $submissionReady=$c['status']===\MeldeVerkehr\Cases\CaseStatus::READY_FOR_SUBMISSION;
 $dispatchRelevant=in_array($c['status'],[
