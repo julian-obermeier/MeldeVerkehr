@@ -139,6 +139,8 @@ textarea{min-height:80px}button,.button{display:inline-block;margin-top:12px;pad
         \MeldeVerkehr\Cases\CaseStatus::AUTHORITY_PROCESSING,
     ],true)):?><section class="card"><h2>Intelligente Assistenz</h2><p>Technische Fotoqualität, OCR- und Schild-/Tatbestandsvorschläge prüfen. Vorschläge ändern keine rechtlich relevanten Daten automatisch.</p><a class="button" href="/cases/<?= rawurlencode($c['id']) ?>/assist">Assistenzcenter öffnen</a></section><?php endif;?>
 
+<?php if($evidencePackage):?><section class="card"><h2>Community-Freigabe</h2><p>Erzeuge bei Bedarf eine separate anonymisierte öffentliche Kopie. Die private Akte wird dabei nicht verändert.</p><a class="button" href="/cases/<?= rawurlencode($c['id']) ?>/community-release">Freigaben verwalten</a></section><?php endif;?>
+
 <section class="card"><h2>Statushistorie</h2><div class="timeline"><?php foreach(array_reverse($data['history']) as $item):?><div class="event"><strong><?= $e($statusLabels[$item['new_status']]??$item['new_status']) ?></strong><br><small class="muted"><?= $e($item['created_at']) ?><?php if($item['reason']):?> · <?= $e($item['reason']) ?><?php endif;?></small></div><?php endforeach;?></div></section>
 </main><script src="/assets/app.js" defer></script><script>
 (() => {
